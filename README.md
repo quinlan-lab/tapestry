@@ -19,6 +19,7 @@ We assume the following tools are in the user's PATH:
 
 ## TODO
 
+- [ ] Create the CL tool called "phase-meth-to-founder-haps.sh" from functions defined in `assign-founder-haplotypes-to-methylation-levels.ipynb` 
 - [ ] Use excalidraw to create a diagram showing how we get from bams to founder-phased methylation levels
 - [ ] Convert manual workflow into a Snakemake workflow
 - [ ] Write usage documentation
