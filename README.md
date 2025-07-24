@@ -20,6 +20,7 @@ We assume the following tools are in the user's PATH:
 ## TODO
 
 - [ ] Create the CL tool called "phase-meth-to-founder-haps.sh" from functions defined in `assign-founder-haplotypes-to-methylation-levels.ipynb` 
+- [ ] Create a python module (called "tapestry") for analyzing founder-phased DNA methylation data across generations in a pedigree, e.g., to answer the question "given a haplotype in a child, has its methylation changed relative to the same haplotype in the parent" 
 - [ ] Use excalidraw to create a diagram showing how we get from bams to founder-phased methylation levels
 - [ ] Convert manual workflow into a Snakemake workflow
 - [ ] Write usage documentation
