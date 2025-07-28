@@ -4,11 +4,20 @@
 
 ## Dependencies 
 
-We assume the following tools are in the user's PATH: 
+We assume the following command-line tools are in the user's PATH: 
 * `bedGraphToBigWig`, `bgzip`, `tabix`
 * `gtg-ped-map`, `gtg-concordance` (https://github.com/Platinum-Pedigree-Consortium/Platinum-Pedigree-Inheritance)
 * `hiphase` (https://github.com/PacificBiosciences/HiPhase)
 * `aligned_bam_to_cpg_scores` (https://github.com/PacificBiosciences/pb-CpG-tools)
+
+Install the python dependencies using the following command:
+
+```
+curl -LsSf https://astral.sh/uv/install.sh | sh
+uv venv --python /path/to/your/python3.11
+source .venv/bin/activate
+uv pip install -r requirements.txt
+```
 
 ## Workflow 
 
