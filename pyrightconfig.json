@@ -2,5 +2,12 @@
     "pythonVersion": "3.11",
     "venvPath": ".",
     "venv": ".venv",
-    "typeCheckingMode": "basic"
+    "typeCheckingMode": "basic",
+    "executionEnvironments": [
+        {
+          "root": ".",
+          "extraPaths": ["util"]
+        }
+      ]
+    
 } 
