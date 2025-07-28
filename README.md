@@ -5,18 +5,27 @@
 ## Dependencies 
 
 We assume the following command-line tools are in the user's PATH: 
+
 * `bedGraphToBigWig`, `bgzip`, `tabix`
 * `gtg-ped-map`, `gtg-concordance` (https://github.com/Platinum-Pedigree-Consortium/Platinum-Pedigree-Inheritance)
 * `hiphase` (https://github.com/PacificBiosciences/HiPhase)
 * `aligned_bam_to_cpg_scores` (https://github.com/PacificBiosciences/pb-CpG-tools)
 
-Install the python dependencies using the following command:
+Install the python dependencies:
 
 ```
-curl -LsSf https://astral.sh/uv/install.sh | sh
-uv venv --python /path/to/your/python3.11
-source .venv/bin/activate
-uv pip install -r requirements.txt
+/path/to/python3.11 -m venv .venv 
+source .venv/bin/activate 
+
+# https://github.com/brentp/cyvcf2?tab=readme-ov-file#github-building-htslib-and-cyvcf2-from-source
+cd $HOME 
+git clone --recursive https://github.com/brentp/cyvcf2
+cd cyvcf2
+pip install -r requirements.txt 
+CYVCF2_HTSLIB_MODE=EXTERNAL python setup.py install
+
+cd /path/to/tapestry
+pip install -r requirements.txt
 ```
 
 ## Workflow 
