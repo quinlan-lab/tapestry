@@ -1,6 +1,6 @@
 # tapestry
 
-<img src="images/Screenshot 2025-07-23 at 5.04.42 PM.png" alt="XXX" width="500"/>
+<img src="images/tapestry.png" alt="XXX" width="900"/>
 
 ## Dependencies 
 
@@ -40,5 +40,5 @@ pip install -r requirements.txt
 - [ ] Create the CL tool called "phase-meth-to-founder-haps.sh" from functions defined in `assign-founder-haplotypes-to-methylation-levels.ipynb` 
 - [ ] Create a python module (called "tapestry") for analyzing founder-phased DNA methylation data across generations in a pedigree, e.g., to answer the question "given a haplotype in a child, has its methylation changed relative to the same haplotype in the parent" 
 - [ ] Use excalidraw to create a diagram showing how we get from bams to founder-phased methylation levels
-- [ ] Convert manual workflow into a Snakemake workflow
+- [ ] Convert manual workflow into a Snakemake workflow (refactor hard-coded filenames into function arguments)
 - [ ] Write usage documentation
