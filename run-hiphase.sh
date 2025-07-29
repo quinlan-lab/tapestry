@@ -9,8 +9,6 @@ reference_dir="/scratch/ucgd/lustre-labs/quinlan/data-shared/constraint-tools/re
 bin_dir="/uufs/chpc.utah.edu/common/HIPAA/u6018199/hiphase-v1.5.0-x86_64-unknown-linux-gnu" 
 export PATH=${bin_dir}:$PATH
 
-prefix="200081"
-
 # TODO: add tandem-repeat vcfs
 # I've excluded them for now as the filenames follow an unknown/less-than-obvious naming scheme 
 
