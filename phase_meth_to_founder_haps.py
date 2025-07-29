@@ -30,7 +30,6 @@ CPG_SITE_MISMATCH_SITE_DISTANCE = 50 # bp
 REFERENCE_GENOME = "hg38"
 
 # Constants from the notebook
-NUMBER_VARIANTS = 100000  # TODO: testing
 READ_BACKED_PHASED_DIR = Path('/scratch/ucgd/lustre-labs/quinlan/data-shared/read-backed-phasing')
 HAPLOTYPE_MAPS_DIR = Path('/scratch/ucgd/lustre-labs/quinlan/data-shared/haplotype-maps/CEPH1463.GRCh38')
 PB_CPG_TOOL_MODE = 'model'
@@ -44,7 +43,6 @@ def get_all_phasing_from_uid(uid):
     df_read_based_phasing = get_read_based_phasing(
         uid=uid, 
         read_backed_phased_dir=READ_BACKED_PHASED_DIR, 
-        number_variants=NUMBER_VARIANTS
     )
     logger.info("Got read-based phasing data")
     
@@ -59,7 +57,6 @@ def get_all_phasing_from_uid(uid):
     df_parental_phasing = get_parental_phasing(
         uid=uid, 
         haplotype_maps_dir=HAPLOTYPE_MAPS_DIR, 
-        number_variants=NUMBER_VARIANTS
     )
     logger.info("Got parental phasing data")
 

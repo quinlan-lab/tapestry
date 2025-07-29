@@ -7,6 +7,8 @@ from tqdm import tqdm
 import polars as pl
 import bioframe as bf # https://bioframe.readthedocs.io/en/latest/index.html
 
+# NUMBER_VARIANTS = 100000 # testing 
+
 def stringify(phase_block_id): 
     if phase_block_id == -2147483648: # https://github.com/brentp/cyvcf2/issues/31#issuecomment-273214346
         return '.'
@@ -30,7 +32,7 @@ def is_snv_het(variant, sample_index):
 
     return is_het and is_snp and has_single_ALT_allele
 
-def get_read_based_phasing(uid, read_backed_phased_dir, number_variants):
+def get_read_based_phasing(uid, read_backed_phased_dir):
     # allele format: hap1 | hap2 
     vcf_file_path = read_backed_phased_dir / f"{uid}.GRCh38.deepvariant.glnexus.phased.vcf.gz"
 
@@ -45,10 +47,10 @@ def get_read_based_phasing(uid, read_backed_phased_dir, number_variants):
         assert len(samples) == 1, f"Expected single sample in VCF, found {len(samples)} samples: {samples}"
         sample_index = 0
 
-        # for variant in tqdm(vcf_reader, total=vcf_reader.num_records): # TODO 
-        for i, variant in enumerate(vcf_reader): # TODO: testing
-            if i >= number_variants: # TODO: testing
-                break
+        for variant in tqdm(vcf_reader, total=vcf_reader.num_records):
+        # for i, variant in enumerate(vcf_reader): # testing
+            # if i >= NUMBER_VARIANTS: # testing
+            #     break # testing
 
             if not is_snv_het(variant, sample_index):
                 continue
@@ -107,7 +109,7 @@ def get_phase_blocks(uid, read_backed_phased_dir):
             separator="\t",
             has_header=True,
             infer_schema_length=1000000,
-            # n_rows=100000  # TODO: testing
+            # n_rows=100000  # testing
         )
         .cast({
             "phase_block_id": pl.String,
@@ -115,20 +117,20 @@ def get_phase_blocks(uid, read_backed_phased_dir):
     )
     return df
 
-def get_parental_phasing(uid, haplotype_maps_dir, number_variants): 
+def get_parental_phasing(uid, haplotype_maps_dir): 
     # "paternal | maternal" 
     # https://quinlangroup.slack.com/archives/C08U7NLC9PZ/p1748885496941579
-    vcf_file_path = haplotype_maps_dir / "CEPH1463.GRCh38.pass.sorted.vcf"
+    vcf_file_path = haplotype_maps_dir / "CEPH1463.GRCh38.pass.sorted.vcf.gz"
 
     records = []
     with VCF(vcf_file_path, strict_gt=True) as vcf_reader: # cyvcf2 handles .vcf.gz directly
         samples = vcf_reader.samples
         sample_index = samples.index(uid) if uid in samples else None
 
-        # for variant in tqdm(vcf_reader, total=vcf_reader.num_records): # TODO 
-        for i, variant in enumerate(vcf_reader): # TODO: testing
-            if i >= number_variants: # TODO: testing
-                break
+        for variant in tqdm(vcf_reader, total=vcf_reader.num_records):
+        # for i, variant in enumerate(vcf_reader): # testing
+        #     if i >= NUMBER_VARIANTS: # testing
+        #         break # testing
 
             if not is_snv_het(variant, sample_index):
                 continue
