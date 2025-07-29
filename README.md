@@ -28,7 +28,7 @@ cd /path/to/tapestry
 pip install -r requirements.txt
 ```
 
-## Workflow 
+## Pedigree-wise workflow 
 
 1. Phase variants:
    - Build an inheritance-based haplotype map and inheritance-phase variants using the `build-iht-based-haplotype-map-and-phase-variants.sh` script.
