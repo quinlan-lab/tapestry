@@ -1,4 +1,4 @@
-from write_header import write_header
+from util.write_header import write_header
 
 def write_data(data_dir, df, filename_stem, suffix='bed'):
     data_dir.mkdir(parents=True, exist_ok=True)
