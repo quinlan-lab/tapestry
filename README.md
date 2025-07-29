@@ -31,7 +31,7 @@ pip install -r requirements.txt
 ## Workflow 
 
 1. Phase variants:
-   - Build an inheritance-based haplotype map and phase variants using the `build-iht-based-haplotype-map-and-phase-variants.sh` script.
+   - Build an inheritance-based haplotype map and inheritance-phase variants using the `build-iht-based-haplotype-map-and-phase-variants.sh` script.
    - Phase variants using read-backed phasing with the `run-hiphase.sh` script.
 2. Use `aligned_bam_to_cpg_scores.sh` to generate methylation levels from the haplotagged BAM files produced in step 1.
 3. Phase methylation data to founder haplotypes using the `phase_meth_to_founder_haps.sh` script, which uses the data produced in steps 1 and 2.
