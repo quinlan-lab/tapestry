@@ -44,28 +44,28 @@ def get_all_phasing_from_uid(uid):
         uid=uid, 
         read_backed_phased_dir=READ_BACKED_PHASED_DIR, 
     )
-    logger.info("Got read-based phasing data")
+    logger.info(f"Got read-based phasing data: {len(df_read_based_phasing)} rows, {len(df_read_based_phasing.columns)} columns")
     
     # Get read-based phase blocks
     df_phase_blocks = get_phase_blocks(
         uid=uid, 
         read_backed_phased_dir=READ_BACKED_PHASED_DIR
     )
-    logger.info("Got phase blocks")
+    logger.info(f"Got phase blocks: {len(df_phase_blocks)} rows, {len(df_phase_blocks.columns)} columns")
 
     # Get inheritance-based phasing data
     df_parental_phasing = get_parental_phasing(
         uid=uid, 
         haplotype_maps_dir=HAPLOTYPE_MAPS_DIR, 
     )
-    logger.info("Got parental phasing data")
+    logger.info(f"Got parental phasing data: {len(df_parental_phasing)} rows, {len(df_parental_phasing.columns)} columns")
 
     # Get IHT blocks
     df_iht_blocks = get_iht_blocks(
         uid=uid, 
         haplotype_maps_dir=HAPLOTYPE_MAPS_DIR
     )
-    logger.info("Got IHT blocks")
+    logger.info(f"Got IHT blocks: {len(df_iht_blocks)} rows, {len(df_iht_blocks.columns)} columns")
 
     # Combine all phasing data
     df_all_phasing = get_all_phasing(
@@ -207,10 +207,12 @@ def main(uid):
     METH_FOUNDER_PHASED_DIR.mkdir(parents=True, exist_ok=True)
     
     df_all_phasing = get_all_phasing_from_uid(uid)
-    logger.info("Got all phasing data")
+    logger.info(f"Got all phasing data: {len(df_all_phasing)} rows, {len(df_all_phasing.columns)} columns")
     
     df_hap_map, df_sites, df_sites_mismatch = get_hap_map(df_all_phasing)
-    logger.info("Got hap map")
+    logger.info(f"Got hap map: {len(df_hap_map)} rows, {len(df_hap_map.columns)} columns")
+    logger.info(f"Got sites: {len(df_sites)} rows, {len(df_sites.columns)} columns")
+    logger.info(f"Got sites mismatch: {len(df_sites_mismatch)} rows, {len(df_sites_mismatch.columns)} columns")
     
     write_hap_map_blocks(df_hap_map, uid, "paternal", METH_FOUNDER_PHASED_DIR)
     write_hap_map_blocks(df_hap_map, uid, "maternal", METH_FOUNDER_PHASED_DIR)
@@ -223,10 +225,10 @@ def main(uid):
     logger.info("Wrote bit-vector sites and mismatches for IGV visualization")
     
     df_meth_hap1_hap2 = get_meth_hap1_hap2(uid=uid, pb_cpg_tool_mode=PB_CPG_TOOL_MODE, meth_read_backed_phased_dir=METH_READ_BACKED_PHASED_DIR)
-    logger.info("Got read-based phasing of methylation levels")
+    logger.info(f"Got read-based phasing of methylation levels: {len(df_meth_hap1_hap2)} rows, {len(df_meth_hap1_hap2.columns)} columns")
     
     df_meth_founder_phased = phase_meth_to_founder_haps(df_meth_hap1_hap2, df_hap_map, df_sites_mismatch)
-    logger.info("Phased methylation levels to founder haplotypes")
+    logger.info(f"Phased methylation levels to founder haplotypes: {len(df_meth_founder_phased)} rows, {len(df_meth_founder_phased.columns)} columns")
 
     fraction_of_CpG_sites_that_are_phased_to_founder_haplotypes = (
         df_meth_founder_phased.select(pl.col("founder_haplotype_pat").is_not_null().mean())
