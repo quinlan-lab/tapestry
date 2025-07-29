@@ -28,13 +28,15 @@ logger = logging.getLogger(__name__)
 
 CPG_SITE_MISMATCH_SITE_DISTANCE = 50 # bp
 REFERENCE_GENOME = "hg38"
-
-# Constants from the notebook
-READ_BACKED_PHASED_DIR = Path('/scratch/ucgd/lustre-labs/quinlan/data-shared/read-backed-phasing')
-HAPLOTYPE_MAPS_DIR = Path('/scratch/ucgd/lustre-labs/quinlan/data-shared/haplotype-maps/CEPH1463.GRCh38')
 PB_CPG_TOOL_MODE = 'model'
-METH_READ_BACKED_PHASED_DIR = Path(f'/scratch/ucgd/lustre-labs/quinlan/data-shared/dna-methylation/CEPH1463.GRCh38.hifi.{PB_CPG_TOOL_MODE}.read-backed-phased')
-METH_FOUNDER_PHASED_DIR = Path(f'/scratch/ucgd/lustre-labs/quinlan/data-shared/dna-methylation/CEPH1463.GRCh38.hifi.{PB_CPG_TOOL_MODE}.founder-phased') 
+
+# INPUT DIRS 
+HAPLOTYPE_MAPS_DIR = Path('/scratch/ucgd/lustre-labs/quinlan/data-shared/haplotype-maps/CEPH1463.GRCh38') # output dir of gtg-ped-map and gtg-concordance
+READ_BACKED_PHASED_DIR = Path('/scratch/ucgd/lustre-labs/quinlan/data-shared/read-backed-phasing') # output dir of hiphase
+METH_READ_BACKED_PHASED_DIR = Path(f'/scratch/ucgd/lustre-labs/quinlan/data-shared/dna-methylation/CEPH1463.GRCh38.hifi.{PB_CPG_TOOL_MODE}.read-backed-phased') # output dir of aligned_bam_to_cpg_scores
+
+# OUTPUT DIRS 
+METH_FOUNDER_PHASED_DIR = Path(f'/scratch/ucgd/lustre-labs/quinlan/data-shared/dna-methylation/CEPH1463.GRCh38.hifi.{PB_CPG_TOOL_MODE}.founder-phased') # output dir of this script 
 
 def get_all_phasing_from_uid(uid):
     """Wrapper function that creates all required DataFrames and calls get_all_phasing"""
