@@ -39,4 +39,8 @@ pip install -r requirements.txt
 
 - [ ] Create a python module (called "tapestry") for analyzing founder-phased DNA methylation data across generations in a pedigree, e.g., to answer the question "given a haplotype in a child, has its methylation changed relative to the same haplotype in the parent" 
 - [ ] Use excalidraw to create a diagram showing how we get from bams to founder-phased methylation levels
-- [ ] Convert manual workflow into a Snakemake workflow (refactor hard-coded filenames into function arguments)
+- [ ] Convert manual workflow into a Snakemake workflow 
+  - [ ] Refactor hard-coded filenames into function arguments
+  - [ ] Update `build-iht-based-haplotype-map-and-phase-variants.sh` to:
+    - Ensure `gtg-ped-map`, etc. are in the PATH
+    - Run `bgzip`, etc.
