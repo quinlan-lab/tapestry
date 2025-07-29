@@ -30,17 +30,17 @@ pip install -r requirements.txt
 
 ## Workflow 
 
-1. Build an inheritance-based haplotype map and phase variants using the `build-iht-based-haplotype-map-and-phase-variants.sh` script. 
-2. Phase variants using read-backed phasing with the `run-hiphase.sh` script.
-3. Use `aligned_bam_to_cpg_scores.sh` to generate methylation levels from the haplotagged BAM files produced in step 2.
-4. Phase methylation data to founder haplotypes using the `phase_meth_to_founder_haps.py` script.
+1. Phase variants:
+   - Build an inheritance-based haplotype map and phase variants using the `build-iht-based-haplotype-map-and-phase-variants.sh` script.
+   - Phase variants using read-backed phasing with the `run-hiphase.sh` script.
+2. Use `aligned_bam_to_cpg_scores.sh` to generate methylation levels from the haplotagged BAM files produced in step 1.
+3. Phase methylation data to founder haplotypes using the `phase_meth_to_founder_haps.sh` script and the data produced in steps 1 and 2.
 
 ## TODO
 
 - [ ] Create a python module (called "tapestry") for analyzing founder-phased DNA methylation data across generations in a pedigree, e.g., to answer the question "given a haplotype in a child, has its methylation changed relative to the same haplotype in the parent" 
 - [ ] Use excalidraw to create a diagram showing how we get from bams to founder-phased methylation levels
 - [ ] Convert manual workflow into a Snakemake workflow 
-  - [ ] Refactor hard-coded filenames into function arguments
   - [ ] Update `build-iht-based-haplotype-map-and-phase-variants.sh` to:
     - Ensure `gtg-ped-map`, etc. are in the PATH
     - Run `bgzip`, etc.
