@@ -12,6 +12,7 @@ from get_hap_map import (
     write_hap_map_blocks,
     write_bit_vector_sites_and_mismatches,    
 )
+from get_meth_hap1_hap2 import get_meth_hap1_hap2
 from util.write_data import write_bed
 
 # Constants from the notebook
@@ -19,6 +20,7 @@ NUMBER_VARIANTS = 100000  # TODO: testing
 READ_BACKED_PHASED_DIR = Path('/scratch/ucgd/lustre-labs/quinlan/data-shared/read-backed-phasing')
 HAPLOTYPE_MAPS_DIR = Path('/scratch/ucgd/lustre-labs/quinlan/data-shared/haplotype-maps/CEPH1463.GRCh38')
 PB_CPG_TOOL_MODE = 'model'
+METH_READ_BACKED_PHASED_DIR = Path(f'/scratch/ucgd/lustre-labs/quinlan/data-shared/dna-methylation/CEPH1463.GRCh38.hifi.{PB_CPG_TOOL_MODE}.read-backed-phased')
 METH_FOUNDER_PHASED_DIR = Path(f'/scratch/ucgd/lustre-labs/quinlan/data-shared/dna-methylation/CEPH1463.GRCh38.hifi.{PB_CPG_TOOL_MODE}.founder-phased') 
 
 def get_all_phasing_from_uid(uid):
@@ -72,9 +74,11 @@ def main(uid):
     write_bed(METH_FOUNDER_PHASED_DIR, df_hap_map, f"{uid}.hap-map-blocks")
     write_bit_vector_sites_and_mismatches(df_sites, df_sites_mismatch, uid, METH_FOUNDER_PHASED_DIR)
 
+    df_meth_hap1_hap2 = get_meth_hap1_hap2(uid=uid, pb_cpg_tool_mode=PB_CPG_TOOL_MODE, meth_read_backed_phased_dir=METH_READ_BACKED_PHASED_DIR)
+
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description='Phase DNA methylation data to founder haplotypes')
     parser.add_argument('-uid', required=True, help='Sample UID to process')
     args = parser.parse_args()
-    
+
     main(args.uid)
