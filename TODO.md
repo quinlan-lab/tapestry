@@ -1,11 +1,10 @@
 
 # TODO [by 30 July] 
-# refactor dir variables in phase_meth_to_founder_haps.py into file paths and pass those as python-script params, and write a bash script (phase_meth_to_founder_haps.sh) that calls the python script
-# check that Tom would be able to run phase_meth_to_founder_haps.sh using just the workflow described in the README 
-# run phase_meth_to_founder_haps.sh on a pedigree, or at least a trio
 #  - [ ] Update `build-iht-based-haplotype-map-and-phase-variants.sh` to:
     - Ensure `gtg-ped-map`, etc. are in the PATH
     - Run `bgzip`, etc.
+# update notebook to reflect new variable and function names and signatures 
+# ask AI to generate a snakemake file from the manual workflow
 # share repo with Tom N so that he can use it to phase Tom S's DNMs at TR loci to founder labels, and thereby compare with Tom S's current phasing methodology. 
 
 # TODO [Aug: lab symposium] 
