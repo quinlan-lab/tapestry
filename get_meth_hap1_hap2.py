@@ -3,7 +3,7 @@ from pathlib import Path
 import polars as pl
 from util.remove_funky_chromosomes import remove_funky_chromosomes
 
-def read_meth_level_bed(file_path: Path, pb_cpg_tool_mode: str) -> pl.DataFrame:
+def read_meth_level(bed: Path, pb_cpg_tool_mode: str) -> pl.DataFrame:
     """
     Reads a methylation level bed file from pb-cpg-tools into a Polars DataFrame.
     
@@ -11,19 +11,19 @@ def read_meth_level_bed(file_path: Path, pb_cpg_tool_mode: str) -> pl.DataFrame:
     and a single header line starting with '#'. It also asserts that the
     pileup-mode in the file matches the expected mode.
     """
-    is_gzipped = str(file_path).endswith('.gz')
+    is_gzipped = str(bed).endswith('.gz')
     _open = gzip.open if is_gzipped else open
 
     has_comment_lines = False
     has_header_line = False
     found_pileup_mode = False
 
-    with _open(file_path, 'rt') as f:
+    with _open(bed, 'rt') as f:
         for line in f:
             if line.startswith('##pileup-mode='):
                 pileup_mode_in_file = line.strip().split('=')[1]
                 assert pileup_mode_in_file == pb_cpg_tool_mode, \
-                    f"Expected pileup-mode '{pb_cpg_tool_mode}' but found '{pileup_mode_in_file}' in {file_path}"
+                    f"Expected pileup-mode '{pb_cpg_tool_mode}' but found '{pileup_mode_in_file}' in {bed}"
                 found_pileup_mode = True
             
             if line.startswith('##'):
@@ -35,14 +35,14 @@ def read_meth_level_bed(file_path: Path, pb_cpg_tool_mode: str) -> pl.DataFrame:
                 # Data line reached before header
                 break
     
-    assert has_comment_lines, f"File {file_path} is missing comment lines starting with '##'"
-    assert has_header_line, f"File {file_path} is missing a header line starting with '#'"
-    assert found_pileup_mode, f"File {file_path} is missing '##pileup-mode' comment line."
+    assert has_comment_lines, f"File {bed} is missing comment lines starting with '##'"
+    assert has_header_line, f"File {bed} is missing a header line starting with '#'"
+    assert found_pileup_mode, f"File {bed} is missing '##pileup-mode' comment line."
 
     df = (
         pl
         .read_csv(
-            file_path,
+            bed,
             separator='\t',
             comment_prefix='##',
             has_header=True,
@@ -76,14 +76,14 @@ def read_meth_level_bed(file_path: Path, pb_cpg_tool_mode: str) -> pl.DataFrame:
 
     return df
 
-def get_meth_hap1_hap2(uid, pb_cpg_tool_mode, meth_read_backed_phased_dir): 
-    df_meth_hap1 = read_meth_level_bed(
-        meth_read_backed_phased_dir / f"{uid}.GRCh38.haplotagged.hap1.bed.gz",
+def get_meth_hap1_hap2(pb_cpg_tool_mode, bed_hap1, bed_hap2): 
+    df_meth_hap1 = read_meth_level(
+        bed_hap1,
         pb_cpg_tool_mode
     ).select(pl.all().name.suffix("_hap1"))
 
-    df_meth_hap2 = read_meth_level_bed(
-        meth_read_backed_phased_dir / f"{uid}.GRCh38.haplotagged.hap2.bed.gz",
+    df_meth_hap2 = read_meth_level(
+        bed_hap2,
         pb_cpg_tool_mode
     ).select(pl.all().name.suffix("_hap2"))
 

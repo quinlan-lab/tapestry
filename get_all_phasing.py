@@ -3,7 +3,7 @@
 # https://quinlangroup.slack.com/archives/C449KJT3J/p1751389842484399
 from cyvcf2 import VCF  # type: ignore
 
-from tqdm import tqdm 
+# from tqdm import tqdm # testing
 import polars as pl
 import bioframe as bf # https://bioframe.readthedocs.io/en/latest/index.html
 
@@ -32,12 +32,11 @@ def is_snv_het(variant, sample_index):
 
     return is_het and is_snp and has_single_ALT_allele
 
-def get_read_based_phasing(uid, read_backed_phased_dir):
-    # allele format: hap1 | hap2 
-    vcf_file_path = read_backed_phased_dir / f"{uid}.GRCh38.deepvariant.glnexus.phased.vcf.gz"
+def get_read_phasing(vcf):
+    # assume vcf follows this phasing format: hap1 | hap2 
 
     records = []
-    with VCF(vcf_file_path, strict_gt=True) as vcf_reader: # cyvcf2 handles .vcf.gz directly
+    with VCF(vcf, strict_gt=True) as vcf_reader: # cyvcf2 handles .vcf.gz directly
         # # assume multi-sample vcf:
         # samples = vcf_reader.samples
         # sample_index = samples.index(uid) if uid in samples else None
@@ -47,10 +46,11 @@ def get_read_based_phasing(uid, read_backed_phased_dir):
         assert len(samples) == 1, f"Expected single sample in VCF, found {len(samples)} samples: {samples}"
         sample_index = 0
 
-        for variant in tqdm(vcf_reader, total=vcf_reader.num_records):
+        for variant in vcf_reader:
+        # for variant in tqdm(vcf_reader, total=vcf_reader.num_records): # testing 
         # for i, variant in enumerate(vcf_reader): # testing
-            # if i >= NUMBER_VARIANTS: # testing
-            #     break # testing
+        #     if i >= NUMBER_VARIANTS: # testing
+        #         break # testing
 
             if not is_snv_het(variant, sample_index):
                 continue
@@ -101,11 +101,11 @@ def get_read_based_phasing(uid, read_backed_phased_dir):
     df = pl.DataFrame(records)
     return df 
 
-def get_phase_blocks(uid, read_backed_phased_dir): 
+def get_read_phase_blocks(tsv): 
     df = (
         pl
         .read_csv(
-            read_backed_phased_dir / f"{uid}.GRCh38.hiphase.blocks.tsv",
+            tsv,
             separator="\t",
             has_header=True,
             infer_schema_length=1000000,
@@ -117,17 +117,17 @@ def get_phase_blocks(uid, read_backed_phased_dir):
     )
     return df
 
-def get_parental_phasing(uid, haplotype_maps_dir): 
-    # "paternal | maternal" 
+def get_iht_phasing(uid, vcf): 
+    # assume vcf is phased as: "paternal | maternal" 
     # https://quinlangroup.slack.com/archives/C08U7NLC9PZ/p1748885496941579
-    vcf_file_path = haplotype_maps_dir / "CEPH1463.GRCh38.pass.sorted.vcf.gz"
 
     records = []
-    with VCF(vcf_file_path, strict_gt=True) as vcf_reader: # cyvcf2 handles .vcf.gz directly
+    with VCF(vcf, strict_gt=True) as vcf_reader: # cyvcf2 handles .vcf.gz directly
         samples = vcf_reader.samples
         sample_index = samples.index(uid) if uid in samples else None
 
-        for variant in tqdm(vcf_reader, total=vcf_reader.num_records):
+        # for variant in tqdm(vcf_reader, total=vcf_reader.num_records): # testing 
+        for variant in vcf_reader:
         # for i, variant in enumerate(vcf_reader): # testing
         #     if i >= NUMBER_VARIANTS: # testing
         #         break # testing
@@ -171,11 +171,9 @@ def get_parental_phasing(uid, haplotype_maps_dir):
     df = pl.DataFrame(records)
     return df 
 
-def get_iht_blocks(uid, haplotype_maps_dir):
-    founder_label_file_path = haplotype_maps_dir / "CEPH1463.GRCh38.iht.sorted.txt"
-
+def get_iht_blocks(uid, txt):
     records = []
-    with open(founder_label_file_path, 'r') as f:
+    with open(txt, 'r') as f:
         header = f.readline().strip().strip('#')
         assert header.startswith("chrom start end"), f"Unexpected header format: {header}"
         assert header.endswith("marker_count len markers"), f"Unexpected header format: {header}"
@@ -208,11 +206,11 @@ def get_iht_blocks(uid, haplotype_maps_dir):
     df = pl.DataFrame(records)
     return df 
 
-def get_all_phasing(df_read_based_phasing, df_phase_blocks, df_parental_phasing, df_iht_blocks):
+def get_all_phasing(df_read_phasing, df_read_phase_blocks, df_iht_phasing, df_iht_blocks):
     df = (
-        df_read_based_phasing
+        df_read_phasing
         .join(
-            df_phase_blocks,
+            df_read_phase_blocks,
             on=["chrom", "phase_block_id"], 
             how="inner"
         )
@@ -222,7 +220,7 @@ def get_all_phasing(df_read_based_phasing, df_phase_blocks, df_parental_phasing,
             "num_variants": "num_variants_phase_block",
         })
         .join(
-            df_parental_phasing, 
+            df_iht_phasing, 
             # Join on REF and ALT, in addition to joining on chrom, start, end
             # This is important because the parental-phased vcf results from joint-calling, 
             # whereas the read-backed-phased vcf results from single-sample calling,

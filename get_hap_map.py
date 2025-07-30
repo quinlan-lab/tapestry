@@ -12,7 +12,7 @@ def extract_bit_vectors(record):
     bit_vector_pat = extract_bit_vector(record["allele_seq_pat"])
     return bit_vector_hap1, bit_vector_pat
 
-def write_df_to_vcf(df, path, uid):
+def write_df_to_vcf(df, vcf, uid):
     df = df.sort(["chrom", "start", "end"]) 
 
     header = [
@@ -20,7 +20,7 @@ def write_df_to_vcf(df, path, uid):
         '#CHROM\tPOS\tID\tREF\tALT\tQUAL\tFILTER\tINFO\tFORMAT\t' + uid
     ]
     
-    with open(path, 'w') as f:
+    with open(vcf, 'w') as f:
         for line in header:
             f.write(line + '\n')
         
@@ -38,22 +38,22 @@ def write_df_to_vcf(df, path, uid):
             f.write(f"{chrom}\t{pos}\t{id_}\t{ref}\t{alt}\t{qual}\t{flt}\t{info}\t{fmt_keys}\t{fmt_vals}\n")
 
 # For visualization in IGV 
-def write_bit_vector_sites_and_mismatches(df_sites, df_sites_mismatch, uid, meth_founder_phased_dir):
+def write_bit_vector_sites_and_mismatches(df_sites, df_sites_mismatch, uid, output_dir):
     dfs = {
         # "sites": df_sites,
         "sites-mismatches": df_sites_mismatch,
     }
     for name, df in dfs.items():
-        write_df_to_vcf(df, f"{meth_founder_phased_dir}/{uid}.bit-vector-{name}.vcf", uid)
+        write_df_to_vcf(df, f"{output_dir}/{uid}.bit-vector-{name}.vcf", uid)
 
         cmd = (
             f'util/compress-index-vcf'
-            f' --name {meth_founder_phased_dir}/{uid}.bit-vector-{name}'
+            f' --name {output_dir}/{uid}.bit-vector-{name}'
         )
         shell(cmd) 
 
 # For visualization in IGV 
-def write_hap_map_blocks(df_hap_map, uid, parental, meth_founder_phased_dir): 
+def write_hap_map_blocks(df_hap_map, uid, parental, output_dir): 
     df_hap_map_blocks = df_hap_map.select([
         pl.col("chrom"),
         pl.col("start"),
@@ -61,15 +61,15 @@ def write_hap_map_blocks(df_hap_map, uid, parental, meth_founder_phased_dir):
         # pl.col(f"{parental}_haplotype").str.split("_").list.get(0).alias(f"founder_haplotype_{parental}")
         pl.col(f"{parental}_haplotype")
     ])
-    write_bed(meth_founder_phased_dir, df_hap_map_blocks, f"{uid}.hap-map-blocks.{parental}")
+    write_bed(output_dir, df_hap_map_blocks, f"{uid}.hap-map-blocks.{parental}")
 
     cmd = (
-        f'cat {meth_founder_phased_dir}/{uid}.hap-map-blocks.{parental}.bed'
+        f'cat {output_dir}/{uid}.hap-map-blocks.{parental}.bed'
         f' | util/sort-compress-index-bed'
-        f' --name {meth_founder_phased_dir}/{uid}.hap-map-blocks.{parental}'
+        f' --name {output_dir}/{uid}.hap-map-blocks.{parental}'
     )
     shell(cmd) 
-    shell(f'rm {meth_founder_phased_dir}/{uid}.hap-map-blocks.{parental}.bed')
+    shell(f'rm {output_dir}/{uid}.hap-map-blocks.{parental}.bed')
 
 def get_hap_map(df_all_phasing):
     df_sites = df_all_phasing.select(["chrom", "start", "end", "REF", "ALT"])
