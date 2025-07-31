@@ -1,4 +1,10 @@
-# [WIP] complete this snakemake pipeline 
+# [WIP] 
+
+# TODO: complete this snakemake pipeline using: 
+# - run-hiphase.sh
+# - build-iht-based-haplotype-map-and-phase-variants.sh
+# - aligned_bam_to_cpg_scores.sh
+# - phase_meth_to_founder_haps.sh
 
 # Resources: 
 # https://snakemake.readthedocs.io/en/stable/index.html
