@@ -90,7 +90,7 @@ and phases DNA methylation to founder haplotypes with various QC stats:
 
 ![XXX](images/QC.png)
 
-The tool also creates files that enables visualization of phased DNA methylation in IGV: 
+The tool also creates files that collectively enable visualization of phased DNA methylation in IGV: 
 
 <img src="images/tapestry.png" alt="XXX" width="900"/>
 
