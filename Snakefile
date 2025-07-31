@@ -1,6 +1,7 @@
 # [WIP] 
 
-# TODO: complete this snakemake pipeline using: 
+# TODO: complete this snakemake pipeline for companion paper
+# Use the following scripts as reference: 
 # - run-hiphase.sh
 # - build-iht-based-haplotype-map-and-phase-variants.sh
 # - aligned_bam_to_cpg_scores.sh
