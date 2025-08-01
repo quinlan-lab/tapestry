@@ -1,14 +1,12 @@
 
-# TODO [by 30 July] 
+TODO [by 30 July] 
+# address https://docs.google.com/presentation/d/12lOZtZDN4Qbgj8Z-y2AG4KEzIAQokKGI1-dzHDgQEog/edit?slide=id.g3725b3eed31_0_10#slide=id.g3725b3eed31_0_10
+# test pyrightconfig.json and phase_meth_to_founder_haps.sh with new folder hierarchy, and commit 
+# change "Got sites mismatch" to "Got sites where read-based and inheritance-based bit vectors don't match"
+# change "Wrote bit-vector sites and mismatches for IGV visualization" to "Wrote sites of bit-vectors, and sites where bit vectors are mismatched, for IGV visualization"
 #  - [ ] Update `build-iht-based-haplotype-map-and-phase-variants.sh` to:
     - Ensure `gtg-ped-map`, etc. are in the PATH
     - Run `bgzip`, etc.
-# update notebook to reflect new variable and function names and signatures 
-# ask AI to generate a snakemake file from the manual workflow
-# share repo with Tom N so that he can use it to phase Tom S's DNMs at TR loci to founder labels, and thereby compare with Tom S's current phasing methodology. 
-
-# TODO [Aug: lab symposium] 
-# [positive control] does my tool phase methylation levels to the correct parental haplotype at these imprinted loci: https://gemini.google.com/app/db2d1c5aa2a8ed10 ? 
-# present phased methylation levels for a pedigree, 
-# create a python library called "tapestry" for analyzing the phased meth data across generations, such as: given a haplotype in a child, has its methylation changed relative to the same haplotype in the parent; etc.
-# and solicit feedback about other interesting questions to ask
+# update src/phase_meth_to_founder_haps.ipynb to reflect new variable and function names and signatures 
+# start analyses in analysis/a.ipynb using https://docs.google.com/presentation/d/12lOZtZDN4Qbgj8Z-y2AG4KEzIAQokKGI1-dzHDgQEog/edit?slide=id.g3725b3eed31_0_30#slide=id.g3725b3eed31_0_30 
+# 
