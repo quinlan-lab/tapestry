@@ -194,7 +194,7 @@ def main(args):
     logger.info("Wrote hap-map blocks")
     
     write_bit_vector_sites_and_mismatches(df_sites, df_sites_mismatch, args.uid, args.output_dir)
-    logger.info("Wrote bit-vector sites and mismatches for IGV visualization")
+    logger.info("Wrote sites of bit-vectors, and sites where bit vectors are mismatched, for IGV visualization")
     
     df_meth_hap1_hap2 = get_meth_hap1_hap2(args.pb_cpg_tool_mode, args.bed_meth_hap1, args.bed_meth_hap2)
     logger.info(f"Got read-based phasing of methylation levels: {len(df_meth_hap1_hap2)} rows, {len(df_meth_hap1_hap2.columns)} columns")
