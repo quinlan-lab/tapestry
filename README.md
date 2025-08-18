@@ -6,7 +6,7 @@ A pipeline to phase DNA methylation from HiFi reads in a human pedigree to the h
 
 We assume the following command-line tools are in the user's PATH: 
 
-* `bedGraphToBigWig`, `bgzip`, `tabix`
+* `bedGraphToBigWig`, `bgzip`, `tabix`, `bcftools`
 * `gtg-ped-map`, `gtg-concordance` (https://github.com/Platinum-Pedigree-Consortium/Platinum-Pedigree-Inheritance)
 * `hiphase` (https://github.com/PacificBiosciences/HiPhase)
 * `aligned_bam_to_cpg_scores` (https://github.com/PacificBiosciences/pb-CpG-tools)

@@ -9,7 +9,10 @@ prefix=${output_dir}/CEPH1463.GRCh38
 
 mkdir -p ${output_dir}
 
-# nohup ${repo}/code/rust/target/release/gtg-ped-map \
+bin_dir="${repo}/code/rust/target/release" 
+export PATH=${bin_dir}:$PATH
+
+# nohup gtg-ped-map \
 #     --ped ${ped} \
 #     --vcf ${vcf} \
 #     --prefix ${prefix} \
@@ -17,7 +20,7 @@ mkdir -p ${output_dir}
 #     > ${output_dir}/gtg-ped-map.log 2>&1 &
 # echo "gtg-ped-map launched"
 
-nohup ${repo}/code/rust/target/release/gtg-concordance \
+nohup gtg-concordance \
     --ped ${ped} \
     --inheritance ${prefix}.iht.txt \
     --vcf ${vcf} \
@@ -25,3 +28,19 @@ nohup ${repo}/code/rust/target/release/gtg-concordance \
     --verbose \
     > ${output_dir}/gtg-concordance.log 2>&1 &
 echo "gtg-concordance launched"
+
+# sort and compress and index vcf 
+bcftools sort ${prefix}.pass.vcf -o ${prefix}.pass.sorted.vcf
+src/util/compress-index-vcf --name ${prefix}.pass.sorted
+
+# sort and compress markers 
+(head -n 1 ${prefix}.markers.txt \
+  && tail -n +2 ${prefix}.markers.txt \
+  | sort -k1,1V -k2,2n) \
+  > ${prefix}.markers.sorted.txt
+
+# sort and compress iht blocks 
+(head -n 1 ${prefix}.iht.txt \
+  && tail -n +2 ${prefix}.iht.txt \
+  | sort -k1,1V -k2,2n) \
+  > ${prefix}.iht.sorted.txt
