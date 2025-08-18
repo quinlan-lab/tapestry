@@ -13,7 +13,7 @@ export PATH=${bin_dir}:$PATH
 # aligned_bam_to_cpg_scores --help
 
 echo "Getting Palladium prefixes..."
-prefixes=$(python util/get_palladium_prefixes.py)
+prefixes=$(python src/util/get_palladium_prefixes.py)
 echo "... Got prefixes" 
 
 for prefix in $prefixes; do
