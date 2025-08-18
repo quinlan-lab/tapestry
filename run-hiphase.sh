@@ -12,7 +12,7 @@ export PATH=${bin_dir}:$PATH
 # TODO: add tandem-repeat vcfs
 # I've excluded them for now as the filenames follow an unknown/less-than-obvious naming scheme 
 
-prefixes=$(python util/get_palladium_prefixes.py)
+prefixes=$(python src/util/get_palladium_prefixes.py)
 echo "Done loading prefixes..."
 
 for prefix in $prefixes; do
