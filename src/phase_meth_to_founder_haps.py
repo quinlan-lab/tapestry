@@ -184,7 +184,7 @@ def main(args):
     df_hap_map, df_sites, df_sites_mismatch = get_hap_map(df_all_phasing)
     logger.info(f"Got hap map: {len(df_hap_map)} rows, {len(df_hap_map.columns)} columns")
     logger.info(f"Got sites: {len(df_sites)} rows, {len(df_sites.columns)} columns")
-    logger.info(f"Got sites mismatch: {len(df_sites_mismatch)} rows, {len(df_sites_mismatch.columns)} columns")
+    logger.info(f"Got sites where read-based and inheritance-based bit vectors don't match: {len(df_sites_mismatch)} rows, {len(df_sites_mismatch.columns)} columns")
     
     write_hap_map_blocks(df_hap_map, args.uid, "paternal", args.output_dir)
     write_hap_map_blocks(df_hap_map, args.uid, "maternal", args.output_dir)
