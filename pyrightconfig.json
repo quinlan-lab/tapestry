@@ -6,7 +6,7 @@
     "executionEnvironments": [
         {
           "root": ".",
-          "extraPaths": ["util"]
+          "extraPaths": ["src/util"]
         }
       ]
     

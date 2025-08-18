@@ -7,8 +7,12 @@ meth_read_phased_dir="/scratch/ucgd/lustre-labs/quinlan/data-shared/dna-methylat
 
 # OUTPUT DIRS 
 output_dir="/scratch/ucgd/lustre-labs/quinlan/data-shared/dna-methylation/CEPH1463.GRCh38.hifi.${pb_cpg_tool_mode}.founder-phased" # output dir of phase_meth_to_founder_haps.py
+# output_dir="/scratch/ucgd/lustre-labs/quinlan/data-shared/dna-methylation/CEPH1463.GRCh38.hifi.${pb_cpg_tool_mode}.founder-phased.test" # testing 
 
-prefixes=$(python util/get_palladium_prefixes.py)
+mkdir -p ${output_dir}
+
+# TODO: use a ped file to get the prefixes for non-founder individuals in the pedigree
+prefixes=$(python src/util/get_palladium_prefixes.py)
 echo "Done loading prefixes..."
 
 # prefixes="200080 200081" # testing 
@@ -24,7 +28,7 @@ for prefix in $prefixes; do
     bed_meth_hap1="${meth_read_phased_dir}/${uid}.GRCh38.haplotagged.hap1.bed.gz" # bed file from aligned_bam_to_cpg_scores for hap1
     bed_meth_hap2="${meth_read_phased_dir}/${uid}.GRCh38.haplotagged.hap2.bed.gz" # bed file from aligned_bam_to_cpg_scores for hap2
 
-    nohup python phase_meth_to_founder_haps.py \
+    nohup python src/phase_meth_to_founder_haps.py \
         --pb_cpg_tool_mode ${pb_cpg_tool_mode} \
         --uid ${uid} \
         --vcf_read_phased ${vcf_read_phased} \

@@ -47,7 +47,7 @@ def write_bit_vector_sites_and_mismatches(df_sites, df_sites_mismatch, uid, outp
         write_df_to_vcf(df, f"{output_dir}/{uid}.bit-vector-{name}.vcf", uid)
 
         cmd = (
-            f'util/compress-index-vcf'
+            f'src/util/compress-index-vcf'
             f' --name {output_dir}/{uid}.bit-vector-{name}'
         )
         shell(cmd) 
@@ -65,7 +65,7 @@ def write_hap_map_blocks(df_hap_map, uid, parental, output_dir):
 
     cmd = (
         f'cat {output_dir}/{uid}.hap-map-blocks.{parental}.bed'
-        f' | util/sort-compress-index-bed'
+        f' | src/util/sort-compress-index-bed'
         f' --name {output_dir}/{uid}.hap-map-blocks.{parental}'
     )
     shell(cmd) 
