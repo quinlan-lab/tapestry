@@ -2,3 +2,6 @@
 .vscode
 __pycache__
 .trash
+
+control_intervals_methylation.csv
+recomb_blocks_methylation.csv
