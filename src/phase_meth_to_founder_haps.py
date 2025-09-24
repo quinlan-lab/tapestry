@@ -11,7 +11,7 @@ from get_all_phasing import (
 from get_hap_map import (
     get_hap_map,
     write_hap_map_blocks,
-    write_bit_vector_sites_and_mismatches,    
+    write_bit_vector_sites_and_mismatches,
 )
 from get_meth_hap1_hap2 import get_meth_hap1_hap2
 from util.write_data import write_bed
