@@ -16,17 +16,16 @@ echo "Writing all CpG sites to ${output_dir} ..."
 # OUTPUT FILE
 bed_all_cpgs="${output_dir}/all_cpg_sites.bed" # output of src/write_all_cpgs.py
 
-# TODO: uncomment 
-# python src/write_all_cpgs.py \
-# 	--reference ${reference} \
-# 	--bed_all_cpgs ${bed_all_cpgs} \
-# 	> ${output_dir}/write_all_cpgs.log 2>&1
+python src/write_all_cpgs.py \
+	--reference ${reference} \
+	--bed_all_cpgs ${bed_all_cpgs} \
+	> ${output_dir}/write_all_cpgs.log 2>&1
 
-# # TODO: use a ped file to get the prefixes for non-founder individuals in the pedigree
-# prefixes=$(python src/util/get_palladium_prefixes.py)
-# echo "Done loading prefixes..."
+# TODO: use a ped file to get the prefixes for non-founder individuals in the pedigree
+prefixes=$(python src/util/get_palladium_prefixes.py)
+echo "Done loading prefixes..."
 
-prefixes="200081" # TESTING 
+# prefixes="200081" # TESTING 
 
 for prefix in $prefixes; do
     uid="${prefix}" # sample ID in joint-called multi-sample vcf
@@ -38,12 +37,12 @@ for prefix in $prefixes; do
 	# OUTPUT FILES 
 	bed_meth_founder_phased_all_cpgs="${output_dir}/${uid}.dna-methylation.founder-phased.all_cpgs.bed"
 
-    python src/expand_to_all_cpgs.py \
+    nohup python src/expand_to_all_cpgs.py \
 		--bed_all_cpgs ${bed_all_cpgs} \
 		--bed_hap_map ${bed_hap_map} \
         --bed_meth_founder_phased ${bed_meth_founder_phased} \
         --bed_meth_founder_phased_all_cpgs ${bed_meth_founder_phased_all_cpgs} \
-        > ${output_dir}/${uid}.log 2>&1
+        > ${output_dir}/${uid}.log 2>&1 & 
 
     echo "Started ${uid} ..."
 done
