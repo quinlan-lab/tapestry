@@ -37,6 +37,7 @@ pip install -r requirements.txt
    - Build an inheritance-based haplotype map and inheritance-phase variants using the `build-iht-based-haplotype-map-and-phase-variants.sh` script.
 2. Use `aligned_bam_to_cpg_scores.sh` to generate methylation levels from the haplotagged BAM files produced in step 1.
 3. Phase methylation data to founder haplotypes using the `phase_meth_to_founder_haps.sh` script, which uses the data produced in steps 1 and 2.
+4. Use `expand_to_all_cpgs.sh` script to generalize tapestry's output to include all CpG sites in the reference genome and unphased methylation levels, where available. Uses output of steps 2 and 3.
 
 ## Example use of CL tool that phases DNA methylation to founder haplotypes 
 
