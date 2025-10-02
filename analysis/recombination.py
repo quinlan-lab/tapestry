@@ -4,12 +4,18 @@ import numpy as np
 import matplotlib.pyplot as plt
 from pathlib import Path
 import sys
+import importlib
 
 REPO_DIR = Path('/scratch/ucgd/lustre-labs/quinlan/u6018199/tapestry')
 sys.path.append(str(REPO_DIR / 'src')) 
+sys.path.append(str(REPO_DIR / 'src/util')) 
 
 from get_meth_hap1_hap2 import read_meth_level
 from get_all_phasing import get_iht_blocks
+
+import version_sort
+importlib.reload(version_sort)
+from version_sort import version_sort
 
 PB_CPG_TOOL_MODE = 'model'
 
@@ -30,21 +36,6 @@ def read_meth_level_wrapper(sample, meth_read_phased_dir, pb_cpg_tool_mode):
         bed_meth_combined, # type: ignore
         pb_cpg_tool_mode
     ).rename({ "chromosome": "chrom" })
-
-def version_sort(df):
-    return (
-        df
-        # Create a sorted DataFrame by:
-        # 1. First sorting based on a new expression.
-        # 2. Extracting only the numbers with `str.extract` and casting to `int`.
-        # 3. Sorting a second time based on the string values themselves to place "chrX" and "chrY" correctly.
-        .sort(
-            pl.col("chrom").str.extract(r'(\d+)').cast(pl.Int64, strict=False),
-            "chrom", 
-            "start",
-            nulls_last=True
-        )
-    )
 
 def get_recombination_blocks(sample, haplotype, txt_iht_blocks):
     df_iht = get_iht_blocks(sample, txt_iht_blocks)
