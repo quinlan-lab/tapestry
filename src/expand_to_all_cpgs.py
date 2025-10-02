@@ -1,10 +1,9 @@
 import argparse
 import logging
 import polars as pl 
-from pathlib import Path
 
-from read_data import read_data
-from write_data import write_bed
+from read_data import read_bed_and_header
+from write_data import write_bed_and_header
 from get_meth_hap1_hap2 import read_meth_level
 from version_sort import version_sort
 
@@ -15,22 +14,6 @@ def read_all_cpgs(bed_all_cpgs):
         new_columns=['chrom', 'start', 'end'],
         # n_rows=100000 # TESTING 
     ) 
-
-def read_bed_and_header(file_path): 
-    file_path = Path(file_path)
-    parent_dir = file_path.parent
-    file_stem = file_path.stem
-    file_suffix = file_path.suffix
-    assert file_suffix == ".bed"
-    return read_data(parent_dir, file_stem)
-
-def write_bed_and_header(file_path, df): 
-    file_path = Path(file_path)
-    parent_dir = file_path.parent
-    file_stem = file_path.stem
-    file_suffix = file_path.suffix
-    assert file_suffix == ".bed"
-    write_bed(parent_dir, df, file_stem)
 
 def read_meth_founder_phased(bed_meth_founder_phased): 
     return read_bed_and_header(bed_meth_founder_phased)
