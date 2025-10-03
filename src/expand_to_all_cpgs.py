@@ -3,7 +3,7 @@ import logging
 import polars as pl 
 
 from read_data import read_bed_and_header
-from write_data import write_bed_and_header
+from write_data import write_dataframe_to_bed
 from get_meth_hap1_hap2 import read_meth_level
 from version_sort import version_sort
 
@@ -70,7 +70,7 @@ def main():
     df_meth_founder_phased_all_cpgs = expand_meth_to_all_cpgs(df_all_cpgs, df_meth_founder_phased, df_meth_unphased)
     logger.info(f"Expanded DNA methylation to include all CpG sites, and unphased methylation levels (where available)")
 
-    write_bed_and_header(args.bed_meth_founder_phased_all_cpgs, df_meth_founder_phased_all_cpgs)
+    write_dataframe_to_bed(df_meth_founder_phased_all_cpgs, args.bed_meth_founder_phased_all_cpgs)
     logger.info(f"Wrote expanded methylation dataframe to {args.bed_meth_founder_phased_all_cpgs}")
 
     logger.info(f"Done running {__file__}")
