@@ -172,7 +172,8 @@ def write_bigwig(df, uid, parental, output_dir):
         # https://bioframe.readthedocs.io/en/latest/api-resources.html#bioframe.io.resources.fetch_chromsizes 
         bf.fetch_chromsizes(db=REFERENCE_GENOME), 
         outpath=f"{output_dir}/{uid}.dna-methylation.founder-phased.{parental}.bw", 
-        path_to_binary="bedGraphToBigWig" # we assume that user has bedGraphToBigWig in their PATH
+        # we assume that user has bedGraphToBigWig in their PATH: 
+        path_to_binary="bedGraphToBigWig" # type: ignore
     )
 
 def main(args):
