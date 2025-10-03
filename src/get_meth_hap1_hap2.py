@@ -2,6 +2,7 @@ import gzip
 from pathlib import Path
 import polars as pl
 from util.remove_funky_chromosomes import remove_funky_chromosomes
+from util.version_sort import version_sort
 
 def read_meth_level(bed: Path, pb_cpg_tool_mode: str) -> pl.DataFrame:
     """
@@ -93,7 +94,11 @@ def get_meth_hap1_hap2(pb_cpg_tool_mode, bed_hap1, bed_hap2):
             df_meth_hap2,
             left_on=["chromosome_hap1", "start_hap1", "end_hap1"],
             right_on=["chromosome_hap2", "start_hap2", "end_hap2"],
-            how="inner", # consider only CpG sites for which methylation levels are present in both haplotypes
+            # "how=full" captures CpG sites for which methylation level is reported for one haplotype, but not the other, 
+            # e.g., because CpG sites are created or destroyed in an individual 
+            # https://quinlangroup.slack.com/archives/C0803TM7X0X/p1759354796808349?thread_ts=1759349045.861589&cid=C0803TM7X0X 
+            how="full", 
+            coalesce=True
         )
         .rename({
             "chromosome_hap1": "chrom", 
@@ -101,4 +106,4 @@ def get_meth_hap1_hap2(pb_cpg_tool_mode, bed_hap1, bed_hap2):
             "end_hap1": "end",
         })
     )
-    return df_meth
+    return version_sort(df_meth)
