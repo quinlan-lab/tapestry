@@ -100,3 +100,4 @@ The tool also creates files that collectively enable visualization of phased DNA
 ## TODO
 
 - [ ] Convert manual workflow into a Snakemake workflow (see `Snakefile`)
+- [ ] Add cmdline invocation of the workflow to the data files it outputs (https://g.co/gemini/share/594a669386ba)
