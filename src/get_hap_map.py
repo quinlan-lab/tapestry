@@ -2,7 +2,7 @@ import numpy as np
 import polars as pl
 
 from util.shell import shell
-from util.write_data import write_bed
+from util.write_data import write_bed # type: ignore 
 
 def extract_bit_vector(l): 
     return np.array([int(x) for x in l[0]], dtype=np.uint8)
@@ -38,13 +38,15 @@ def write_df_to_vcf(df, vcf, uid):
             f.write(f"{chrom}\t{pos}\t{id_}\t{ref}\t{alt}\t{qual}\t{flt}\t{info}\t{fmt_keys}\t{fmt_vals}\n")
 
 # For visualization in IGV 
-def write_bit_vector_sites_and_mismatches(df_sites, df_sites_mismatch, uid, output_dir):
+def write_bit_vector_sites_and_mismatches(df_sites, df_sites_mismatch, uid, output_dir, logger):
     dfs = {
         # "sites": df_sites,
         "sites-mismatches": df_sites_mismatch,
     }
     for name, df in dfs.items():
-        write_df_to_vcf(df, f"{output_dir}/{uid}.bit-vector-{name}.vcf", uid)
+        vcf = f"{output_dir}/{uid}.bit-vector-{name}.vcf"
+        write_df_to_vcf(df, vcf, uid)
+        logger.info(f"Wrote bit-vector-{name} (for IGV visualization) to: '{vcf}'")
 
         cmd = (
             f'src/util/compress-index-vcf'

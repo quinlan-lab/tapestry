@@ -17,20 +17,12 @@ from get_hap_map import (
     write_bit_vector_sites_and_mismatches,
 )
 from get_meth_hap1_hap2 import get_meth_hap1_hap2
-from util.write_data import write_bed
+from util.write_data import write_bed, write_bed_and_header
 from util.version_sort import version_sort
 
-logging.basicConfig(
-    level=logging.INFO,
-    format='%(asctime)s - %(levelname)s - %(message)s',
-    datefmt='%Y-%m-%d %H:%M:%S'
-)
-logger = logging.getLogger(__name__)
-
-CPG_SITE_MISMATCH_SITE_DISTANCE = 50 # bp
 REFERENCE_GENOME = "hg38"
 
-def get_all_phasing_wrapper(uid, vcf_read_phased, tsv_read_phase_blocks, vcf_iht_phased, txt_iht_blocks):
+def get_all_phasing_wrapper(uid, vcf_read_phased, tsv_read_phase_blocks, vcf_iht_phased, txt_iht_blocks, logger):
     df_read_phasing = get_read_phasing(vcf_read_phased)
     logger.info(f"Got read-based phasing data: {len(df_read_phasing)} rows, {len(df_read_phasing.columns)} columns")
     
@@ -52,7 +44,12 @@ def get_all_phasing_wrapper(uid, vcf_read_phased, tsv_read_phase_blocks, vcf_iht
     
     return df_all_phasing
 
-def phase_meth_to_founder_haps(df_meth_hap1_hap2, df_hap_map, df_sites_mismatch):
+def write_bit_vector_mismatches(output_dir, uid, df_sites_mismatch, logger):
+    bed = f"{output_dir}/{uid}.bit-vector-sites-mismatches.bed"
+    write_bed_and_header(bed, df_sites_mismatch)
+    logger.info(f"Wrote sites where bit vectors are mismatched, for later computation of proximity of (all) cpg sites to mismatch sites to: '{bed}'")
+
+def phase_meth_to_founder_haps(df_meth_hap1_hap2, df_hap_map):
     df = bf.overlap(
         df_meth_hap1_hap2.to_pandas(), 
         df_hap_map.to_pandas(), 
@@ -120,38 +117,9 @@ def phase_meth_to_founder_haps(df_meth_hap1_hap2, df_hap_map, df_sites_mismatch)
         ])
     )
 
-    df = (
-        pl
-        .from_pandas(
-            # Use bf.closest() to find the single nearest mismatch for EACH CpG site.
-            # The result includes a 'distance' column indicating distance between CpG site and nearest mismatch site. 
-            bf.closest(
-                df.to_pandas(), 
-                df_sites_mismatch.to_pandas()
-            )
-        )
-        .cast({
-            "start_hap_map_block": pl.Int64,
-            "end_hap_map_block": pl.Int64,
-            "num_het_SNVs_in_hap_map_block": pl.Int64,
-            "total_read_count_pat": pl.Int64,
-            "total_read_count_mat": pl.Int64,
-        })
-        .with_columns(
-            (pl.col('distance') < CPG_SITE_MISMATCH_SITE_DISTANCE)
-            .alias(f'is_within_{CPG_SITE_MISMATCH_SITE_DISTANCE}bp_of_mismatch_site'),
-        )
-        .drop([
-            "chrom_", "start_", "end_",
-            "REF_", "ALT_",
-            "distance"
-        ])
-        .sort(["chrom", "start", "end"])
-    )
-
     return df 
 
-def write_bigwig(df, uid, parental, pb_cpg_tool_mode, output_dir):
+def write_bigwig(df, uid, parental, pb_cpg_tool_mode, output_dir, logger=None):
     """
     Write a bigwig file for a given parental haplotype and given pb-cpg-tools pileup mode 
     """
@@ -168,15 +136,20 @@ def write_bigwig(df, uid, parental, pb_cpg_tool_mode, output_dir):
         .to_pandas()  # Convert to pandas DataFrame for bioframe compatibility
     )
 
+    file_path = f"{output_dir}/{uid}.dna-methylation.founder-phased.{parental}.{pb_cpg_tool_mode}.{REFERENCE_GENOME}.bw"
+
     # https://bioframe.readthedocs.io/en/latest/api-fileops.html#bioframe.io.fileops.to_bigwig
     bf.to_bigwig(
         df_bed_graph, 
         # https://bioframe.readthedocs.io/en/latest/api-resources.html#bioframe.io.resources.fetch_chromsizes 
         bf.fetch_chromsizes(db=REFERENCE_GENOME), 
-        outpath=f"{output_dir}/{uid}.dna-methylation.founder-phased.{parental}.{pb_cpg_tool_mode}.bw", 
+        outpath=file_path, 
         # we assume that user has bedGraphToBigWig in their PATH: 
         path_to_binary="bedGraphToBigWig" # type: ignore
     )
+
+    if logger: 
+        logger.info(f"Wrote bigwig file for {parental} {pb_cpg_tool_mode}-based methylation levels, ASSUMING {REFERENCE_GENOME}, to: '{file_path}'")
 
 def add_suffix(df, suffix, cols_to_suffix): 
     df.columns = [f"{col}{suffix}" if col in cols_to_suffix else col for col in df.columns]
@@ -210,10 +183,33 @@ def combine_count_and_model_based_methylation_levels(
 
     return version_sort(df)
 
-def main(args):
+def main():
+    parser = argparse.ArgumentParser(description='Phase HiFi-based DNA methylation data to founder haplotypes')
+    parser.add_argument('--uid', required=True, help='Sample UID in joint-called multi-sample vcf')
+    parser.add_argument('--vcf_read_phased', required=True, help='Single-sample vcf from hiphase')
+    parser.add_argument('--tsv_read_phase_blocks', required=True, help='Single-sample tsv from hiphase')
+    parser.add_argument('--vcf_iht_phased', required=True, help='Joint-called multi-sample vcf from gtg-ped-map/gtg-concordance')
+    parser.add_argument('--txt_iht_blocks', required=True, help='Multi-sample iht blocks file from gtg-ped-map/gtg-concordance')
+    parser.add_argument('--bed_meth_count_hap1', required=True, help='Bed file of count-based methylation levels from aligned_bam_to_cpg_scores for hap1')
+    parser.add_argument('--bed_meth_count_hap2', required=True, help='Bed file of count-based methylation levels from aligned_bam_to_cpg_scores for hap2')
+    parser.add_argument('--bed_meth_model_hap1', required=True, help='Bed file of model-based methylation levels from aligned_bam_to_cpg_scores for hap1')
+    parser.add_argument('--bed_meth_model_hap2', required=True, help='Bed file of model-based methylation levels from aligned_bam_to_cpg_scores for hap2')
+    parser.add_argument('--output_dir', required=True, help='Output directory')
+    args = parser.parse_args()
+
+    logging.basicConfig(
+        level=logging.INFO,
+        format='%(asctime)s - %(levelname)s - %(filename)s - %(message)s',
+        datefmt='%Y-%m-%d %H:%M:%S'
+    )
+    logger = logging.getLogger(__name__)
+
+    logger.info(f"Starting '{__file__}'")
+    logger.info("Script started with the following arguments: %s", vars(args))
+
     Path(args.output_dir).mkdir(parents=True, exist_ok=True)
     
-    df_all_phasing = get_all_phasing_wrapper(args.uid, args.vcf_read_phased, args.tsv_read_phase_blocks, args.vcf_iht_phased, args.txt_iht_blocks)
+    df_all_phasing = get_all_phasing_wrapper(args.uid, args.vcf_read_phased, args.tsv_read_phase_blocks, args.vcf_iht_phased, args.txt_iht_blocks, logger)
     logger.info(f"Got all phasing data: {len(df_all_phasing)} rows, {len(df_all_phasing.columns)} columns")
     
     df_hap_map, df_sites, df_sites_mismatch = get_hap_map(df_all_phasing)
@@ -223,14 +219,14 @@ def main(args):
     
     write_hap_map_blocks(df_hap_map, args.uid, "paternal", args.output_dir)
     write_hap_map_blocks(df_hap_map, args.uid, "maternal", args.output_dir)
-    logger.info("Wrote paternal and maternal hap-map blocks for IGV visualization")
+    logger.info(f"Wrote paternal and maternal hap-map blocks for IGV visualization to '{args.output_dir}'")
     
     write_bed(args.output_dir, df_hap_map, f"{args.uid}.hap-map-blocks")
-    logger.info("Wrote hap-map blocks")
+    logger.info(f"Wrote hap-map blocks to '{args.output_dir}'")
     
-    write_bit_vector_sites_and_mismatches(df_sites, df_sites_mismatch, args.uid, args.output_dir)
-    logger.info("Wrote sites of bit-vectors, and sites where bit vectors are mismatched, for IGV visualization")
-    
+    write_bit_vector_sites_and_mismatches(df_sites, df_sites_mismatch, args.uid, args.output_dir, logger)
+    write_bit_vector_mismatches(args.output_dir, args.uid, df_sites_mismatch, logger)    
+
     df_meth_count_hap1_hap2 = get_meth_hap1_hap2(
         pb_cpg_tool_mode='count', 
         bed_hap1=args.bed_meth_count_hap1, 
@@ -244,43 +240,21 @@ def main(args):
     )    
     logger.info(f"Got read-based phasing of model-based methylation levels: {len(df_meth_model_hap1_hap2)} rows, {len(df_meth_model_hap1_hap2.columns)} columns")
     
-    df_meth_count_founder_phased = phase_meth_to_founder_haps(df_meth_count_hap1_hap2, df_hap_map, df_sites_mismatch)
+    df_meth_count_founder_phased = phase_meth_to_founder_haps(df_meth_count_hap1_hap2, df_hap_map)
     logger.info(f"Phased count-based methylation levels to founder haplotypes: {len(df_meth_count_founder_phased)} rows, {len(df_meth_count_founder_phased.columns)} columns")
-    df_meth_model_founder_phased = phase_meth_to_founder_haps(df_meth_model_hap1_hap2, df_hap_map, df_sites_mismatch)
+    df_meth_model_founder_phased = phase_meth_to_founder_haps(df_meth_model_hap1_hap2, df_hap_map)
     logger.info(f"Phased model-based methylation levels to founder haplotypes: {len(df_meth_model_founder_phased)} rows, {len(df_meth_model_founder_phased.columns)} columns")
     df_meth_founder_phased = combine_count_and_model_based_methylation_levels(df_meth_count_founder_phased, df_meth_model_founder_phased)
     logger.info(f"Combined count- and model-based methylation levels: {len(df_meth_founder_phased)} rows, {len(df_meth_founder_phased.columns)} columns")
 
-    fraction_of_CpG_sites_that_are_phased_to_founder_haplotypes = (
-        df_meth_founder_phased.select(pl.col("founder_haplotype_pat").is_not_null().mean())
-    )
-    logger.info(f"Percentage of CpG sites that are phased to founder haplotypes: {fraction_of_CpG_sites_that_are_phased_to_founder_haplotypes[0, 0]*100:.0f}%")
-
-    fraction_of_CpG_sites_that_are_near_mismatch_sites = (
-        df_meth_founder_phased.select(pl.col(f'is_within_{CPG_SITE_MISMATCH_SITE_DISTANCE}bp_of_mismatch_site').mean())
-    )
-    logger.info(f"Percentage of CpG sites that are within {CPG_SITE_MISMATCH_SITE_DISTANCE}bp of a mismatch site: {fraction_of_CpG_sites_that_are_near_mismatch_sites[0, 0]*100:.3f}%")
-
     write_bed(args.output_dir, df_meth_founder_phased, filename_stem=f"{args.uid}.dna-methylation.founder-phased")
-    logger.info("Wrote count- and model-based methylation levels phased to founder haplotypes")
+    logger.info(f"Wrote count- and model-based methylation levels, phased to founder haplotypes, to: '{args.output_dir}'")
     
     for parental in ['pat', 'mat']: 
         for pb_cpg_tool_mode in ['count', 'model']:
-            write_bigwig(df_meth_founder_phased, args.uid, parental, pb_cpg_tool_mode, args.output_dir)
-            logger.info(f"Wrote bigwig file for {parental} {pb_cpg_tool_mode}-based methylation levels")
+            write_bigwig(df_meth_founder_phased, args.uid, parental, pb_cpg_tool_mode, args.output_dir, logger)
+
+    logger.info(f"Done running '{__file__}'")
 
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser(description='Phase HiFi-based DNA methylation data to founder haplotypes')
-    parser.add_argument('--uid', required=True, help='Sample UID in joint-called multi-sample vcf')
-    parser.add_argument('--vcf_read_phased', required=True, help='Single-sample vcf from hiphase')
-    parser.add_argument('--tsv_read_phase_blocks', required=True, help='Single-sample tsv from hiphase')
-    parser.add_argument('--vcf_iht_phased', required=True, help='Joint-called multi-sample vcf from gtg-ped-map/gtg-concordance')
-    parser.add_argument('--txt_iht_blocks', required=True, help='Multi-sample iht blocks file from gtg-ped-map/gtg-concordance')
-    parser.add_argument('--bed_meth_count_hap1', required=True, help='Bed file of count-based methylation levels from aligned_bam_to_cpg_scores for hap1')
-    parser.add_argument('--bed_meth_count_hap2', required=True, help='Bed file of count-based methylation levels from aligned_bam_to_cpg_scores for hap2')
-    parser.add_argument('--bed_meth_model_hap1', required=True, help='Bed file of model-based methylation levels from aligned_bam_to_cpg_scores for hap1')
-    parser.add_argument('--bed_meth_model_hap2', required=True, help='Bed file of model-based methylation levels from aligned_bam_to_cpg_scores for hap2')
-    parser.add_argument('--output_dir', required=True, help='Output directory')
-    args = parser.parse_args()
-    main(args)
-    logger.info(f"Done running {__file__}")
+    main()
