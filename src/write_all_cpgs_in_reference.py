@@ -42,7 +42,12 @@ def find_all_cpgs_in_reference(reference, logger):
 
     return df
 
-def main(args): 
+def main(): 
+    parser = argparse.ArgumentParser(description='Get all CpG sites in reference genome and write them to disk')
+    parser.add_argument('--reference', required=True, help='Genome reference sequence to find locations of CpG sites')
+    parser.add_argument('--bed_all_cpgs_in_reference', required=True, help='Bed file to store CpG sites observed in reference genome')
+    args = parser.parse_args()
+
     logging.basicConfig(
         level=logging.INFO,
         format='%(asctime)s - %(levelname)s - %(filename)s - %(message)s',
@@ -60,8 +65,4 @@ def main(args):
     logger.info(f"Done running '{__file__}'")
 
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser(description='Get all CpG sites in reference genome and write them to disk')
-    parser.add_argument('--reference', required=True, help='Genome reference sequence to find locations of CpG sites')
-    parser.add_argument('--bed_all_cpgs_in_reference', required=True, help='Bed file to store CpG sites observed in reference genome')
-    args = parser.parse_args()
-    main(args)
+    main()
