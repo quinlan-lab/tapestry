@@ -4,7 +4,7 @@ import polars as pl
 # https://samtools.github.io/hts-specs/BEDv1.pdf
 # "We recommend that only a single tab (\t) be used as field separator."
 # "Comment lines start with # with no horizontal whitespace beforehand. A # appearing anywhere else in a data line is treated as feature data, not a comment."
-def write_dataframe_to_bed(df: pl.DataFrame, file_path: str):
+def write_dataframe_to_bed(df: pl.DataFrame, file_path: str, source: str | None = None):
     """
     Writes a Polars DataFrame to a file in BED format.
 
@@ -18,7 +18,11 @@ def write_dataframe_to_bed(df: pl.DataFrame, file_path: str):
     """
     with open(file_path, "w") as f:
         # Create the custom header string and write it to the file
-        header_string = "#" + "\t".join(df.columns) + "\n"
+        if source: 
+            header_string = f"##source='{source}'\n"
+        else: 
+            header_string = ""
+        header_string += "#" + "\t".join(df.columns) + "\n"
         f.write(header_string)
 
         # Write the DataFrame content directly to the file handler,
