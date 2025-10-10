@@ -37,7 +37,7 @@ pip install -r requirements.txt
    - Build an inheritance-based haplotype map and inheritance-phase variants using the `build-iht-based-haplotype-map-and-phase-variants.sh` script.
 2. Use `aligned_bam_to_cpg_scores.sh` to generate count- and model-based methylation levels from the haplotagged BAM files produced in step 1.
 3. Phase count- and model-based methylation data to founder haplotypes using the `phase_meth_to_founder_haps.sh` script, which uses the data produced in steps 1 and 2.
-4. Use `expand_to_all_cpgs.sh` script to generalize tapestry's output to include all CpG sites in the reference genome and unphased count- and model-based methylation levels, where available. Uses output of steps 2 and 3.
+4. Use `expand_to_all_cpgs.sh` script to generalize tapestry's output to include all CpG sites in the reference and sample genome, and unphased count- and model-based methylation levels, where available. Uses output of steps 2 and 3.
 
 ## Example use of CL tool that phases count- and model-based DNA methylation to founder haplotypes 
 
@@ -97,7 +97,7 @@ This will produce a log file that looks like:
 2025-10-06 14:59:17 - INFO - Done running /scratch/ucgd/lustre-labs/quinlan/u6018199/tapestry/src/phase_meth_to_founder_haps.py
 ```
 
-and phases count- and model-based DNA methylation to founder haplotypes with two QC stats for each CpG site: `haplotype_concordance_in_hap_map_block` and `is_within_50bp_of_mismatch_site`. 
+and phases count- and model-based DNA methylation to founder haplotypes. 
 The tool also creates files that collectively enable visualization of phased DNA methylation in IGV, e.g., 
 
 <img src="images/tapestry.png" alt="XXX" width="900"/>
