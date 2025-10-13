@@ -2,6 +2,7 @@ import argparse
 import logging
 import polars as pl 
 import bioframe as bf # https://bioframe.readthedocs.io/en/latest/index.html
+from pathlib import Path
 
 from read_data import read_bed_and_header
 from write_data import write_dataframe_to_bed
@@ -174,8 +175,15 @@ def main():
     df_meth_unphased = read_meth_unphased(args.bed_meth_count_unphased, args.bed_meth_model_unphased) 
     logger.info(f"Read CpG sites at which unphased methylation levels are available, both count-based and model-based")
 
-    df_meth_founder_phased = read_meth_founder_phased(args.bed_meth_founder_phased)
-    logger.info(f"Read CpG sites at which count- and model-based methylation levels have been phased to founder haplotypes")
+    if Path(args.bed_meth_founder_phased).exists():
+        df_meth_founder_phased = read_meth_founder_phased(args.bed_meth_founder_phased)
+        logger.info(f"Read CpG sites at which count- and model-based methylation levels have been phased to founder haplotypes")
+    else: 
+        logger.info(f"Could not read CpG sites at which count- and model-based methylation levels have been phased to founder haplotypes") 
+        logger.info(f"Required file does not exist: '{args.bed_meth_founder_phased}'")
+        logger.info(f"This may be because this sample is a founder and therefore cannot be inheritance-based phased")
+        logger.info(f"Done running '{__file__}'")
+        return 
 
     df_meth_founder_phased_all_cpgs = expand_meth_to_all_cpgs(df_all_cpgs_in_reference, df_meth_unphased, df_meth_founder_phased)
     logger.info(f"Expanded DNA methylation dataset to include (1) all CpG sites observed in reference and sample genomes, and (2) unphased methylation levels (where available)")
