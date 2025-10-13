@@ -11,10 +11,10 @@ output_dir="/scratch/ucgd/lustre-labs/quinlan/data-shared/dna-methylation/CEPH14
 mkdir -p ${output_dir}
 
 # TODO: use a ped file to get the prefixes for non-founder individuals in the pedigree
-# prefixes=$(python src/util/get_palladium_prefixes.py) # TODO: uncomment 
-# echo "Done loading prefixes..."
+prefixes=$(python src/util/get_palladium_prefixes.py) 
+echo "Done loading prefixes..."
 
-prefixes="200081" # TESTING
+# prefixes="200081" # TESTING
 
 for prefix in $prefixes; do
     uid="${prefix}" # sample ID in joint-called multi-sample vcf (see below)
