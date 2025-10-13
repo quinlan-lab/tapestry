@@ -22,10 +22,10 @@ python src/write_all_cpgs_in_reference.py \
 	> ${output_dir}/write_all_cpgs_in_reference.log 2>&1
 
 # TODO: use a ped file to get the prefixes for non-founder individuals in the pedigree
-# prefixes=$(python src/util/get_palladium_prefixes.py) # TODO: remove comment
+prefixes=$(python src/util/get_palladium_prefixes.py)
 echo "Done loading prefixes..."
 
-prefixes="200081" # TODO: comment 
+# prefixes="200081" # TESTING
 
 for prefix in $prefixes; do
     uid="${prefix}" # sample ID in joint-called multi-sample vcf
