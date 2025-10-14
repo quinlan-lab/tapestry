@@ -25,7 +25,7 @@ python src/write_all_cpgs_in_reference.py \
 prefixes=$(python src/util/get_palladium_prefixes.py)
 echo "Done loading prefixes..."
 
-# prefixes="200081" # TESTING
+# prefixes="200084" # TESTING
 
 for prefix in $prefixes; do
     uid="${prefix}" # sample ID in joint-called multi-sample vcf

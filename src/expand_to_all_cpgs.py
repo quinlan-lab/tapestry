@@ -3,6 +3,7 @@ import logging
 import polars as pl 
 import bioframe as bf # https://bioframe.readthedocs.io/en/latest/index.html
 from pathlib import Path
+from typing import Literal
 
 from read_data import read_bed_and_header
 from write_data import write_dataframe_to_bed
@@ -126,6 +127,7 @@ def compute_proximity_to_mismatched_heterozygous_sites(df_meth_founder_phased_al
 def reduce_to_phasable_chromosomes(df): 
     df = df.filter(
         (pl.col('chrom') != 'chrM') &
+        (pl.col('chrom') != 'chrX') &
         (pl.col('chrom') != 'chrY')
     )
     assert df[f"is_within_{CPG_SITE_MISMATCH_SITE_DISTANCE}bp_of_mismatch_site"].is_not_null().all()
@@ -140,14 +142,70 @@ def compute_fraction_of_cpgs_that_are_close_to_mismatches(df, logger=None):
     else: 
         print(report)
 
-def compute_fraction_of_cpgs_at_which_meth_is_phased(df, parental, mode, logger=None): 
+def compute_fraction_of_cpgs_at_which_meth_is_phased_to_given_parent(df, parental, mode, logger=None): 
     df = reduce_to_phasable_chromosomes(df)
-    fraction = df.select(pl.col(f"methylation_level_{parental}_{mode}").is_not_null().mean())[0,0]
+    fraction = (
+        df
+        .select(pl.col(f"methylation_level_{parental}_{mode}").is_not_null())
+        .mean()
+        .item()
+    )
     report = f"Percentage of CpG sites (in reference and sample genomes, and on phasable chroms) at which {mode}-based methylation is phased to {parental} haplotype: {fraction*100:.2f}%"
     if logger: 
         logger.info(report)
     else: 
         print(report)
+
+def create_meth_non_null_expr(
+    mode: str, 
+    logic: Literal["any", "all"], 
+    alias: str
+) -> pl.Expr:
+    """
+    Creates a Polars expression to check for non-null methylation levels.
+
+    Args:
+        mode: A string suffix for the column names ('count' or 'model').
+        logic: 'any' for OR (|), 'all' for AND (&).
+        alias: The name for the resulting boolean column.
+    
+    Returns:
+        A Polars expression.
+    """
+    pat_col = pl.col(f"methylation_level_pat_{mode}")
+    mat_col = pl.col(f"methylation_level_mat_{mode}")
+    
+    if logic == "any":
+        expression = pat_col.is_not_null() | mat_col.is_not_null()
+    elif logic == "all":
+        expression = pat_col.is_not_null() & mat_col.is_not_null()
+    else:
+        raise ValueError("`logic` parameter must be 'any' or 'all'")
+        
+    return expression.alias(alias)
+
+def compute_fraction_of_cpgs_at_which_meth_is_phased(df, mode, logic, alias, logger=None):
+    df = reduce_to_phasable_chromosomes(df)
+    expr = create_meth_non_null_expr(mode, logic, alias)
+    fraction = (
+        df
+        .with_columns(expr)
+        .select(pl.col(alias))
+        .mean()
+        .item()
+    )
+    report = f"Percentage of CpG sites (in reference and sample genomes, and on phasable chroms) at which {mode}-based methylation is phased to {alias}: {fraction*100:.2f}%"
+    if logger: 
+        logger.info(report)
+    else: 
+        print(report)
+
+def compute_fraction_of_cpgs_at_which_meth_is_phased_wrapper(df, logger=None):
+    for mode in ['count', 'model']:
+        for parental in ['pat', 'mat']: 
+            compute_fraction_of_cpgs_at_which_meth_is_phased_to_given_parent(df, parental, mode, logger)
+        compute_fraction_of_cpgs_at_which_meth_is_phased(df, mode, logic='any', alias='at least one parental haplotype', logger=logger)
+        compute_fraction_of_cpgs_at_which_meth_is_phased(df, mode, logic='all', alias='both parental haplotypes', logger=logger)
 
 def main(): 
     parser = argparse.ArgumentParser(description='Expand output of tapestry to include all CpG sites and unphased DNA methylation levels')
@@ -195,10 +253,7 @@ def main():
     logger.info(f"Wrote expanded methylation dataframe to: '{args.bed_meth_founder_phased_all_cpgs}'")
 
     compute_fraction_of_cpgs_that_are_close_to_mismatches(df_meth_founder_phased_all_cpgs, logger)
-
-    for parental in ['pat', 'mat']: 
-        for mode in ['count', 'model']:
-            compute_fraction_of_cpgs_at_which_meth_is_phased(df_meth_founder_phased_all_cpgs, parental, mode, logger)
+    compute_fraction_of_cpgs_at_which_meth_is_phased_wrapper(df_meth_founder_phased_all_cpgs, logger)
 
     logger.info(f"Done running '{__file__}'")
 
