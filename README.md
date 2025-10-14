@@ -39,7 +39,7 @@ pip install -r requirements.txt
 3. Phase count- and model-based methylation data to founder haplotypes using the `phase_meth_to_founder_haps.sh` script, which uses the data produced in steps 1 and 2.
 4. Use `expand_to_all_cpgs.sh` script to generalize tapestry's output to include all CpG sites in the reference and sample genome, and unphased count- and model-based methylation levels, where available. Uses output of steps 2 and 3.
 
-## Example use of CL tool that phases count- and model-based DNA methylation to founder haplotypes 
+## Step 3 of workflow: Phasing count- and model-based DNA methylation to founder haplotypes 
 
 The `phase_meth_to_founder_haps.sh` script calls a CL tool called `src/phase_meth_to_founder_haps.py`: 
 
@@ -101,6 +101,43 @@ and phases count- and model-based DNA methylation to founder haplotypes.
 The tool also creates files that collectively enable visualization of phased DNA methylation in IGV, e.g., 
 
 <img src="images/tapestry.png" alt="XXX" width="900"/>
+
+## Step 4 of workflow: Expanding the dataset to include all CpG sites in the reference and the sample genome, and to include unphased DNA methylation
+
+We would like to be aware of the existence of all CpG sites in the reference genome, irrespective of whether phased or unphased methylation levels are reported for those sites. Additionally, DNA methylation levels are computed at all CpG sites in the sample's haplotypes, even if those CpG sites are not in the reference genome (an example of a variant "creating" a CpG site in the sample). Conversely, CpG sites can be destroyed by mutation, and therefore a methylation level is not reported at that site on the corresponding haplotype. Finally, this step of the workflow reports various QC statistics, e.g., the percentage of CpG sites (in reference and sample genomes, and on phasable chromosomes) at which count-based methylation is phased to at least one parental haplotype. See `https://github.com/quinlan-lab/tapestry/blob/main/src/expand_to_all_cpgs.200081.ipynb` for examples of all these things. 
+
+### Bed file format
+
+The bed file output by step 4 includes a header containing run metadata and column headings. The header format provides key/value pairs as "##{key}={value}", and a final column header line in the form: "#col1 col2 col3...". An example header is shown below:
+
+```
+##source='/scratch/ucgd/lustre-labs/quinlan/u6018199/tapestry/src/expand_to_all_cpgs.py with args {'bed_all_cpgs_in_reference': '/scratch/ucgd/lustre-labs/quinlan/data-shared/dna-methylation/CEPH1463.GRCh38.hifi.founder-phased.all-cpgs/all_cpg_sites_in_reference.bed', 'bed_meth_count_unphased': '/scratch/ucgd/lustre-labs/quinlan/data-shared/dna-methylation/CEPH1463.GRCh38.hifi.count.read-backed-phased/200084.GRCh38.haplotagged.combined.bed.gz', 'bed_meth_model_unphased': '/scratch/ucgd/lustre-labs/quinlan/data-shared/dna-methylation/CEPH1463.GRCh38.hifi.model.read-backed-phased/200084.GRCh38.haplotagged.combined.bed.gz', 'bed_meth_founder_phased': '/scratch/ucgd/lustre-labs/quinlan/data-shared/dna-methylation/CEPH1463.GRCh38.hifi.founder-phased/200084.dna-methylation.founder-phased.bed', 'bed_het_site_mismatches': '/scratch/ucgd/lustre-labs/quinlan/data-shared/dna-methylation/CEPH1463.GRCh38.hifi.founder-phased/200084.bit-vector-sites-mismatches.bed', 'bed_meth_founder_phased_all_cpgs': '/scratch/ucgd/lustre-labs/quinlan/data-shared/dna-methylation/CEPH1463.GRCh38.hifi.founder-phased.all-cpgs/200084.dna-methylation.founder-phased.all_cpgs.bed'}'
+#chrom  start   end     total_read_count        methylation_level_count methylation_level_model start_hap_map_block     end_hap_map_block       haplotype_concordance_in_hap_map_block  num_het_SNVs_in_hap_map_blocktotal_read_count_pat    total_read_count_mat    founder_haplotype_pat   founder_haplotype_matmethylation_level_pat_count     methylation_level_mat_count     methylation_level_pat_model     methylation_level_mat_model     is_within_50bp_of_mismatch_site
+```
+
+Definitions of column headings: 
+
+Column | Definition 
+:--- | :---
+chrom | chromosome on which CpG site is found 
+start | start coordinate of CpG site 
+end | end coordinate of CpG site 
+total_read_count | total number of HiFi reads overlapping CpG site
+methylation_level_count | methylation level: fraction of reads that are methylated (inferred from sequencing kinetics) at given CpG site, c.f., https://github.com/PacificBiosciences/pb-CpG-tools?tab=readme-ov-file#output-modes-and-option-details
+methylation_level_model | methylation level: neural network maps sequencing kinetics at multiple CpG sites to methylation probability at a central CpG site, c.f., "Methods" section of https://www.pacb.com/wp-content/uploads/poster_saunders.pdf
+start_hap_map_block | start of hap-map block (a genomic interval in which parental phasing of reads can be performed)
+end_hap_map_block | end of hap-map block 
+haplotype_concordance_in_hap_map_block | the degree of similarity (on a scale of 0 to 1, with 1 representing perfect similarity) of the bit vectors: sequences of alleles observed at heterozygous sites on haplotypes inferred by read-backed vs inheritance-backed phasing 
+num_het_SNVs_in_hap_map_block | number of heterozygous sites in the given hap-map block 
+total_read_count_pat | number of reads from the (deduced) paternal haplotype    
+total_read_count_mat | number of reads from the (deduced) maternal haplotype
+founder_haplotype_pat | a label indicating which of the haplotypes in a founder of the pedigree the paternal haplotype in the given individual was descended from 
+founder_haplotype_mat | a similar label corresponding to the maternal haplotype of the sample 
+methylation_level_pat_count | count-based methylation level on the paternal haplotype (fraction of paternal reads that are methylated)      
+methylation_level_mat_count | count-based methylation level on the maternal haplotype (fraction of maternal reads that are methylated)          
+methylation_level_pat_model | model-based methylation level on the paternal haplotype (deep-learning estimated methylation using only the paternal reads)     
+methylation_level_mat_model | model-based methylation level on the maternal haplotype (deep-learning estimated methylation using only the maternal reads) 
+is_within_50bp_of_mismatch_site | is the given CpG site within 50bp of a heterozygous site at which the read-based and inheritance-based bit vectors (allele sequences corresponding to each haplotype) are mismatched 
 
 ## TODO
 
