@@ -2,7 +2,7 @@ import re
 from pathlib import Path
 import polars as pl
 
-def main(log_directory_path, file_pattern, methylation_logic):
+def print_fraction_cpg_sites(log_directory_path, file_pattern, methylation_logic):
     """
     Parses log files to create a Polars DataFrame of sample IDs and their
     fraction of phased CpG sites.
@@ -49,10 +49,6 @@ def main(log_directory_path, file_pattern, methylation_logic):
     final_df = (
         df
         .sort("sample_id")
-        # .with_columns(
-        #     (pl.col("percentage") / 100.0).alias("fraction_of_cpg_sites")
-        # )
-        # .select("sample_id", "fraction_of_cpg_sites")
     )
 
     pl.Config.set_tbl_rows(50)
@@ -61,8 +57,14 @@ def main(log_directory_path, file_pattern, methylation_logic):
     print(final_df)
 
 if __name__ == '__main__':
-    main(
+    print_fraction_cpg_sites(
         log_directory_path='/scratch/ucgd/lustre-labs/quinlan/data-shared/dna-methylation/CEPH1463.GRCh38.hifi.founder-phased.all-cpgs',
         file_pattern="*.log",
         methylation_logic='Percentage of CpG sites (in reference and sample genomes, and on phasable chroms) at which count-based methylation is phased to at least one parental haplotype',
     )
+
+    print_fraction_cpg_sites(
+        log_directory_path='/scratch/ucgd/lustre-labs/quinlan/data-shared/dna-methylation/CEPH1463.GRCh38.hifi.founder-phased.all-cpgs',
+        file_pattern="*.log",
+        methylation_logic='Percentage of CpG sites (in reference and sample genomes, and on phasable chroms) at which count-based unphased methylation is reported',
+    )    
