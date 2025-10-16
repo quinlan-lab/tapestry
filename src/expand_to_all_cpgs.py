@@ -142,6 +142,20 @@ def compute_fraction_of_cpgs_that_are_close_to_mismatches(df, logger=None):
     else: 
         print(report)
 
+def compute_fraction_of_cpgs_at_which_umphased_meth_is_reported(df, mode, logger=None): 
+    df = reduce_to_phasable_chromosomes(df)
+    fraction = (
+        df
+        .select(pl.col(f"methylation_level_{mode}").is_not_null())
+        .mean()
+        .item()
+    )
+    report = f"Percentage of CpG sites (in reference and sample genomes, and on phasable chroms) at which {mode}-based unphased methylation is reported: {fraction*100:.2f}%"
+    if logger: 
+        logger.info(report)
+    else: 
+        print(report)
+
 def compute_fraction_of_cpgs_at_which_meth_is_phased_to_given_parent(df, parental, mode, logger=None): 
     df = reduce_to_phasable_chromosomes(df)
     fraction = (
@@ -206,6 +220,7 @@ def compute_fraction_of_cpgs_at_which_meth_is_phased_wrapper(df, logger=None):
             compute_fraction_of_cpgs_at_which_meth_is_phased_to_given_parent(df, parental, mode, logger)
         compute_fraction_of_cpgs_at_which_meth_is_phased(df, mode, logic='any', alias='at least one parental haplotype', logger=logger)
         compute_fraction_of_cpgs_at_which_meth_is_phased(df, mode, logic='all', alias='both parental haplotypes', logger=logger)
+        compute_fraction_of_cpgs_at_which_umphased_meth_is_reported(df, mode, logger)
 
 def main(): 
     parser = argparse.ArgumentParser(description='Expand output of tapestry to include all CpG sites and unphased DNA methylation levels')
