@@ -252,9 +252,9 @@ def main():
         df_meth_founder_phased = read_meth_founder_phased(args.bed_meth_founder_phased)
         logger.info(f"Read CpG sites at which count- and model-based methylation levels have been phased to founder haplotypes")
     else: 
-        logger.info(f"Could not read CpG sites at which count- and model-based methylation levels have been phased to founder haplotypes") 
-        logger.info(f"Required file does not exist: '{args.bed_meth_founder_phased}'")
-        logger.info(f"This may be because this sample is a founder and therefore cannot be inheritance-based phased")
+        logger.warning(f"Could not read CpG sites at which count- and model-based methylation levels have been phased to founder haplotypes") 
+        logger.warning(f"Required file does not exist: '{args.bed_meth_founder_phased}'")
+        logger.warning(f"This may be because this sample is a founder and therefore cannot be inheritance-based phased")
         logger.info(f"Done running '{__file__}'")
         return 
 
