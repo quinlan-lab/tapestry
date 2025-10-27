@@ -22,20 +22,20 @@ def generate_methylation_expressions():
     alleles = ['pat', 'mat']
 
     for allele in alleles: 
-        expression = pl.col(f"founder_haplotype_{allele}").unique()
+        expression = pl.col(f"founder_haplotype_{allele}").unique().alias(f"founder_{allele}")
         expressions.append(expression)
     
     for level_type in level_types:
         column_name = f"methylation_level_{level_type}"
         expressions.extend([
             # .mean() works by summing all the non-null values and dividing by the count of those non-null values
-            pl.col(column_name).mean().alias(f"mean_of_non_null_{level_type}_based_meths"), 
-            pl.col(column_name).count().alias(f"num_cpgs_with_non_null_{level_type}_based_meth"),
+            pl.col(column_name).mean().alias(f"{level_type}_based_meth"), 
+            # pl.col(column_name).count().alias(f"num_cpgs_with_non_null_{level_type}_based_meth"),
         ])
 
     for allele in alleles:
         for level_type in level_types:
-            expression = pl.col(f"methylation_level_{allele}_{level_type}").mean().alias(f"mean_of_non_null_{level_type}_based_meths_on_{allele}_haplotype")
+            expression = pl.col(f"methylation_level_{allele}_{level_type}").mean().alias(f"{level_type}_based_meth_{allele}")
             expressions.append(expression)
             
     return expressions
@@ -66,25 +66,16 @@ def compute_methylation(df_intervals, df_meth, aggregation_expressions=generate_
 def compute_delta_methylation(df): 
     # List of the metric types you want to calculate a delta for
     metrics_to_diff = [
-        "count_based_meths",
-        "model_based_meths"
+        "count_based_meth",
+        "model_based_meth"
     ]
-
     delta_expressions = []
     for metric in metrics_to_diff:
-        # 1. Define the column names dynamically
-        pat_col = f"mean_of_non_null_{metric}_on_pat_haplotype"
-        mat_col = f"mean_of_non_null_{metric}_on_mat_haplotype"
-        alias_name = f"delta_of_{metric}"
-        
-        # 2. Create the expression
-        expr = (pl.col(pat_col) - pl.col(mat_col)).alias(alias_name)
-        
-        # 3. Add to our list
+        expr = (pl.col(f"{metric}_pat") - pl.col(f"{metric}_mat")).alias(f"delta_of_{metric}")
         delta_expressions.append(expr)
-
-    # 4. Run all expressions at once
     df = df.with_columns(delta_expressions)
+
+    df = df.drop(['num_cpgs'])
 
     return df 
 
