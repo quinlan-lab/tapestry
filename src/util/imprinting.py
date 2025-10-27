@@ -14,7 +14,6 @@ def prefix_columns(df, prefix, join_keys):
 def compute_delta_methylation_all_samples(reference_genome, tile_size, meth_read_phased_dir): 
     df_tiles = get_tiles(reference_genome, tile_size)
     prefixes = get_prefixes_wrapper()
-    join_keys = ['chrom', 'start', 'end']
     df_all_samples = None
     for prefix in tqdm(prefixes):
         bed_meth = f"{meth_read_phased_dir}/{prefix}.dna-methylation.founder-phased.all_cpgs.bed"
@@ -29,9 +28,10 @@ def compute_delta_methylation_all_samples(reference_genome, tile_size, meth_read
         # df_meth = df_meth.head(10000) # TESTING
         df_tiles_with_meth = compute_methylation(df_tiles, df_meth)
         df_tiles_with_delta_meth = compute_delta_methylation(df_tiles_with_meth)
+        join_keys = ['chrom', 'start', 'end']
         df_tiles_with_delta_meth = (
             df_tiles_with_delta_meth
-            .select(['chrom', 'start', 'end', 'delta_of_count_based_meth', 'delta_of_model_based_meth'])
+            .select(join_keys + ['delta_of_count_based_meth', 'delta_of_model_based_meth'])
             .rename({
                 'delta_of_count_based_meth': 'count',
                 'delta_of_model_based_meth': 'model'
@@ -44,7 +44,7 @@ def compute_delta_methylation_all_samples(reference_genome, tile_size, meth_read
         else:
             df_all_samples = df_all_samples.join(
                 df_tiles_with_delta_meth,
-                on=['chrom', 'start', 'end'],
+                on=join_keys,
                 # capture tiles in which at least of the two dfs has a record: 
                 how="full", 
                 coalesce=True, 
