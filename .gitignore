@@ -5,3 +5,4 @@ __pycache__
 
 control_intervals_methylation.csv
 recomb_blocks_methylation.csv
+analysis/delta_meth_all_samples.bed
