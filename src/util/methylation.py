@@ -75,7 +75,11 @@ def compute_delta_methylation(df):
         delta_expressions.append(expr)
     df = df.with_columns(delta_expressions)
 
-    df = df.drop(['num_cpgs'])
+    df = df.drop([
+        'num_cpgs',
+        'count_based_meth',
+        'model_based_meth'
+    ])
 
     return df 
 
