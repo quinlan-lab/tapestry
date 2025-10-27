@@ -63,6 +63,31 @@ def compute_methylation(df_intervals, df_meth, aggregation_expressions=generate_
         }) 
     )
 
+def compute_delta_methylation(df): 
+    # List of the metric types you want to calculate a delta for
+    metrics_to_diff = [
+        "count_based_meths",
+        "model_based_meths"
+    ]
+
+    delta_expressions = []
+    for metric in metrics_to_diff:
+        # 1. Define the column names dynamically
+        pat_col = f"mean_of_non_null_{metric}_on_pat_haplotype"
+        mat_col = f"mean_of_non_null_{metric}_on_mat_haplotype"
+        alias_name = f"delta_of_{metric}"
+        
+        # 2. Create the expression
+        expr = (pl.col(pat_col) - pl.col(mat_col)).alias(alias_name)
+        
+        # 3. Add to our list
+        delta_expressions.append(expr)
+
+    # 4. Run all expressions at once
+    df = df.with_columns(delta_expressions)
+
+    return df 
+
 def test_polars_expressions(): 
     # Generate the list of expressions by calling the function.
     aggregation_expressions = generate_methylation_expressions()
