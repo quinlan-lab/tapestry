@@ -29,10 +29,8 @@ def read_bed_and_header(file_path):
     assert file_suffix == ".bed"
     return read_bed_and_header_core(parent_dir, file_stem)
 
-def read_tapestry(bed) -> pl.DataFrame:
+def read_dataframe_from_bed(bed): 
     """
-    Reads the final output file of tapestry into a Polars DataFrame.
-    
     The function asserts that the file contains header lines starting with '##' 
     and a single header line starting with '#'. 
     """
@@ -56,7 +54,7 @@ def read_tapestry(bed) -> pl.DataFrame:
     assert has_comment_lines, f"File {bed} is missing comment lines starting with '##'"
     assert has_header_line, f"File {bed} is missing a header line starting with '#'"
 
-    df = (
+    return (
         pl
         .read_csv(
             bed,
@@ -68,19 +66,23 @@ def read_tapestry(bed) -> pl.DataFrame:
         .rename({
             '#chrom': 'chrom',
         })
-        .cast({
-            "start_hap_map_block": pl.Int64,
-            "end_hap_map_block": pl.Int64,
-            "haplotype_concordance_in_hap_map_block": pl.Float64,
-            "num_het_SNVs_in_hap_map_block": pl.Int64,
-            "total_read_count_pat": pl.Int64,
-            "total_read_count_mat": pl.Int64,
-            "methylation_level_pat_count": pl.Float64,
-            "methylation_level_mat_count": pl.Float64,
-            "methylation_level_pat_model": pl.Float64,
-            "methylation_level_mat_model": pl.Float64,
-        })
     )
+
+def read_tapestry(bed) -> pl.DataFrame:
+    df = read_dataframe_from_bed(bed)
+
+    df = df.cast({
+        "start_hap_map_block": pl.Int64,
+        "end_hap_map_block": pl.Int64,
+        "haplotype_concordance_in_hap_map_block": pl.Float64,
+        "num_het_SNVs_in_hap_map_block": pl.Int64,
+        "total_read_count_pat": pl.Int64,
+        "total_read_count_mat": pl.Int64,
+        "methylation_level_pat_count": pl.Float64,
+        "methylation_level_mat_count": pl.Float64,
+        "methylation_level_pat_model": pl.Float64,
+        "methylation_level_mat_model": pl.Float64,
+    })
 
     return df
 
