@@ -60,8 +60,9 @@ def read_dataframe_from_bed(bed):
             bed,
             separator='\t',
             comment_prefix='##',
-            has_header=True,
-            # The header line starts with '#', which polars handles automatically.
+            has_header=True, # The header line starts with '#', which polars handles automatically.
+            infer_schema=True,
+            infer_schema_length=1000000
         )
         .rename({
             '#chrom': 'chrom',
