@@ -10,6 +10,11 @@ from write_data import write_dataframe_to_bed
 from get_meth_hap1_hap2 import read_meth_level
 from version_sort import version_sort
 
+# https://quinlangroup.slack.com/archives/C02KEHXJ274/p1724332317643529
+# /scratch/ucgd/lustre-labs/quinlan/u6018199/cyvcf2
+# https://quinlangroup.slack.com/archives/C449KJT3J/p1751389842484399
+from cyvcf2 import VCF  # type: ignore
+
 CPG_SITE_MISMATCH_SITE_DISTANCE = 50 # bp
 
 def read_all_cpgs_in_reference(bed): 
@@ -221,6 +226,132 @@ def compute_fraction_of_cpgs_at_which_meth_is_phased_wrapper(df, logger=None):
         compute_fraction_of_cpgs_at_which_meth_is_phased(df, mode, logic='any', alias='at least one parental haplotype', logger=logger)
         compute_fraction_of_cpgs_at_which_meth_is_phased(df, mode, logic='all', alias='both parental haplotypes', logger=logger)
         compute_fraction_of_cpgs_at_which_umphased_meth_is_reported(df, mode, logger)
+
+def is_snv(variant):
+    # is_snp allows multiallelic sites (len(variant.ALT) > 1)
+    # https://github.com/brentp/cyvcf2/blob/541ab16a255a5287c331843d8180ed6b9ef10e00/cyvcf2/cyvcf2.pyx#L1903-L1911
+    return variant.is_snp
+
+def get_iht_phased_variants(uid, vcf): 
+    # assume vcf is phased as: "paternal | maternal" 
+    # https://quinlangroup.slack.com/archives/C08U7NLC9PZ/p1748885496941579
+
+    # assume vcf is a joint vcf 
+
+    records = []
+    with VCF(vcf, strict_gt=True) as vcf_reader: # cyvcf2 handles .vcf.gz directly
+        samples = vcf_reader.samples
+        sample_index = samples.index(uid) if uid in samples else None
+
+        # for variant in tqdm(vcf_reader, total=vcf_reader.num_records): # testing 
+        for variant in vcf_reader:
+        # for i, variant in enumerate(vcf_reader): # testing
+        #     if i >= 100: # testing
+        #         break # testing
+
+            if not is_snv(variant): 
+                continue
+
+            chrom = variant.CHROM
+            pos = variant.POS # pos is 1-based
+            start = pos - 1 
+            end = pos
+            REF = variant.REF
+            ALT = variant.ALT
+
+            # single sample of 0|1 in vcf becomes [[0, 1, True]]
+            # 2 samples of 0/0 and 1|1 would be [[0, 0, False], [1, 1, True]]
+            # https://brentp.github.io/cyvcf2/#cyvcf2
+            genotype_all_samples = variant.genotypes
+            genotype = genotype_all_samples[sample_index]
+
+            # "-1" in "genotype" indicates missing data: 
+            # c.f., "test_set_gts" at: https://github.com/brentp/cyvcf2/issues/31#issuecomment-275195917
+            allele_pat = str(genotype[0]) if genotype[0] != -1 else '.'
+            allele_mat = str(genotype[1]) if genotype[1] != -1 else '.'
+
+            phased = genotype[2]
+
+            if not phased: 
+                raise ValueError(f"Expected phased genotype, but found unphased: {genotype}")
+
+            records.append({ 
+                "chrom": chrom,
+                "start": start,
+                "end": end,
+                "REF": REF,
+                "ALT": ALT,
+                "allele_pat": allele_pat,
+                "allele_mat": allele_mat,
+            })
+ 
+    df = pl.DataFrame(records)
+    return df 
+
+def label_with_variants(df_meth_founder_phased_all_cpgs, df_iht_phased_variants):
+    # enlarge interval defining CpG sites from C nucleotide to CG dinucleotide
+    df_meth_founder_phased_all_cpgs_dinucleotides = df_meth_founder_phased_all_cpgs.clone()
+    df_meth_founder_phased_all_cpgs_dinucleotides = df_meth_founder_phased_all_cpgs_dinucleotides.with_columns((pl.col("end") + 1))
+
+    df = bf.overlap(
+        df_meth_founder_phased_all_cpgs_dinucleotides.to_pandas(),
+        df_iht_phased_variants.to_pandas(),
+        how='left',
+        suffixes=('', '_variant')
+    )
+    df = (
+        pl
+        .from_pandas(df)
+        .cast({
+            "total_read_count": pl.Int64,
+            "start_hap_map_block": pl.Int64,
+            "end_hap_map_block": pl.Int64,
+            "num_het_SNVs_in_hap_map_block": pl.Int64,
+            "total_read_count_pat": pl.Int64,
+            "total_read_count_mat": pl.Int64,
+        })
+    )
+
+    # determine the number of overlapping SNVs for each cpg record 
+    CG_cols = df_meth_founder_phased_all_cpgs_dinucleotides.columns 
+    df = df.with_columns(
+        pl
+        .when(pl.col("start_variant").is_null())
+        .then(pl.lit(0))
+        .otherwise(pl.col("start_variant").count().over(CG_cols)) # The .over() expression is Polars' implementation of Window Functions
+        .alias("num_SNVs_overlapping_CG")
+    )    
+
+    df = (
+        df
+        .rename({
+            'start': 'start_cpg',
+            'end': 'end_cpg',
+            'is_within_50bp_of_mismatch_site': 'cpg_is_within_50bp_of_mismatch_site',
+            'REF_variant': 'REF',
+            'ALT_variant': 'ALT',
+            'allele_pat_variant': 'allele_pat',
+            'allele_mat_variant': 'allele_mat'
+        })
+        .drop(['chrom_variant'])
+    )
+
+    return df 
+
+def label_with_imprinting_flag(df): 
+    df = df.with_columns(
+        pl
+        .when(pl.col("allele_pat").is_null())
+        .then(None)
+        .when(pl.col("allele_pat") == pl.col("allele_mat"))
+        .then(pl.lit("hom"))
+        .otherwise(pl.lit("het"))
+        .alias("genotype")
+    )
+    # TODO (Monday 24th of Nov)
+    # 2. group by cpg coord (and other methylation-related columns), and aggregate over "genotype" column (only), yielding: null, hom, het, hom-hom, hom-het, het-hom, het-het 
+    # 3. create new column called "include_for_imprinting" and set it to False if "het" is in "genotype" and True otherwise 
+    return df 
 
 def main(): 
     parser = argparse.ArgumentParser(description='Expand output of tapestry to include all CpG sites and unphased DNA methylation levels')
