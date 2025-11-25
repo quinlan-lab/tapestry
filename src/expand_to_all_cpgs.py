@@ -338,7 +338,7 @@ def label_with_variants(df_meth_founder_phased_all_cpgs, df_iht_phased_variants)
 
     return df 
 
-def label_with_imprinting_flag(df): 
+def label_cpgs_as_allele_specific(df): 
     CG_cols = [
         col for col in df.columns 
         if col not in [
@@ -351,12 +351,12 @@ def label_with_imprinting_flag(df):
             'num_SNVs_overlapping_CG'
         ]
     ]
-    return ( 
+    df = ( 
         df
         .with_columns(
             pl
             .when(pl.col("allele_pat").is_null())
-            .then(None)
+            .then(pl.lit("."))
             .when(pl.col("allele_pat") == pl.col("allele_mat"))
             .then(pl.lit("hom"))
             .otherwise(pl.lit("het"))
@@ -364,11 +364,22 @@ def label_with_imprinting_flag(df):
         )
         .group_by(CG_cols) # there are two records in df for each CG that overlaps 2 SNVs 
         .agg([
-            pl.col("genotype").str.join(",").alias("genotypes"),
-            (pl.col("genotype") == "het").any().not_().alias("include_for_imprinting"),
+            pl.col("genotype").str.join(",").alias("snv_genotypes"),
+            (pl.col("genotype") == "het").any().alias("cpg_is_allele_specific"),
         ])
+        .with_columns(
+            pl
+            .when(pl.col('snv_genotypes') == '.')
+            .then(False)
+            .otherwise(True)
+            .alias("cpg_overlaps_at_least_one_snv")
+        )
         .sort(['chrom', 'start_cpg'])  
     )
+
+    cols = df.columns
+    cols_reordered = cols[:-3] + [cols[-1], cols[-3], cols[-2]]
+    return df.select(cols_reordered)    
 
 def main(): 
     parser = argparse.ArgumentParser(description='Expand output of tapestry to include all CpG sites and unphased DNA methylation levels')
@@ -423,11 +434,11 @@ def main():
     df_meth_founder_phased_all_cpgs_with_variant_label = label_with_variants(df_meth_founder_phased_all_cpgs, df_iht_phased_variants)
     logger.info(f"Determined which CpG sites overlap 1 or 2 SNVs")
 
-    df_meth_founder_phased_all_cpgs_with_imprinting_flag = label_with_imprinting_flag(df_meth_founder_phased_all_cpgs_with_variant_label) 
-    logger.info(f"Flagged CpG sites that have been created or destroyed by assessing overlap with SNVs, e.g., for use in scanning the genome for imprinted loci across a pedigree")
+    df_meth_founder_phased_all_cpgs_with_allele_specific_flag = label_cpgs_as_allele_specific(df_meth_founder_phased_all_cpgs_with_variant_label) 
+    logger.info(f"Flagged CpG sites that are allele-specific by assessing overlap with het SNVs, e.g., for use in scanning the genome for imprinted loci across a pedigree")
 
     write_dataframe_to_bed(
-        df_meth_founder_phased_all_cpgs_with_imprinting_flag, 
+        df_meth_founder_phased_all_cpgs_with_allele_specific_flag, 
         args.bed_meth_founder_phased_all_cpgs, 
         source=f"{__file__} with args {vars(args)}"
     )

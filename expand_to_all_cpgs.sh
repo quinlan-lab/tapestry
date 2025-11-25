@@ -5,6 +5,7 @@ reference="/scratch/ucgd/lustre-labs/quinlan/data-shared/constraint-tools/refere
 meth_founder_phased_dir="/scratch/ucgd/lustre-labs/quinlan/data-shared/dna-methylation/CEPH1463.GRCh38.hifi.founder-phased" # output dir of phase_meth_to_founder_haps.py (containing count-based and model-based founder-phased meth)
 meth_count_read_phased_dir="/scratch/ucgd/lustre-labs/quinlan/data-shared/dna-methylation/CEPH1463.GRCh38.hifi.count.read-backed-phased" # output dir of aligned_bam_to_cpg_scores (containing count-based unphased meth)
 meth_model_read_phased_dir="/scratch/ucgd/lustre-labs/quinlan/data-shared/dna-methylation/CEPH1463.GRCh38.hifi.model.read-backed-phased" # output dir of aligned_bam_to_cpg_scores (countaining model-based unphased meth)
+iht_phased_dir='/scratch/ucgd/lustre-labs/quinlan/data-shared/haplotype-maps/CEPH1463.GRCh38' # output dir of gtg-ped-map/gtg-concordance
 
 # OUTPUT DIRS 
 output_dir="/scratch/ucgd/lustre-labs/quinlan/data-shared/dna-methylation/CEPH1463.GRCh38.hifi.founder-phased.all-cpgs" 
@@ -25,7 +26,7 @@ python src/write_all_cpgs_in_reference.py \
 prefixes=$(python src/util/get_palladium_prefixes.py)
 echo "Done loading prefixes..."
 
-# prefixes="200080 200100" # TESTING
+# prefixes="200081" # TESTING
 
 for prefix in $prefixes; do
     uid="${prefix}" # sample ID in joint-called multi-sample vcf
@@ -35,6 +36,7 @@ for prefix in $prefixes; do
 	bed_meth_count_unphased="${meth_count_read_phased_dir}/${uid}.GRCh38.haplotagged.combined.bed.gz" # bed file from aligned_bam_to_cpg_scores (unphased count-based meth)
 	bed_meth_model_unphased="${meth_model_read_phased_dir}/${uid}.GRCh38.haplotagged.combined.bed.gz" # bed file from aligned_bam_to_cpg_scores (unphased model-based meth)
 	bed_het_site_mismatches="${meth_founder_phased_dir}/${uid}.bit-vector-sites-mismatches.bed" # bed file of heterozygous sites at which bit-vectors are mismatched, from src/phase_meth_to_founder_haps.py
+    vcf_iht_phased="${iht_phased_dir}/CEPH1463.GRCh38.pass.sorted.vcf.gz" # joint-called multi-sample vcf from gtg-ped-map/gtg-concordance
 
 	# OUTPUT FILES 
 	bed_meth_founder_phased_all_cpgs="${output_dir}/${uid}.dna-methylation.founder-phased.all_cpgs.bed"
@@ -46,6 +48,8 @@ for prefix in $prefixes; do
         --bed_meth_model_unphased ${bed_meth_model_unphased} \
         --bed_meth_founder_phased_all_cpgs ${bed_meth_founder_phased_all_cpgs} \
 		--bed_het_site_mismatches ${bed_het_site_mismatches} \
+		--uid ${uid} \
+        --vcf_iht_phased ${vcf_iht_phased} \
         > ${output_dir}/${uid}.log 2>&1 & 
 
     echo "Started ${uid} ..."
