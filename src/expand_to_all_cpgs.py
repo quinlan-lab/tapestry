@@ -339,19 +339,36 @@ def label_with_variants(df_meth_founder_phased_all_cpgs, df_iht_phased_variants)
     return df 
 
 def label_with_imprinting_flag(df): 
-    df = df.with_columns(
-        pl
-        .when(pl.col("allele_pat").is_null())
-        .then(None)
-        .when(pl.col("allele_pat") == pl.col("allele_mat"))
-        .then(pl.lit("hom"))
-        .otherwise(pl.lit("het"))
-        .alias("genotype")
+    CG_cols = [
+        col for col in df.columns 
+        if col not in [
+            'start_variant', 
+            'end_variant', 
+            'REF', 
+            'ALT',	
+            'allele_pat', 
+            'allele_mat', 
+            'num_SNVs_overlapping_CG'
+        ]
+    ]
+    return ( 
+        df
+        .with_columns(
+            pl
+            .when(pl.col("allele_pat").is_null())
+            .then(None)
+            .when(pl.col("allele_pat") == pl.col("allele_mat"))
+            .then(pl.lit("hom"))
+            .otherwise(pl.lit("het"))
+            .alias("genotype")
+        )
+        .group_by(CG_cols) # there are two records in df for each CG that overlaps 2 SNVs 
+        .agg([
+            pl.col("genotype").str.join(",").alias("genotypes"),
+            (pl.col("genotype") == "het").any().not_().alias("include_for_imprinting"),
+        ])
+        .sort(['chrom', 'start_cpg'])  
     )
-    # TODO (Monday 24th of Nov)
-    # 2. group by cpg coord (and other methylation-related columns), and aggregate over "genotype" column (only), yielding: null, hom, het, hom-hom, hom-het, het-hom, het-het 
-    # 3. create new column called "include_for_imprinting" and set it to False if "het" is in "genotype" and True otherwise 
-    return df 
 
 def main(): 
     parser = argparse.ArgumentParser(description='Expand output of tapestry to include all CpG sites and unphased DNA methylation levels')
@@ -361,6 +378,8 @@ def main():
     parser.add_argument('--bed_meth_founder_phased', required=True, help='Founder-phased methylation levels')
     parser.add_argument('--bed_het_site_mismatches', required=True, help='Heterozygous sites where bit vectors are mismatched')
     parser.add_argument('--bed_meth_founder_phased_all_cpgs', required=True, help='Founder-phased methylation levels at all CpG sites, both in reference and sample, including null methylation levels, and unphased methylation levels')
+    parser.add_argument('--uid', required=True, help='Sample UID in joint-called multi-sample vcf')
+    parser.add_argument('--vcf_iht_phased', required=True, help='Joint-called multi-sample vcf from gtg-ped-map/gtg-concordance')
     args = parser.parse_args()
 
     logging.basicConfig(
@@ -395,11 +414,24 @@ def main():
     df_meth_founder_phased_all_cpgs = compute_proximity_to_mismatched_heterozygous_sites(df_meth_founder_phased_all_cpgs, args.bed_het_site_mismatches)
     logger.info(f"Computed proximity of all CpG sites to heterozygous sites at which bit-vectors are mismatched")
 
-    write_dataframe_to_bed(df_meth_founder_phased_all_cpgs, args.bed_meth_founder_phased_all_cpgs, source=f"{__file__} with args {vars(args)}")
-    logger.info(f"Wrote expanded methylation dataframe to: '{args.bed_meth_founder_phased_all_cpgs}'")
-
     compute_fraction_of_cpgs_that_are_close_to_mismatches(df_meth_founder_phased_all_cpgs, logger)
     compute_fraction_of_cpgs_at_which_meth_is_phased_wrapper(df_meth_founder_phased_all_cpgs, logger)
+
+    df_iht_phased_variants = get_iht_phased_variants(args.uid, args.vcf_iht_phased)
+    logger.info(f"Got inheritance-phased SNVs from joint vcf")
+
+    df_meth_founder_phased_all_cpgs_with_variant_label = label_with_variants(df_meth_founder_phased_all_cpgs, df_iht_phased_variants)
+    logger.info(f"Determined which CpG sites overlap 1 or 2 SNVs")
+
+    df_meth_founder_phased_all_cpgs_with_imprinting_flag = label_with_imprinting_flag(df_meth_founder_phased_all_cpgs_with_variant_label) 
+    logger.info(f"Flagged CpG sites that have been created or destroyed by assessing overlap with SNVs, e.g., for use in scanning the genome for imprinted loci across a pedigree")
+
+    write_dataframe_to_bed(
+        df_meth_founder_phased_all_cpgs_with_imprinting_flag, 
+        args.bed_meth_founder_phased_all_cpgs, 
+        source=f"{__file__} with args {vars(args)}"
+    )
+    logger.info(f"Wrote expanded and imprinting-flagged methylation dataframe to: '{args.bed_meth_founder_phased_all_cpgs}'")
 
     logger.info(f"Done running '{__file__}'")
 
