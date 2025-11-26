@@ -70,20 +70,21 @@ def read_dataframe_from_bed(bed):
     )
 
 def read_tapestry(bed) -> pl.DataFrame:
-    df = read_dataframe_from_bed(bed)
-
-    df = df.cast({
-        "start_hap_map_block": pl.Int64,
-        "end_hap_map_block": pl.Int64,
-        "haplotype_concordance_in_hap_map_block": pl.Float64,
-        "num_het_SNVs_in_hap_map_block": pl.Int64,
-        "total_read_count_pat": pl.Int64,
-        "total_read_count_mat": pl.Int64,
-        "methylation_level_pat_count": pl.Float64,
-        "methylation_level_mat_count": pl.Float64,
-        "methylation_level_pat_model": pl.Float64,
-        "methylation_level_mat_model": pl.Float64,
-    })
-
-    return df
-
+    return (
+        read_dataframe_from_bed(bed)
+        .cast({
+            "start_hap_map_block": pl.Int64,
+            "end_hap_map_block": pl.Int64,
+            "haplotype_concordance_in_hap_map_block": pl.Float64,
+            "num_het_SNVs_in_hap_map_block": pl.Int64,
+            "total_read_count_pat": pl.Int64,
+            "total_read_count_mat": pl.Int64,
+            "methylation_level_pat_count": pl.Float64,
+            "methylation_level_mat_count": pl.Float64,
+            "methylation_level_pat_model": pl.Float64,
+            "methylation_level_mat_model": pl.Float64,
+        }).rename({
+            "start_cpg": "start",
+            "end_cpg": "end"
+        })
+    )
