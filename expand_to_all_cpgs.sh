@@ -8,7 +8,7 @@ meth_model_read_phased_dir="/scratch/ucgd/lustre-labs/quinlan/data-shared/dna-me
 iht_phased_dir='/scratch/ucgd/lustre-labs/quinlan/data-shared/haplotype-maps/CEPH1463.GRCh38' # output dir of gtg-ped-map/gtg-concordance
 
 # OUTPUT DIRS 
-output_dir="/scratch/ucgd/lustre-labs/quinlan/data-shared/dna-methylation/CEPH1463.GRCh38.hifi.founder-phased.all-cpgs.2" 
+output_dir="/scratch/ucgd/lustre-labs/quinlan/data-shared/dna-methylation/CEPH1463.GRCh38.hifi.founder-phased.all-cpgs" 
 
 mkdir -p ${output_dir}
 
