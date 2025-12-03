@@ -24,4 +24,5 @@ bcftools query -s ${SAMPLE} -r ${REGION} -f ${FORMAT} ${JOINT_CALLED_VCF}
 echo ""
 
 echo "Variants from joint-called VCF (inheritance-phased):"
+echo "(This is the vcf we use to label CpG sites as allele-specific or not.)"
 bcftools query -s ${SAMPLE} -r ${REGION} -f ${FORMAT} ${JOINT_CALLED_VCF_IHT_PHASED}
