@@ -232,10 +232,7 @@ def is_snv(variant):
     # https://github.com/brentp/cyvcf2/blob/541ab16a255a5287c331843d8180ed6b9ef10e00/cyvcf2/cyvcf2.pyx#L1903-L1911
     return variant.is_snp
 
-def get_iht_phased_variants(uid, vcf): 
-    # assume vcf is phased as: "paternal | maternal" 
-    # https://quinlangroup.slack.com/archives/C08U7NLC9PZ/p1748885496941579
-
+def get_joint_called_variants(uid, vcf): 
     # assume vcf is a joint vcf 
 
     records = []
@@ -267,13 +264,10 @@ def get_iht_phased_variants(uid, vcf):
 
             # "-1" in "genotype" indicates missing data: 
             # c.f., "test_set_gts" at: https://github.com/brentp/cyvcf2/issues/31#issuecomment-275195917
-            allele_pat = str(genotype[0]) if genotype[0] != -1 else '.'
-            allele_mat = str(genotype[1]) if genotype[1] != -1 else '.'
+            allele_1 = str(genotype[0]) if genotype[0] != -1 else '.'
+            allele_2 = str(genotype[1]) if genotype[1] != -1 else '.'
 
             phased = genotype[2]
-
-            if not phased: 
-                raise ValueError(f"Expected phased genotype, but found unphased: {genotype}")
 
             records.append({ 
                 "chrom": chrom,
@@ -281,24 +275,37 @@ def get_iht_phased_variants(uid, vcf):
                 "end": end,
                 "REF": REF,
                 "ALT": ALT,
-                "allele_pat": allele_pat,
-                "allele_mat": allele_mat,
+                "allele_1": allele_1,
+                "allele_2": allele_2,
+                "phased": phased
             })
  
     df = pl.DataFrame(records)
     return df 
 
-def label_with_variants(df_meth_founder_phased_all_cpgs, df_iht_phased_variants):
-    # enlarge interval defining CpG sites from C nucleotide to CG dinucleotide
-    df_meth_founder_phased_all_cpgs_dinucleotides = df_meth_founder_phased_all_cpgs.clone()
-    df_meth_founder_phased_all_cpgs_dinucleotides = df_meth_founder_phased_all_cpgs_dinucleotides.with_columns((pl.col("end") + 1))
+def label_with_variants(df_meth_founder_phased_all_cpgs, df_joint_called_variants):
+    df_meth_founder_phased_all_cpgs_dinucleotides = (
+        df_meth_founder_phased_all_cpgs
+        .clone()
+        .with_columns((pl.col("end") + 1)) # enlarge interval defining CpG sites from C nucleotide to CG dinucleotide
+    )
+    df_meth_founder_phased_all_cpgs_dinucleotides_pd = df_meth_founder_phased_all_cpgs_dinucleotides.to_pandas()
+
+    df_joint_called_variants_pd = (
+        df_joint_called_variants
+        .to_pandas()
+        .astype({
+            'phased': "boolean",
+        })
+    )
 
     df = bf.overlap(
-        df_meth_founder_phased_all_cpgs_dinucleotides.to_pandas(),
-        df_iht_phased_variants.to_pandas(),
+        df_meth_founder_phased_all_cpgs_dinucleotides_pd,
+        df_joint_called_variants_pd,
         how='left',
         suffixes=('', '_variant')
     )
+
     df = (
         pl
         .from_pandas(df)
@@ -330,8 +337,9 @@ def label_with_variants(df_meth_founder_phased_all_cpgs, df_iht_phased_variants)
             'is_within_50bp_of_mismatch_site': 'cpg_is_within_50bp_of_mismatch_site',
             'REF_variant': 'REF',
             'ALT_variant': 'ALT',
-            'allele_pat_variant': 'allele_pat',
-            'allele_mat_variant': 'allele_mat'
+            'allele_1_variant': 'allele_1',
+            'allele_2_variant': 'allele_2',
+            'phased_variant': 'snv_phased'
         })
         .drop(['chrom_variant'])
     )
@@ -346,18 +354,40 @@ def label_cpgs_as_allele_specific(df):
             'end_variant', 
             'REF', 
             'ALT',	
-            'allele_pat', 
-            'allele_mat', 
+            'allele_1', 
+            'allele_2', 
+            'snv_phased',
             'num_SNVs_overlapping_CG'
         ]
     ]
+
     df = ( 
         df
         .with_columns(
             pl
-            .when(pl.col("allele_pat").is_null())
+            .when(
+                # null and non_null never occur together 
+                pl.col("allele_1").is_null() &
+                pl.col("allele_2").is_null()
+            )
+            .then(pl.lit(".")) # "None" (instead of ".") not necessary because I classify CpGs as overlapping SNVs or not later anyway
+            .when( 
+                # allele_1==. and allele_2==. :
+                # Most of these CpGs have null haplotype-specific methylation levels, 
+                # and, as such, would never be considered in imprinting scans 
+
+                # allele_1==. and allele_2!=.:
+                # Many of these are het dels, which generate allele-specific CpGs, and will be falsely labeled as NOT allele-specific below,
+                # but can be identified as allele-specific via per-haplotype read count < threshold, which pb-cpg-tools then quantifies as a *null* methylation level
+
+                # allele_1!=. and allele_2==.:
+                # empty dataframe 
+
+                (pl.col("allele_1") == '.') | 
+                (pl.col("allele_2") == '.')
+            )
             .then(pl.lit("."))
-            .when(pl.col("allele_pat") == pl.col("allele_mat"))
+            .when(pl.col("allele_1") == pl.col("allele_2"))
             .then(pl.lit("hom"))
             .otherwise(pl.lit("het"))
             .alias("genotype")
@@ -390,7 +420,7 @@ def main():
     parser.add_argument('--bed_het_site_mismatches', required=True, help='Heterozygous sites where bit vectors are mismatched')
     parser.add_argument('--bed_meth_founder_phased_all_cpgs', required=True, help='Founder-phased methylation levels at all CpG sites, both in reference and sample, including null methylation levels, and unphased methylation levels')
     parser.add_argument('--uid', required=True, help='Sample UID in joint-called multi-sample vcf')
-    parser.add_argument('--vcf_iht_phased', required=True, help='Joint-called multi-sample vcf from gtg-ped-map/gtg-concordance')
+    parser.add_argument('--vcf_joint_called', required=True, help='Joint-called multi-sample vcf')
     args = parser.parse_args()
 
     logging.basicConfig(
@@ -428,10 +458,10 @@ def main():
     compute_fraction_of_cpgs_that_are_close_to_mismatches(df_meth_founder_phased_all_cpgs, logger)
     compute_fraction_of_cpgs_at_which_meth_is_phased_wrapper(df_meth_founder_phased_all_cpgs, logger)
 
-    df_iht_phased_variants = get_iht_phased_variants(args.uid, args.vcf_iht_phased)
-    logger.info(f"Got inheritance-phased SNVs from joint vcf")
+    df_joint_called_variants = get_joint_called_variants(args.uid, args.vcf_joint_called)
+    logger.info(f"Got SNVs from joint-called vcf")
 
-    df_meth_founder_phased_all_cpgs_with_variant_label = label_with_variants(df_meth_founder_phased_all_cpgs, df_iht_phased_variants)
+    df_meth_founder_phased_all_cpgs_with_variant_label = label_with_variants(df_meth_founder_phased_all_cpgs, df_joint_called_variants)
     logger.info(f"Determined which CpG sites overlap 1 or 2 SNVs")
 
     df_meth_founder_phased_all_cpgs_with_allele_specific_flag = label_cpgs_as_allele_specific(df_meth_founder_phased_all_cpgs_with_variant_label) 
@@ -442,7 +472,7 @@ def main():
         args.bed_meth_founder_phased_all_cpgs, 
         source=f"{__file__} with args {vars(args)}"
     )
-    logger.info(f"Wrote expanded and imprinting-flagged methylation dataframe to: '{args.bed_meth_founder_phased_all_cpgs}'")
+    logger.info(f"Wrote expanded and allele-specific-flagged methylation dataframe to: '{args.bed_meth_founder_phased_all_cpgs}'")
 
     logger.info(f"Done running '{__file__}'")
 
