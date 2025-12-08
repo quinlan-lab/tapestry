@@ -425,6 +425,8 @@ def write_methylation(df, file_path, source):
     shell(cmd) 
     shell(f'rm {file_path}')
 
+    return root
+
 def main(): 
     parser = argparse.ArgumentParser(description='Expand output of tapestry to include all CpG sites and unphased DNA methylation levels')
     parser.add_argument('--bed_all_cpgs_in_reference', required=True, help='All CpG sites observed in reference genome')
@@ -481,12 +483,13 @@ def main():
     df_meth_founder_phased_all_cpgs_with_allele_specific_flag = label_cpgs_as_allele_specific(df_meth_founder_phased_all_cpgs_with_variant_label) 
     logger.info(f"Flagged CpG sites that are allele-specific by assessing overlap with het SNVs, e.g., for use in scanning the genome for imprinted loci across a pedigree")
 
-    write_methylation(
+    methylation_data_root = write_methylation(
         df_meth_founder_phased_all_cpgs_with_allele_specific_flag, 
         args.bed_meth_founder_phased_all_cpgs, 
         source=f"{__file__} with args {vars(args)}"
     )
-    logger.info(f"Wrote expanded and allele-specific-flagged methylation dataframe to: '{args.bed_meth_founder_phased_all_cpgs}'")
+    logger.info(f"Wrote expanded and allele-specific-flagged methylation dataframe to: '{methylation_data_root}.sorted.bed.gz'")
+    logger.info(f"Index exists at: '{methylation_data_root}.sorted.bed.gz.tbi'")
 
     logger.info(f"Done running '{__file__}'")
 
@@ -502,7 +505,9 @@ def test_write_methylation():
 
     file_path = 'tmp.bed'
     source = "test source text"
-    write_methylation(df, file_path, source)
+    root = write_methylation(df, file_path, source)
+    print(f"Wrote dataframe to: '{root}.sorted.bed.gz'")
+    print(f"Index exists at: '{root}.sorted.bed.gz.tbi'")
 
 if __name__ == "__main__":
     main()
