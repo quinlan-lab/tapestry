@@ -14,6 +14,6 @@ set -o errexit
 set -o nounset
 set -o xtrace 
 
-sort --parallel=8 --buffer-size=75% --version-sort -k1,1 -k2,2 /dev/stdin \
+awk '/^#/{print; next} {print | "sort --parallel=8 --buffer-size=75% --version-sort -k1,1 -k2,2"}' \
   | bgzip --force --stdout > ${name}.sorted.bed.gz
 tabix --force --preset bed ${name}.sorted.bed.gz

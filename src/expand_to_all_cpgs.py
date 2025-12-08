@@ -4,11 +4,13 @@ import polars as pl
 import bioframe as bf # https://bioframe.readthedocs.io/en/latest/index.html
 from pathlib import Path
 from typing import Literal
+import os 
 
 from read_data import read_bed_and_header
 from write_data import write_dataframe_to_bed
 from get_meth_hap1_hap2 import read_meth_level
 from version_sort import version_sort
+from shell import shell
 
 # https://quinlangroup.slack.com/archives/C02KEHXJ274/p1724332317643529
 # /scratch/ucgd/lustre-labs/quinlan/u6018199/cyvcf2
@@ -411,6 +413,18 @@ def label_cpgs_as_allele_specific(df):
     cols_reordered = cols[:-3] + [cols[-1], cols[-3], cols[-2]]
     return df.select(cols_reordered)    
 
+def write_methylation(df, file_path, source): 
+    write_dataframe_to_bed(df, file_path, source)
+    root, suffix = os.path.splitext(file_path)
+
+    cmd = (
+        f'cat {file_path}'
+        f' | src/util/sort-compress-index-bed'
+        f' --name {root}'
+    )
+    shell(cmd) 
+    shell(f'rm {file_path}')
+
 def main(): 
     parser = argparse.ArgumentParser(description='Expand output of tapestry to include all CpG sites and unphased DNA methylation levels')
     parser.add_argument('--bed_all_cpgs_in_reference', required=True, help='All CpG sites observed in reference genome')
@@ -467,7 +481,7 @@ def main():
     df_meth_founder_phased_all_cpgs_with_allele_specific_flag = label_cpgs_as_allele_specific(df_meth_founder_phased_all_cpgs_with_variant_label) 
     logger.info(f"Flagged CpG sites that are allele-specific by assessing overlap with het SNVs, e.g., for use in scanning the genome for imprinted loci across a pedigree")
 
-    write_dataframe_to_bed(
+    write_methylation(
         df_meth_founder_phased_all_cpgs_with_allele_specific_flag, 
         args.bed_meth_founder_phased_all_cpgs, 
         source=f"{__file__} with args {vars(args)}"
@@ -476,5 +490,20 @@ def main():
 
     logger.info(f"Done running '{__file__}'")
 
+def test_write_methylation(): 
+    bed_data = {
+        "chrom": ["chr1", "chr1", "chr2", "chrX", "chrY"],
+        "start": [10000, 15000, 50000, 100000, 2000000],
+        "end":   [10150, 15300, 50050, 100500, 2000100],
+        "meth":  [0.2, 0.1, 0.5, 0.9, 0.3]
+    }
+    df = pl.DataFrame(bed_data) 
+    print(df)
+
+    file_path = 'tmp.bed'
+    source = "test source text"
+    write_methylation(df, file_path, source)
+
 if __name__ == "__main__":
     main()
+    # test_write_methylation()
