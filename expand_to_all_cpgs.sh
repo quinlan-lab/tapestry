@@ -7,7 +7,7 @@ meth_count_read_phased_dir="/scratch/ucgd/lustre-labs/quinlan/data-shared/dna-me
 meth_model_read_phased_dir="/scratch/ucgd/lustre-labs/quinlan/data-shared/dna-methylation/CEPH1463.GRCh38.hifi.model.read-backed-phased" # output dir of aligned_bam_to_cpg_scores (countaining model-based unphased meth)
 
 # OUTPUT DIRS 
-output_dir="/scratch/ucgd/lustre-labs/quinlan/data-shared/dna-methylation/CEPH1463.GRCh38.hifi.founder-phased.all-cpgs" 
+output_dir="/scratch/ucgd/lustre-labs/quinlan/data-shared/dna-methylation/CEPH1463.GRCh38.hifi.founder-phased.all-cpgs.hunnicutt" 
 
 mkdir -p ${output_dir}
 
