@@ -1,16 +1,20 @@
 import sys
 import polars as pl
 
+def funky(chrom): 
+    return "_random" in chrom or "chrEBV" in chrom or "chrUn_" in chrom
+
 def remove_funky_chromosomes(df, chrom_column):
-    # remove chromosomes like chr1_KI270706v1_random, chrEBV, chrUn_GL000195v1  
-    df = df.filter(
-        ~(
-            df[chrom_column].str.contains('_random') |
-            df[chrom_column].str.contains('chrEBV') |
-            df[chrom_column].str.contains('chrUn_')
-        )
+    """
+    Removes rows where the chromosome name indicates a non-standard contig 
+    e.g., chr1_KI270706v1_random, chrEBV, chrUn_GL000195v1  
+    """
+    # using .filter() with pl.col() expressions allows us to handle DataFrames and LazyFrames:
+    return df.filter(
+        ~pl.col(chrom_column).str.contains("_random") &
+        ~pl.col(chrom_column).str.contains("chrEBV") &
+        ~pl.col(chrom_column).str.contains("chrUn_") 
     )
-    return df
 
 def main(): 
     df = pl.read_csv(

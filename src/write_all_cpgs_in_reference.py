@@ -2,46 +2,47 @@ import argparse
 import logging
 import pysam
 import re
-import polars as pl 
 
-from remove_funky_chromosomes import remove_funky_chromosomes
+from remove_funky_chromosomes import funky
 
-def find_all_cpgs_in_reference(reference, logger):
+def scan_and_write_cpgs(reference, output_file, logger):
     """
-    Scans a reference genome FASTA file for all CpG sites and returns them
-    as a Polars DataFrame.
-
+    Scans a reference genome for CpG sites, filters out 'funky' chromosomes,
+    and writes valid sites directly to a BED file record-by-record.
+    
     Args:
-        reference (str): The path to the reference FASTA file.
-
-    Returns:
-        pl.DataFrame: A DataFrame with columns ['chrom', 'start', 'end']
-                      representing the CpG sites in BED format.
+        reference (str): Path to the reference FASTA.
+        output_file (str): Path to the output BED/TSV file.
+        logger: Logger instance.
     """
-    cpg_sites = []
-    with pysam.FastaFile(reference) as fa:
+    count = 0
+    
+    # Open both the FASTA and the output file simultaneously
+    with pysam.FastaFile(reference) as fa, open(output_file, "w") as out_f:
+        
         for chrom in fa.references:
+            # 1. Filter Logic:
+            # Check the chromosome name *before* fetching the sequence. 
+            if funky(chrom):
+                logger.debug(f"Skipping funky chromosome: {chrom}")
+                continue
+
             logger.info(f"Scanning '{chrom}'")
+            
+            # 2. Fetch Sequence:
             sequence = fa.fetch(chrom).upper()
-            # Use a list comprehension for efficiency
-            cpg_sites.extend(
-                [
-                    (chrom, match.start(), match.start() + 1)
-                    for match in re.finditer('CG', sequence)
-                ]
-            )
 
-    logger.info(f"Found {len(cpg_sites)} CpG sites in reference genome")
+            # 3. Stream & Write:
+            # re.finditer yields matches one by one (generator), avoiding big lists.
+            for match in re.finditer('CG', sequence):
+                start = match.start()
+                # Write immediately to file: chrom, start, end (start+1)
+                out_f.write(f"{chrom}\t{start}\t{start + 1}\n")
+                count += 1
 
-    # Create a Polars DataFrame from the list of tuples
-    df = pl.DataFrame(
-        cpg_sites,
-        schema={'chrom': pl.Utf8, 'start': pl.Int64, 'end': pl.Int64},
-        orient="row"
-    )
+    logger.info(f"Finished. Wrote {count} CpG sites to {output_file}")
 
-    return df
-
+@profile # type:ignore 
 def main(): 
     parser = argparse.ArgumentParser(description='Get all CpG sites in reference genome and write them to disk')
     parser.add_argument('--reference', required=True, help='Genome reference sequence to find locations of CpG sites')
@@ -49,7 +50,7 @@ def main():
     args = parser.parse_args()
 
     logging.basicConfig(
-        level=logging.INFO,
+        level=logging.DEBUG,  # <--- This allows debug messages through
         format='%(asctime)s - %(levelname)s - %(filename)s - %(message)s',
         datefmt='%Y-%m-%d %H:%M:%S'
     )
@@ -58,10 +59,11 @@ def main():
     logger.info(f"Starting '{__file__}'")
     logger.info("Script started with the following arguments: %s", vars(args))
 
-    df = find_all_cpgs_in_reference(args.reference, logger)
-    df = remove_funky_chromosomes(df, chrom_column='chrom')
-    df.write_csv(args.bed_all_cpgs_in_reference, separator='\t', include_header=False)
-    logger.info(f"Wrote: '{args.bed_all_cpgs_in_reference}'")
+    scan_and_write_cpgs(
+        reference=args.reference, 
+        output_file=args.bed_all_cpgs_in_reference, 
+        logger=logger
+    )
     logger.info(f"Done running '{__file__}'")
 
 if __name__ == "__main__":
