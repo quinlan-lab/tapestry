@@ -1,10 +1,12 @@
 from tqdm import tqdm 
 from pathlib import Path 
 import polars as pl 
+import argparse
 
 from tile import get_tiles 
 from get_palladium_prefixes import get_prefixes_wrapper
 from read_data import read_tapestry
+from write_data import write_dataframe_to_bed
 from methylation import compute_methylation
 from version_sort import version_sort
 from prefix_columns import prefix_columns
@@ -22,20 +24,25 @@ def compute_delta_methylation(df):
     df = df.with_columns(delta_expressions)
 
     df = df.drop([
-        'num_cpgs',
         'count_based_meth',
         'model_based_meth'
     ])
 
     return df 
 
-def compute_delta_methylation_all_samples(reference_genome, tile_size, meth_read_phased_dir): 
+def compute_delta_methylation_all_samples(reference_genome, tile_size, meth_read_phased_dir, testing): 
     df_tiles = get_tiles(reference_genome, tile_size)
     prefixes = get_prefixes_wrapper()
-    prefixes = prefixes[:2] # TESTING
+    if testing: 
+        print('[Testing] Using only 2 samples')
+        prefixes = prefixes[:2]
+    else: 
+        print('[Production] Using all samples')
+    print(f"Samples: {prefixes}")
+
     df_all_samples = None
     for prefix in tqdm(prefixes):
-        bed_meth = f"{meth_read_phased_dir}/{prefix}.dna-methylation.founder-phased.all_cpgs.bed"
+        bed_meth = f"{meth_read_phased_dir}/{prefix}.dna-methylation.founder-phased.all_cpgs.sorted.bed.gz"
         if Path(bed_meth).exists():
             df_meth = read_tapestry(bed_meth)
         else: 
@@ -50,7 +57,7 @@ def compute_delta_methylation_all_samples(reference_genome, tile_size, meth_read
         join_keys = ['chrom', 'start', 'end']
         df_tiles_with_delta_meth = (
             df_tiles_with_delta_meth
-            .select(join_keys + ['delta_of_count_based_meth', 'delta_of_model_based_meth'])
+            .select(join_keys + ['num_cpgs', 'delta_of_count_based_meth', 'delta_of_model_based_meth'])
             .rename({
                 'delta_of_count_based_meth': 'count',
                 'delta_of_model_based_meth': 'model'
@@ -70,3 +77,19 @@ def compute_delta_methylation_all_samples(reference_genome, tile_size, meth_read
             )   
     return version_sort(df_all_samples)
 
+def main(): 
+    parser = argparse.ArgumentParser(description='Compute methylation difference between haplotypes for multiple samples')
+    parser.add_argument('--reference_genome', required=True, help='Reference genome')
+    parser.add_argument('--tile_size', required=True, type=int, help='Size in bp of genomic tile over which to average DNA methylation')
+    parser.add_argument('--meth_read_phased_dir', required=True, help='Directory containing founder-phased DNA methylation at CpG sites')
+    parser.add_argument('--output_bed', required=True, help='Bed file containing delta methylation within tiles for all samples')
+    parser.add_argument('--testing', action='store_true', help='Testing mode, where program takes only 2 mins to run for 2 samples')
+    args = parser.parse_args()
+
+    df_delta_meth_all_samples = compute_delta_methylation_all_samples(args.reference_genome, args.tile_size, args.meth_read_phased_dir, testing=args.testing)
+    write_dataframe_to_bed(df_delta_meth_all_samples, args.output_bed, source=__file__)
+    print(f"Wrote '{args.output_bed}'")
+    print(f"Done running '{__file__}'")
+    
+if __name__ == '__main__': 
+    main()
