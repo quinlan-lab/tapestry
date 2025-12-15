@@ -20,6 +20,7 @@ def generate_methylation_expressions():
         A list of Polars expressions that can be used in an .agg() clause.
     """
     expressions = [
+        # This counts total rows in the group (including nulls)
         pl.len().alias("num_cpgs"),
     ]
 
@@ -27,21 +28,31 @@ def generate_methylation_expressions():
     alleles = ['pat', 'mat']
 
     for allele in alleles: 
-        expression = pl.col(f"founder_haplotype_{allele}").unique().alias(f"founder_{allele}")
-        expressions.append(expression)
+        expressions.append(
+            pl.col(f"founder_haplotype_{allele}").unique().alias(f"founder_{allele}")
+        )
     
     for level_type in level_types:
         column_name = f"methylation_level_{level_type}"
-        expressions.extend([
+
+        # Always calculate mean
+        expressions.append(
             # .mean() works by summing all the non-null values and dividing by the count of those non-null values
-            pl.col(column_name).mean().alias(f"{level_type}_based_meth"), 
-            # pl.col(column_name).count().alias(f"num_cpgs_with_non_null_{level_type}_based_meth"),
-        ])
+            pl.col(column_name).mean().alias(f"{level_type}_based_meth")
+        )
+
+        # Only calculate non-null count if level_type is 'count'
+        if level_type == 'count':
+            expressions.append(
+                # .count() only counts non-null values
+                pl.col(column_name).count().alias(f"num_cpgs_with_non_null_{level_type}_based_meth")
+            )        
 
     for allele in alleles:
         for level_type in level_types:
-            expression = pl.col(f"methylation_level_{allele}_{level_type}").mean().alias(f"{level_type}_based_meth_{allele}")
-            expressions.append(expression)
+            expressions.append(
+                pl.col(f"methylation_level_{allele}_{level_type}").mean().alias(f"{level_type}_based_meth_{allele}")
+            )
             
     return expressions
 
