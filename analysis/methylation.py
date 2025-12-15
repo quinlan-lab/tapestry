@@ -50,10 +50,21 @@ def generate_methylation_expressions():
 
     for allele in alleles:
         for level_type in level_types:
+            col_name = f"methylation_level_{allele}_{level_type}"
+
+            # Always calculate mean
             expressions.append(
-                pl.col(f"methylation_level_{allele}_{level_type}").mean().alias(f"{level_type}_based_meth_{allele}")
+                # .mean() works by summing all the non-null values and dividing by the count of those non-null values
+                pl.col(col_name).mean().alias(f"{level_type}_based_meth_{allele}")
             )
-            
+
+            # Only calculate non-null count if level_type is 'count'
+            if level_type == 'count':
+                expressions.append(
+                    # .count() only counts non-null values
+                    pl.col(col_name).count().alias(f"num_cpgs_with_non_null_{level_type}_based_meth_{allele}")
+                )
+                
     return expressions
 
 def compute_methylation(df_intervals, df_meth, aggregation_expressions=generate_methylation_expressions()): 
