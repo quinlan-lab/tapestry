@@ -57,10 +57,11 @@ def compute_delta_methylation_all_samples(reference_genome, tile_size, meth_read
         join_keys = ['chrom', 'start', 'end']
         df_tiles_with_delta_meth = (
             df_tiles_with_delta_meth
-            .select(join_keys + ['num_cpgs', 'delta_of_count_based_meth', 'delta_of_model_based_meth'])
+            .select(join_keys + ['num_cpgs', 'num_cpgs_with_non_null_count_based_meth', 'delta_of_count_based_meth', 'delta_of_model_based_meth'])
             .rename({
+                'num_cpgs_with_non_null_count_based_meth': 'num_valid_cpgs',
                 'delta_of_count_based_meth': 'count',
-                'delta_of_model_based_meth': 'model'
+                'delta_of_model_based_meth': 'model',
             })
         )
         df_tiles_with_delta_meth = prefix_columns(df_tiles_with_delta_meth, prefix=prefix, join_keys=join_keys)
