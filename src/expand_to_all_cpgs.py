@@ -250,7 +250,7 @@ def compute_fraction_of_cpgs_at_which_meth_is_phased_wrapper(df, logger=None):
         compute_fraction_of_cpgs_at_which_meth_is_phased(df, mode, logic='all', alias='both parental haplotypes', logger=logger)
         compute_fraction_of_cpgs_at_which_umphased_meth_is_reported(df, mode, logger)
 
-# Polars' native CSV reader is significantly faster than looping through records in Python, even with efficient libraries like cyvcf2.
+# Polars' native streaming CSV reader is significantly faster than looping through records in Python, even with efficient libraries like cyvcf2.
 # This function handles multi-allelic SNVs (https://gemini.google.com/app/5bd2b7ad98e8f872)
 def get_joint_called_variants(uid, vcf_path):
     return (
@@ -521,7 +521,7 @@ def main():
     logger.info(f"Expanded DNA methylation dataset to include (1) all CpG sites observed in reference and sample genomes, and (2) unphased methylation levels (where available)")
     report_size(df, 'CpG Methylation', logger)
 
-    # Save memory: 
+    # Release memory: 
     del df_all_cpgs_in_reference
     del df_meth_unphased
     del df_meth_founder_phased
@@ -544,7 +544,7 @@ def main():
     logger.info(f"Determined which CpG sites overlap 1 or 2 SNVs")
     report_size(df, 'CpG Methylation', logger)
 
-    # Save memory: 
+    # Release memory: 
     del df_joint_called_variants
     gc.collect() # type:ignore 
     logger.info(f"Removed df_joint_called_variants, which is no longer needed")
