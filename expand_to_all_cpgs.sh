@@ -7,16 +7,16 @@ meth_count_read_phased_dir="/scratch/ucgd/lustre-labs/quinlan/data-shared/dna-me
 meth_model_read_phased_dir="/scratch/ucgd/lustre-labs/quinlan/data-shared/dna-methylation/CEPH1463.GRCh38.hifi.model.read-backed-phased" # output dir of aligned_bam_to_cpg_scores (countaining model-based unphased meth)
 
 # OUTPUT DIRS 
-output_dir="/scratch/ucgd/lustre-labs/quinlan/data-shared/dna-methylation/CEPH1463.GRCh38.hifi.founder-phased.all-cpgs.trapper" 
+output_dir="/scratch/ucgd/lustre-labs/quinlan/data-shared/dna-methylation/CEPH1463.GRCh38.hifi.founder-phased.all-cpgs" 
 
 mkdir -p ${output_dir}
 
-echo "Writing all CpG sites in reference genome to ${output_dir} ..." 
+echo "Writing all CpG sites in reference genome to '${output_dir}' ..." 
 
 # OUTPUT FILE
 bed_all_cpgs_in_reference="${output_dir}/all_cpg_sites_in_reference.bed" # output of src/write_all_cpgs_in_reference.py
 
-python src/write_all_cpgs_in_reference.py \
+python -m memory_profiler src/write_all_cpgs_in_reference.py \
 	--reference ${reference} \
 	--bed_all_cpgs_in_reference ${bed_all_cpgs_in_reference} \
 	> ${output_dir}/write_all_cpgs_in_reference.log 2>&1
@@ -40,7 +40,11 @@ for prefix in $prefixes; do
 	# OUTPUT FILES 
 	bed_meth_founder_phased_all_cpgs="${output_dir}/${uid}.dna-methylation.founder-phased.all_cpgs.bed"
 
-    nohup python src/expand_to_all_cpgs.py \
+    echo "Started ${uid} ..."
+
+	# set POLARS_VERBOSE=1 to get verbose output from polars 
+	# Note: Do not use nohup to run multiple of these processes at once on a machine because this process takes up about 35Gb of memory at peak per sample
+    python src/expand_to_all_cpgs.py \
 		--bed_all_cpgs_in_reference ${bed_all_cpgs_in_reference} \
         --bed_meth_founder_phased ${bed_meth_founder_phased} \
         --bed_meth_count_unphased ${bed_meth_count_unphased} \
@@ -49,10 +53,10 @@ for prefix in $prefixes; do
 		--bed_het_site_mismatches ${bed_het_site_mismatches} \
 		--uid ${uid} \
         --vcf_joint_called ${vcf_joint_called} \
-        > ${output_dir}/${uid}.log 2>&1 & 
+        > ${output_dir}/${uid}.log 2>&1 
 
-    echo "Started ${uid} ..."
+    echo "... Finished ${uid}"
 done
 
-echo "All expand_to_all_cpgs.py processes started."
 echo "Check ${output_dir} for logs and outputs."
+echo "Done running expand_to_all_cpgs.sh" 

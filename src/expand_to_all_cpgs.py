@@ -1,21 +1,42 @@
 import argparse
 import logging
-import polars as pl 
-import bioframe as bf # https://bioframe.readthedocs.io/en/latest/index.html
 from pathlib import Path
 from typing import Literal
 import os 
 
+# polars hogs memory by default: 
+# https://quinlangroup.slack.com/archives/C02KEHXJ274/p1765314327680539
+# but we can force aggressive memory release using the following configuration:  
+# https://github.com/pola-rs/polars/issues/23128#issuecomment-2978695783
+# Note: this configuration must be executed prior to importing polars 
+JEMALLOC_CONFIG = "background_thread:true,dirty_decay_ms:1000,muzzy_decay_ms:1000,narenas:2"
+os.environ["MALLOC_CONF"] = JEMALLOC_CONFIG
+# Set this as well to cover specific Polars builds (e.g. PyPI wheels)
+os.environ["_RJEM_MALLOC_CONF"] = JEMALLOC_CONFIG
+import polars as pl 
+
+# TODO: 
+# replace bioframe with polars-bio to reduce memory pressure because: 
+#  1. one doesn't need to create pandas copies of polars dfs 
+#  2. polars-bio can "stream" instead of requiring the entire data to be in memory at once 
+# https://quinlangroup.slack.com/archives/C449KJT3J/p1765324832459979
+import bioframe as bf # https://bioframe.readthedocs.io/en/latest/index.html
+
+from memory_profiler import profile
+
 from read_data import read_bed_and_header
 from write_data import write_dataframe_to_bed
 from get_meth_hap1_hap2 import read_meth_level
-from version_sort import version_sort
 from shell import shell
 
-# https://quinlangroup.slack.com/archives/C02KEHXJ274/p1724332317643529
-# /scratch/ucgd/lustre-labs/quinlan/u6018199/cyvcf2
-# https://quinlangroup.slack.com/archives/C449KJT3J/p1751389842484399
-from cyvcf2 import VCF  # type: ignore
+# Note that polars uses hash joins to do equi-joins, 
+# and that requires keeping at least one of the dataframes in memory, 
+# instead of partitioning both dataframes into chunks that are processed sequentially in memory, 
+# as with Grace Hash Join (https://en.wikipedia.org/wiki/Hash_join#Grace_hash_join)
+# https://github.com/pola-rs/polars/pull/12270#issuecomment-3643880502
+
+# How to monitor memory usage: 
+# ps -eo pid,user,comm,rss --sort=-rss | head -11 | awk '{printf "%-10s %-15s %-20s %.4f GB\n", $1, $2, $3, $4/1024/1024}'
 
 CPG_SITE_MISMATCH_SITE_DISTANCE = 50 # bp
 
@@ -27,7 +48,7 @@ def read_all_cpgs_in_reference(bed):
         new_columns=['chrom', 'start', 'end'],
         # n_rows=100000 # TESTING 
     ) 
-    return version_sort(df)
+    return df 
 
 def read_meth_unphased(bed_meth_count_unphased, bed_meth_model_unphased): 
     df_meth_count_unphased = (
@@ -49,13 +70,13 @@ def read_meth_unphased(bed_meth_count_unphased, bed_meth_model_unphased):
     df = df_meth_count_unphased.join(
         df_meth_model_unphased,
         on=['chrom', 'start', 'end'],
-        join_nulls=True,
+        nulls_equal=True, # join on nulls
         # "how=full" will capture CpG sites where count-based meth levels are available, but not model-based meth levels, and vice versa.
         # This is also why I did not join on "total_read_count", e.g., this could be null for count-based meth and non-null for model-based meth in the same record. 
         how="full", 
         coalesce=True, 
     )   
-    return version_sort(df)
+    return df
 
 def read_meth_founder_phased(bed_meth_founder_phased): 
     return read_bed_and_header(bed_meth_founder_phased)
@@ -95,7 +116,7 @@ def expand_meth_to_all_cpgs(df_all_cpgs_in_reference, df_meth_unphased, df_meth_
     else: 
         raise ValueError('total_read_count_count is not identical to total_read_count_model')
     
-    return version_sort(df)
+    return df 
 
 def compute_proximity_to_mismatched_heterozygous_sites(df_meth_founder_phased_all_cpgs, bed_het_site_mismatches): 
     df_sites_mismatch = read_bed_and_header(bed_het_site_mismatches)
@@ -129,7 +150,7 @@ def compute_proximity_to_mismatched_heterozygous_sites(df_meth_founder_phased_al
         ])
     )
 
-    return version_sort(df_meth_founder_phased_all_cpgs)
+    return df_meth_founder_phased_all_cpgs
 
 def reduce_to_phasable_chromosomes(df): 
     df = df.filter(
@@ -229,66 +250,93 @@ def compute_fraction_of_cpgs_at_which_meth_is_phased_wrapper(df, logger=None):
         compute_fraction_of_cpgs_at_which_meth_is_phased(df, mode, logic='all', alias='both parental haplotypes', logger=logger)
         compute_fraction_of_cpgs_at_which_umphased_meth_is_reported(df, mode, logger)
 
-def is_snv(variant):
-    # is_snp allows multiallelic sites (len(variant.ALT) > 1)
-    # https://github.com/brentp/cyvcf2/blob/541ab16a255a5287c331843d8180ed6b9ef10e00/cyvcf2/cyvcf2.pyx#L1903-L1911
-    return variant.is_snp
+# Polars' native CSV reader is significantly faster than looping through records in Python, even with efficient libraries like cyvcf2.
+# This function handles multi-allelic SNVs (https://gemini.google.com/app/5bd2b7ad98e8f872)
+def get_joint_called_variants(uid, vcf_path):
+    return (
+        pl.scan_csv(
+            vcf_path,
+            separator='\t',
+            comment_prefix='##',
+            has_header=True,
+            null_values=['.'], 
+            ignore_errors=True,
+            # n_rows=100 # TESTING 
+        )
+        .rename({"#CHROM": "chrom", "POS": "pos"})
+        .select([
+            pl.col("chrom"),
+            pl.col("pos"),
+            pl.col("REF"),
+            pl.col("ALT"),
+            pl.col(uid).alias("gt_raw")
+        ])
+        # 1. Strict SNV Filter (Multi-allelic safe)
+        # Keep row if REF is 1 char AND ALT is not_null AND all ALTs are 1 char
+        .filter(
+            (pl.col("REF").str.len_chars() == 1) &
+            (pl.col("ALT").is_not_null()) &
+            (
+                pl
+                .col("ALT")
+                .str.split(",")                                  # 1. Split string into list
+                .list.eval(pl.element().str.len_chars() == 1)    # 2. Check length of each element
+                .list.all()                                      # 3. Check if ALL checks passed
+            )
+        )
+        # 2. Pre-calculation of positions and GT string
+        .with_columns([
+            (pl.col("pos") - 1).alias("start"),
+            pl.col("pos").alias("end"),
+            # Clean GT: remove metadata like :AD:DP (keep "0/1" or "1|2")
+            pl.col("gt_raw").str.split(":").list.get(0).alias("GT")
+        ])
+        # 3. Create the Allele Lookup List [REF, Alt1, Alt2...]
+        # We prepend REF to ALT, then split. 
+        # e.g., REF="T", ALT="A,C" -> "T,A,C" -> ["T", "A", "C"]
+        # Index 0 points to REF, Index 1 points to first ALT, etc.
+        .with_columns([
+            pl
+            .format("{},{}", pl.col("REF"), pl.col("ALT").fill_null(""))
+            .str.strip_chars_end(",") # Handle case where ALT was null/empty
+            .str.split(",")
+            .alias("allele_lookup")
+        ])
+        # 4. Parse Genotype Indices
+        .with_columns([
+            pl.col("GT").str.contains("|", literal=True).fill_null(False).alias("phased"),
+            # Normalize separators to pipe for splitting: 
+            pl.col("GT").str.replace("/", "|").str.split("|").alias("split_gt")
+        ])
 
-def get_joint_called_variants(uid, vcf): 
-    # assume vcf is a joint vcf 
+        .with_columns([
+            # Extract indices as alleles
+            pl.col("split_gt").list.get(0).alias("allele_1"),
+            pl.col("split_gt").list.get(1).alias("allele_2"),
+        ])
+        # .with_columns([
+        #     # Extract indices as integers (handle '.' as null)
+        #     pl.col("split_gt").list.get(0).cast(pl.Int32, strict=False).alias("idx1"),
+        #     pl.col("split_gt").list.get(1).cast(pl.Int32, strict=False).alias("idx2"),
+        # ])
+        # # 5. Map Indices to Actual Alleles
+        # .with_columns([
+        #     # Use list.get() to pull the string from allele_lookup using the index
+        #     # fill_null('.') handles the case where index was missing (originally -1 or '.')
+        #     pl.col("allele_lookup").list.get(pl.col("idx1")).fill_null(".").alias("allele_1"),
+        #     pl.col("allele_lookup").list.get(pl.col("idx2")).fill_null(".").alias("allele_2")
+        # ])
 
-    records = []
-    with VCF(vcf, strict_gt=True) as vcf_reader: # cyvcf2 handles .vcf.gz directly
-        samples = vcf_reader.samples
-        sample_index = samples.index(uid) if uid in samples else None
-
-        # for variant in tqdm(vcf_reader, total=vcf_reader.num_records): # testing 
-        for variant in vcf_reader:
-        # for i, variant in enumerate(vcf_reader): # testing
-        #     if i >= 100: # testing
-        #         break # testing
-
-            if not is_snv(variant): 
-                continue
-
-            chrom = variant.CHROM
-            pos = variant.POS # pos is 1-based
-            start = pos - 1 
-            end = pos
-            REF = variant.REF
-            ALT = variant.ALT
-
-            # single sample of 0|1 in vcf becomes [[0, 1, True]]
-            # 2 samples of 0/0 and 1|1 would be [[0, 0, False], [1, 1, True]]
-            # https://brentp.github.io/cyvcf2/#cyvcf2
-            genotype_all_samples = variant.genotypes
-            genotype = genotype_all_samples[sample_index]
-
-            # "-1" in "genotype" indicates missing data: 
-            # c.f., "test_set_gts" at: https://github.com/brentp/cyvcf2/issues/31#issuecomment-275195917
-            allele_1 = str(genotype[0]) if genotype[0] != -1 else '.'
-            allele_2 = str(genotype[1]) if genotype[1] != -1 else '.'
-
-            phased = genotype[2]
-
-            records.append({ 
-                "chrom": chrom,
-                "start": start,
-                "end": end,
-                "REF": REF,
-                "ALT": ALT,
-                "allele_1": allele_1,
-                "allele_2": allele_2,
-                "phased": phased
-            })
- 
-    df = pl.DataFrame(records)
-    return df 
+        .select([
+            "chrom", "start", "end", 
+            "allele_1", "allele_2"
+        ])
+        .collect() # q.collect(engine="auto") and q.collect(engine="streaming") have similar memory footprint (for unknown reasons)
+    )
 
 def label_with_variants(df_meth_founder_phased_all_cpgs, df_joint_called_variants):
     df_meth_founder_phased_all_cpgs_dinucleotides = (
         df_meth_founder_phased_all_cpgs
-        .clone()
         .with_columns((pl.col("end") + 1)) # enlarge interval defining CpG sites from C nucleotide to CG dinucleotide
     )
     df_meth_founder_phased_all_cpgs_dinucleotides_pd = df_meth_founder_phased_all_cpgs_dinucleotides.to_pandas()
@@ -296,9 +344,6 @@ def label_with_variants(df_meth_founder_phased_all_cpgs, df_joint_called_variant
     df_joint_called_variants_pd = (
         df_joint_called_variants
         .to_pandas()
-        .astype({
-            'phased': "boolean",
-        })
     )
 
     df = bf.overlap(
@@ -337,11 +382,8 @@ def label_with_variants(df_meth_founder_phased_all_cpgs, df_joint_called_variant
             'start': 'start_cpg',
             'end': 'end_cpg',
             'is_within_50bp_of_mismatch_site': 'cpg_is_within_50bp_of_mismatch_site',
-            'REF_variant': 'REF',
-            'ALT_variant': 'ALT',
             'allele_1_variant': 'allele_1',
             'allele_2_variant': 'allele_2',
-            'phased_variant': 'snv_phased'
         })
         .drop(['chrom_variant'])
     )
@@ -354,11 +396,8 @@ def label_cpgs_as_allele_specific(df):
         if col not in [
             'start_variant', 
             'end_variant', 
-            'REF', 
-            'ALT',	
             'allele_1', 
             'allele_2', 
-            'snv_phased',
             'num_SNVs_overlapping_CG'
         ]
     ]
@@ -427,6 +466,11 @@ def write_methylation(df, file_path, source):
 
     return root
 
+def report_size(df, df_name, logger): 
+    size_in_gb = df.estimated_size(unit="gb")
+    logger.info(f"{df_name}: {size_in_gb:.4f} GB")
+
+@profile # type:ignore 
 def main(): 
     parser = argparse.ArgumentParser(description='Expand output of tapestry to include all CpG sites and unphased DNA methylation levels')
     parser.add_argument('--bed_all_cpgs_in_reference', required=True, help='All CpG sites observed in reference genome')
@@ -448,16 +492,21 @@ def main():
 
     logger.info(f"Starting '{__file__}'")
     logger.info("Script started with the following arguments: %s", vars(args))
+    logger.info(f"Polars version: {pl.__version__}")
+    logger.info(f"Polars thread pool size: {pl.thread_pool_size()}") 
 
     df_all_cpgs_in_reference = read_all_cpgs_in_reference(args.bed_all_cpgs_in_reference)
     logger.info(f"Read all CpG sites in reference genome")
+    report_size(df_all_cpgs_in_reference, 'All CpGs in reference', logger)
 
     df_meth_unphased = read_meth_unphased(args.bed_meth_count_unphased, args.bed_meth_model_unphased) 
     logger.info(f"Read CpG sites at which unphased methylation levels are available, both count-based and model-based")
+    report_size(df_meth_unphased, 'Unphased methylation levels', logger)
 
     if Path(args.bed_meth_founder_phased).exists():
         df_meth_founder_phased = read_meth_founder_phased(args.bed_meth_founder_phased)
         logger.info(f"Read CpG sites at which count- and model-based methylation levels have been phased to founder haplotypes")
+        report_size(df_meth_founder_phased, 'Phased methylation levels', logger)
     else: 
         logger.warning(f"Could not read CpG sites at which count- and model-based methylation levels have been phased to founder haplotypes") 
         logger.warning(f"Required file does not exist: '{args.bed_meth_founder_phased}'")
@@ -465,29 +514,46 @@ def main():
         logger.info(f"Done running '{__file__}'")
         return 
 
-    df_meth_founder_phased_all_cpgs = expand_meth_to_all_cpgs(df_all_cpgs_in_reference, df_meth_unphased, df_meth_founder_phased)
+    # In the following, to save memory, we update what "df" points to 
+    # (instead of creating new references for each updated dataframe of CpG sites) 
+
+    df = expand_meth_to_all_cpgs(df_all_cpgs_in_reference, df_meth_unphased, df_meth_founder_phased)
     logger.info(f"Expanded DNA methylation dataset to include (1) all CpG sites observed in reference and sample genomes, and (2) unphased methylation levels (where available)")
+    report_size(df, 'CpG Methylation', logger)
 
-    df_meth_founder_phased_all_cpgs = compute_proximity_to_mismatched_heterozygous_sites(df_meth_founder_phased_all_cpgs, args.bed_het_site_mismatches)
+    # Save memory: 
+    del df_all_cpgs_in_reference
+    del df_meth_unphased
+    del df_meth_founder_phased
+    import gc
+    gc.collect() # type:ignore 
+    logger.info(f"Removed df_all_cpgs_in_reference, df_meth_unphased, df_meth_founder_phased, which are no longer needed")
+
+    df = compute_proximity_to_mismatched_heterozygous_sites(df, args.bed_het_site_mismatches)
     logger.info(f"Computed proximity of all CpG sites to heterozygous sites at which bit-vectors are mismatched")
+    report_size(df, 'CpG Methylation', logger)
 
-    compute_fraction_of_cpgs_that_are_close_to_mismatches(df_meth_founder_phased_all_cpgs, logger)
-    compute_fraction_of_cpgs_at_which_meth_is_phased_wrapper(df_meth_founder_phased_all_cpgs, logger)
+    compute_fraction_of_cpgs_that_are_close_to_mismatches(df, logger)
+    compute_fraction_of_cpgs_at_which_meth_is_phased_wrapper(df, logger)
 
     df_joint_called_variants = get_joint_called_variants(args.uid, args.vcf_joint_called)
     logger.info(f"Got SNVs from joint-called vcf")
+    report_size(df_joint_called_variants, 'Joint-called SNVs', logger)
 
-    df_meth_founder_phased_all_cpgs_with_variant_label = label_with_variants(df_meth_founder_phased_all_cpgs, df_joint_called_variants)
+    df = label_with_variants(df, df_joint_called_variants)
     logger.info(f"Determined which CpG sites overlap 1 or 2 SNVs")
+    report_size(df, 'CpG Methylation', logger)
 
-    df_meth_founder_phased_all_cpgs_with_allele_specific_flag = label_cpgs_as_allele_specific(df_meth_founder_phased_all_cpgs_with_variant_label) 
+    # Save memory: 
+    del df_joint_called_variants
+    gc.collect() # type:ignore 
+    logger.info(f"Removed df_joint_called_variants, which is no longer needed")
+
+    df = label_cpgs_as_allele_specific(df) 
     logger.info(f"Flagged CpG sites that are allele-specific by assessing overlap with het SNVs, e.g., for use in scanning the genome for imprinted loci across a pedigree")
+    report_size(df, 'CpG Methylation', logger)
 
-    methylation_data_root = write_methylation(
-        df_meth_founder_phased_all_cpgs_with_allele_specific_flag, 
-        args.bed_meth_founder_phased_all_cpgs, 
-        source=f"{__file__} with args {vars(args)}"
-    )
+    methylation_data_root = write_methylation(df, args.bed_meth_founder_phased_all_cpgs, source=f"{__file__} with args {vars(args)}")
     logger.info(f"Wrote expanded and allele-specific-flagged methylation dataframe to: '{methylation_data_root}.sorted.bed.gz'")
     logger.info(f"Index exists at: '{methylation_data_root}.sorted.bed.gz.tbi'")
 
