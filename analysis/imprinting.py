@@ -2,6 +2,7 @@ from tqdm import tqdm
 from pathlib import Path 
 import polars as pl 
 import argparse
+import polars.selectors as cs
 
 from tile import get_tiles 
 from get_palladium_prefixes import get_prefixes_wrapper
@@ -87,6 +88,67 @@ def compute_delta_methylation_all_samples(reference_genome, tile_size, meth_read
             )   
     return version_sort(df_all_samples)
 
+def format_locus(df):
+    return df.with_columns(
+        locus = pl.format(
+            "{}:{}-{}", 
+            pl.col("chrom"),
+            pl.col("start"),
+            pl.col("end")
+        )
+    )
+
+def call_imprinted_loci(df, meth_mode, delta_meth_threshold, num_valid_cpgs_per_hap_threshold, valid_cpg_ratio_threshold):
+    delta_meth_cols = [col for col in df.columns if col.endswith(f"_{meth_mode}")]
+
+    # List to store expressions that return the 'prefix' (sample name) if 'condition' (see below) is met
+    sample_match_exprs = []
+    
+    for delta_meth_col in delta_meth_cols:
+        prefix = delta_meth_col.removesuffix(f"_{meth_mode}")
+        num_valid_cpgs_col = f"{prefix}_num_cpgs"
+        num_valid_cpgs_pat_col = f"{prefix}_num_valid_cpgs_pat"
+        num_valid_cpgs_mat_col = f"{prefix}_num_valid_cpgs_mat"
+
+        condition = (
+            (pl.col(delta_meth_col).abs() > delta_meth_threshold) & 
+            (pl.col(num_valid_cpgs_pat_col) >= num_valid_cpgs_per_hap_threshold) & 
+            (pl.col(num_valid_cpgs_mat_col) >= num_valid_cpgs_per_hap_threshold) &
+            ((pl.col(num_valid_cpgs_pat_col) / pl.col(num_valid_cpgs_col)) > valid_cpg_ratio_threshold) &
+            ((pl.col(num_valid_cpgs_mat_col) / pl.col(num_valid_cpgs_col)) > valid_cpg_ratio_threshold)
+        )
+
+        # If 'condition' is True, return the sample name (prefix); otherwise return null
+        sample_match_exprs.append(
+            pl.when(condition).then(pl.lit(prefix)).otherwise(None)
+        )
+
+    df= format_locus(
+        df
+        .with_columns(
+            # Combine all sample checks into one list column and remove non-matches (nulls)
+            pl.concat_list(sample_match_exprs).list
+            .drop_nulls()
+            .alias("imprinted_samples")
+        )
+        # Filter to keep only rows where at least one sample matched
+        .filter(pl.col("imprinted_samples").list.len() > 0)
+        .with_columns(
+            pl.col("imprinted_samples").list.len().alias("num_imprinted_samples")
+        )
+        .select(
+            'chrom',
+            'start', 
+            'end',
+            'imprinted_samples',
+            'num_imprinted_samples',
+            # cs.contains("NA12885") # TESTING 
+        )
+    )
+
+    print(f"Number of candidate imprinted loci: {len(df)}")
+    return df
+    
 def main(): 
     parser = argparse.ArgumentParser(description='Compute methylation difference between haplotypes for multiple samples')
     parser.add_argument('--reference_genome', required=True, help='Reference genome')
