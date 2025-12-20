@@ -97,7 +97,7 @@ def compute_methylation_all_samples_at_given_loci(df_loci, meth_read_phased_dir)
     # prefixes = prefixes[:2] # TESTING
     df_all_samples = None
     for prefix in tqdm(prefixes):
-        bed_meth = f"{meth_read_phased_dir}/{prefix}.dna-methylation.founder-phased.all_cpgs.bed"
+        bed_meth = f"{meth_read_phased_dir}/{prefix}.dna-methylation.founder-phased.all_cpgs.sorted.bed.gz"
         if Path(bed_meth).exists():
             df_meth = read_tapestry(bed_meth)
         else: 
