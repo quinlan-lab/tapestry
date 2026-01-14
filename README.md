@@ -142,10 +142,6 @@ cpg_overlaps_at_least_one_snv | does the CpG dinucleotide overlap an SNV?
 snv_genotypes | are the SNVs (if any) that overlap CpG dinucleotide `hom` or `het`? 
 cpg_is_allele_specific | does the CpG dinucleotide appear in the reads corresponding to one haplotype, but not the reads of the other haplotype? 
 
-## Tutorial 
-
-How to develop an imprinting caller using Tapestry output: https://docs.google.com/presentation/d/1A95YqjHMGJnEQdnCw4BQknhhEqAl9EUROupWtPXfZRw/edit?usp=sharing
-
 ## TODO
 
 - [ ] Convert manual workflow into a Snakemake workflow (see `Snakefile`), creating a subdirectory called, e.g., `CEPH1463.GRCh38` in `read-backed-phasing` (output of `run-hiphase.sh`)
