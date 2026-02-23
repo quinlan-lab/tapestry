@@ -477,7 +477,7 @@ def main():
     parser.add_argument('--bed_meth_count_unphased', required=True, help='Unphased count-based methylation levels')
     parser.add_argument('--bed_meth_model_unphased', required=True, help='Unphased model-based methylation levels')
     parser.add_argument('--bed_meth_founder_phased', required=True, help='Founder-phased methylation levels')
-    parser.add_argument('--bed_het_site_mismatches', required=True, help='Heterozygous sites where bit vectors are mismatched')
+    parser.add_argument('--bed_het_site_mismatches', required=False, default=None, help='Heterozygous sites where bit vectors are mismatched (omit for trio workflow)')
     parser.add_argument('--bed_meth_founder_phased_all_cpgs', required=True, help='Founder-phased methylation levels at all CpG sites, both in reference and sample, including null methylation levels, and unphased methylation levels')
     parser.add_argument('--uid', required=True, help='Sample UID in joint-called multi-sample vcf')
     parser.add_argument('--vcf_joint_called', required=True, help='Joint-called multi-sample vcf')
@@ -529,11 +529,16 @@ def main():
     gc.collect() # type:ignore 
     logger.info(f"Removed df_all_cpgs_in_reference, df_meth_unphased, df_meth_founder_phased, which are no longer needed")
 
-    df = compute_proximity_to_mismatched_heterozygous_sites(df, args.bed_het_site_mismatches)
-    logger.info(f"Computed proximity of all CpG sites to heterozygous sites at which bit-vectors are mismatched")
-    report_size(df, 'CpG Methylation', logger)
-
-    compute_fraction_of_cpgs_that_are_close_to_mismatches(df, logger)
+    if args.bed_het_site_mismatches is not None:
+        df = compute_proximity_to_mismatched_heterozygous_sites(df, args.bed_het_site_mismatches)
+        logger.info(f"Computed proximity of all CpG sites to heterozygous sites at which bit-vectors are mismatched")
+        report_size(df, 'CpG Methylation', logger)
+        compute_fraction_of_cpgs_that_are_close_to_mismatches(df, logger)
+    else:
+        df = df.with_columns(
+            pl.lit(False).alias(f'is_within_{CPG_SITE_MISMATCH_SITE_DISTANCE}bp_of_mismatch_site')
+        )
+        logger.info(f"No mismatch-site bed provided; set is_within_{CPG_SITE_MISMATCH_SITE_DISTANCE}bp_of_mismatch_site=False for all rows")
     compute_fraction_of_cpgs_at_which_meth_is_phased_wrapper(df, logger)
 
     df_joint_called_variants = get_joint_called_variants(args.uid, args.vcf_joint_called)

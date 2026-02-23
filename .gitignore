@@ -8,3 +8,4 @@ recomb_blocks_methylation.csv
 analysis/delta_meth_all_samples.bed
 analysis/delta_meth_all_samples.log
 analysis/imprinted_meth_all_samples.bed
+tests/mock_data
