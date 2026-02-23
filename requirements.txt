@@ -13,6 +13,7 @@ babel==2.17.0
 bcrypt==4.2.1
 beautifulsoup4==4.13.5
 bioframe==0.8.0
+biopython==1.86
 bleach==6.2.0
 blinker==1.9.0
 cachetools==5.5.2
@@ -58,6 +59,7 @@ ipykernel==6.29.5
 ipython==8.31.0
 ipython_pygments_lexers==1.1.1
 ipywidgets==8.1.7
+isal==1.8.0
 isoduration==20.11.0
 itsdangerous==2.2.0
 jedi==0.19.2
@@ -97,6 +99,7 @@ nbconvert==7.16.6
 nbformat==5.10.4
 ncls==0.0.68
 nest-asyncio==1.6.0
+networkx==3.6.1
 notebook==7.4.5
 notebook_shim==0.2.4
 numba==0.61.0
@@ -121,6 +124,7 @@ prompt_toolkit==3.0.50
 propcache==0.3.0
 psutil==6.1.1
 ptyprocess==0.7.0
+PuLP==3.3.0
 pure_eval==0.2.3
 pyarrow==21.0.0
 pyasn1==0.6.1
@@ -128,6 +132,7 @@ pyasn1_modules==0.4.2
 pyBigWig==0.3.24
 pycares==4.8.0
 pycparser==2.22
+pyfaidx==0.9.0.3
 Pygments==2.19.1
 PyNaCl==1.5.0
 pynndescent==0.5.13
@@ -179,8 +184,11 @@ webcolors==24.11.1
 webencodings==0.5.1
 websocket-client==1.8.0
 Werkzeug==3.0.6
+whatshap==2.8
 widgetsnbextension==4.0.14
 xlrd==2.0.1
+xopen==2.0.2
 xxhash==3.5.0
 yarl==1.18.3
 zipp==3.21.0
+zlib-ng==1.0.0
