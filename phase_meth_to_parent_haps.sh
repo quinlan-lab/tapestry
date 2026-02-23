@@ -1,20 +1,21 @@
 export PYTHONPATH="src:src/util"
 
 # INPUT DIRS
-whatshap_phasing_dir="/path/to/whatshap-phasing"           # output dir of run-whatshap-phase.sh
-meth_count_haplotagged_dir="/path/to/meth/count/haplotagged"  # output dir of aligned_bam_to_cpg_scores in count mode
-meth_model_haplotagged_dir="/path/to/meth/model/haplotagged"  # output dir of aligned_bam_to_cpg_scores in model mode
+whatshap_phasing_dir="/scratch/ucgd/lustre-labs/quinlan/data-shared/whatshap-phasing"  # output dir of run-whatshap-phase.sh
+dna_meth_dir="/scratch/ucgd/lustre-labs/quinlan/data-shared/dna-methylation"
+meth_count_haplotagged_dir="${dna_meth_dir}/CEPH1463.GRCh38.hifi.count.trio.iht-phased"  # output dir of aligned_bam_to_cpg_scores in count mode
+meth_model_haplotagged_dir="${dna_meth_dir}/CEPH1463.GRCh38.hifi.model.trio.iht-phased"  # output dir of aligned_bam_to_cpg_scores in model mode
 
 # OUTPUT DIR
-output_dir="/path/to/trio-founder-phased"
+output_dir="/scratch/ucgd/lustre-labs/quinlan/data-shared/dna-methylation/CEPH1463.GRCh38.hifi.parent-phased.trio" 
 
 mkdir -p ${output_dir}
 
 # Pedigree file
-ped="/path/to/trio.ped"
+ped="trio.ped"
 
 # Child sample ID
-uid="kid"
+uid="NA12883"
 
 # INPUT FILES
 vcf_trio_phased="${whatshap_phasing_dir}/trio_phased.vcf.gz"
@@ -23,7 +24,7 @@ bed_meth_count_hap2="${meth_count_haplotagged_dir}/${uid}.GRCh38.haplotagged.hap
 bed_meth_model_hap1="${meth_model_haplotagged_dir}/${uid}.GRCh38.haplotagged.hap1.bed.gz"
 bed_meth_model_hap2="${meth_model_haplotagged_dir}/${uid}.GRCh38.haplotagged.hap2.bed.gz"
 
-python src/trio_phase_meth_to_parent_haps.py \
+python src/phase_meth_to_parent_haps.py \
     --uid ${uid} \
     --vcf_trio_phased ${vcf_trio_phased} \
     --ped ${ped} \
