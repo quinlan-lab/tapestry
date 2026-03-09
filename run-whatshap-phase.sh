@@ -43,9 +43,9 @@ if [ -n "$DEV_DIR" ]; then
 	# Override input paths to point to the generated dev data
     trio_ped="${DEV_DIR}/trio.ped" # <--- ADD THIS LINE
     vcf_joint_called="${DEV_DIR}/input/CEPH-1463.joint.GRCh38.deepvariant.glnexus.vcf.gz"
-	bam_kid="${DEV_DIR}/dev_bams/${kid_id}.GRCh38.haplotagged.bam"
-    bam_dad="${DEV_DIR}/dev_bams/${dad_id}.GRCh38.haplotagged.bam"
-    bam_mom="${DEV_DIR}/dev_bams/${mom_id}.GRCh38.haplotagged.bam"
+	bam_kid="${DEV_DIR}/input/${kid_id}.GRCh38.haplotagged.bam"
+    bam_dad="${DEV_DIR}/input/${dad_id}.GRCh38.haplotagged.bam"
+    bam_mom="${DEV_DIR}/input/${mom_id}.GRCh38.haplotagged.bam"
     
     reference="${DEV_DIR}/dev_reference.fa"
 

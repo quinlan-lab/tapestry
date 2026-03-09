@@ -8,7 +8,7 @@ if [ "$#" -ne 1 ]; then
 fi
 
 DEV_DIR="${1%/}"
-mkdir -p "${DEV_DIR}/input" "${DEV_DIR}/dev_bams"
+mkdir -p "${DEV_DIR}/input"
 
 # --- Source Configurations ---
 vcf_joint_called="/scratch/ucgd/lustre-labs/quinlan/data-shared/datasets/Palladium/deepvariant/CEPH-1463.joint.GRCh38.deepvariant.glnexus.phased.vcf.gz"
@@ -39,7 +39,7 @@ bcftools index ${dev_vcf}
 # Subset BAMs function
 subset_bam() {
     local in_bam=$1
-    local out_bam="${DEV_DIR}/dev_bams/$(basename $in_bam)"
+    local out_bam="${DEV_DIR}/input/$(basename $in_bam)"
     echo "Subsetting ${in_bam}..."
     samtools view -b ${in_bam} ${DEV_REGION} > ${out_bam}
     samtools index ${out_bam}
