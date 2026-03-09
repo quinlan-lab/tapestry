@@ -33,7 +33,7 @@ EOF
 # Subset VCF
 dev_vcf="${DEV_DIR}/dev_input.vcf.gz"
 echo "Subsetting VCF..."
-bcftools view -r ${DEV_REGION} ${vcf_joint_called} -Oz -o ${dev_vcf}
+bcftools view -r ${DEV_REGION} -s ${kid_id},${dad_id},${mom_id} ${vcf_joint_called} -Oz -o ${dev_vcf}
 bcftools index ${dev_vcf}
 
 # Subset BAMs function
