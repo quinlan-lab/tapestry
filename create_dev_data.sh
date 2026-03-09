@@ -8,7 +8,7 @@ if [ "$#" -ne 1 ]; then
 fi
 
 DEV_DIR="${1%/}"
-mkdir -p "${DEV_DIR}/dev_bams"
+mkdir -p "${DEV_DIR}/input" "${DEV_DIR}/dev_bams"
 
 # --- Source Configurations ---
 vcf_joint_called="/scratch/ucgd/lustre-labs/quinlan/data-shared/datasets/Palladium/deepvariant/CEPH-1463.joint.GRCh38.deepvariant.glnexus.phased.vcf.gz"
@@ -31,7 +31,7 @@ cat << 'EOF' > ${dev_ped}
 EOF
 
 # Subset VCF
-dev_vcf="${DEV_DIR}/dev_input.vcf.gz"
+dev_vcf="${DEV_DIR}/input/CEPH-1463.joint.GRCh38.deepvariant.glnexus.vcf.gz"
 echo "Subsetting VCF..."
 bcftools view -r ${DEV_REGION} -s ${kid_id},${dad_id},${mom_id} ${vcf_joint_called} -Oz -o ${dev_vcf}
 bcftools index ${dev_vcf}
