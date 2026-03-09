@@ -49,4 +49,11 @@ subset_bam "${palladium_bam_dir}/${kid_id}.GRCh38.haplotagged.bam"
 subset_bam "${palladium_bam_dir}/${dad_id}.GRCh38.haplotagged.bam"
 subset_bam "${palladium_bam_dir}/${mom_id}.GRCh38.haplotagged.bam"
 
+# Subset reference FASTA from UCSC
+dev_ref="${DEV_DIR}/dev_reference.fa"
+dev_chrom="${DEV_REGION%%:*}"
+echo "Fetching reference for ${dev_chrom} from UCSC..."
+curl -sS "https://hgdownload.soe.ucsc.edu/goldenPath/hg38/chromosomes/${dev_chrom}.fa.gz" | gunzip > "${dev_ref}"
+samtools faidx "${dev_ref}"
+
 echo "Dev data creation complete! You can now ingest this with the workflow script."
