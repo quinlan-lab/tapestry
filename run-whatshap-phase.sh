@@ -1,32 +1,21 @@
 #!/bin/bash
 
 DEV_DIR=""
-LOG_FILE=""
 
-# Enhanced argument handling
+# Argument handling
 while [[ "$#" -gt 0 ]]; do
     case $1 in
-        --dev-dir|-d) 
-            DEV_DIR="$2"
-            shift 2 
+        --dev-dir|-d)
+            DEV_DIR="${2%/}"
+            shift 2
             ;;
-        *) 
-            if [ -z "$LOG_FILE" ]; then
-                LOG_FILE="$1"
-                shift
-            else
-                echo "Error: Unknown parameter passed: $1"
-                exit 1
-            fi
+        *)
+            echo "Error: Unknown parameter passed: $1"
+            echo "Usage: $0 [--dev-dir <DEV_DATA_DIR>]"
+            exit 1
             ;;
     esac
 done
-
-if [ -z "$LOG_FILE" ]; then
-    echo "Error: LOG_FILE argument is required."
-    echo "Usage: $0 <LOG_FILE> [--dev-dir <DEV_DATA_DIR>]"
-    exit 1
-fi
 
 source src/util/logging.sh 
 
@@ -49,7 +38,7 @@ bam_mom="${palladium_bam_dir}/${mom_id}.GRCh38.haplotagged.bam"
 
 # --- Optional Dev Data Overrides ---
 if [ -n "$DEV_DIR" ]; then
-    log_info $LOG_FILE "DEV MODE ENABLED: Reading from and writing to ${DEV_DIR}"
+    log_info "DEV MODE ENABLED: Reading from and writing to ${DEV_DIR}"
     
 	# Override input paths to point to the generated dev data
     trio_ped="${DEV_DIR}/trio.ped" # <--- ADD THIS LINE
@@ -58,6 +47,8 @@ if [ -n "$DEV_DIR" ]; then
     bam_dad="${DEV_DIR}/dev_bams/${dad_id}.GRCh38.haplotagged.bam"
     bam_mom="${DEV_DIR}/dev_bams/${mom_id}.GRCh38.haplotagged.bam"
     
+    reference="${DEV_DIR}/dev_reference.fa"
+
     # Override output dir to write entirely inside the dev directory
     # (Appending '/output' to keep the generated files separate from the raw dev inputs)
     output_dir="${DEV_DIR}/output"
@@ -74,7 +65,7 @@ mkdir -p ${output_dir}
 
 # --- Main Workflow ---
 
-log_info $LOG_FILE "Unphasing: '${vcf_joint_called}'" 
+log_info "Unphasing: '${vcf_joint_called}'" 
 
 # Step 1: unphase the input VCF to avoid mixed phasing
 vcf_joint_called_unphased="${output_dir}/CEPH-1463.joint.GRCh38.deepvariant.glnexus.unphased.vcf"
@@ -88,7 +79,7 @@ tabix ${vcf_joint_called_unphased}.gz
 # Step 2: pedigree-aware phasing
 vcf_joint_called_phased="${output_dir}/CEPH-1463.joint.GRCh38.deepvariant.glnexus.phased.vcf.gz"
 
-log_info $LOG_FILE "Phasing: ${kid_id}" 
+log_info "Phasing: ${kid_id}" 
 
 whatshap phase \
     --ped ${trio_ped} \
@@ -101,7 +92,7 @@ whatshap phase \
     ${bam_kid} ${bam_dad} ${bam_mom} \
     2> ${output_dir}/CEPH-1463.joint.GRCh38.deepvariant.glnexus.${kid_id}.phased.log
 
-log_info $LOG_FILE "Indexing: '${vcf_joint_called_phased}'" 
+log_info "Indexing: '${vcf_joint_called_phased}'" 
 tabix ${vcf_joint_called_phased}
 
-log_info $LOG_FILE "${kid_id} phased in: '${vcf_joint_called_phased}'"
+log_info "${kid_id} phased in: '${vcf_joint_called_phased}'"
