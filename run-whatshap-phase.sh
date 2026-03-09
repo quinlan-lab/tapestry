@@ -41,13 +41,13 @@ if [ -n "$DEV_DIR" ]; then
     log_info "DEV MODE ENABLED: Reading from and writing to ${DEV_DIR}"
     
 	# Override input paths to point to the generated dev data
-    trio_ped="${DEV_DIR}/trio.ped" # <--- ADD THIS LINE
+    trio_ped="${DEV_DIR}/input/trio.ped"
     vcf_joint_called="${DEV_DIR}/input/CEPH-1463.joint.GRCh38.deepvariant.glnexus.vcf.gz"
 	bam_kid="${DEV_DIR}/input/${kid_id}.GRCh38.haplotagged.bam"
     bam_dad="${DEV_DIR}/input/${dad_id}.GRCh38.haplotagged.bam"
     bam_mom="${DEV_DIR}/input/${mom_id}.GRCh38.haplotagged.bam"
     
-    reference="${DEV_DIR}/dev_reference.fa"
+    reference="${DEV_DIR}/input/dev_reference.fa"
 
     # Override output dir to write entirely inside the dev directory
     # (Appending '/output' to keep the generated files separate from the raw dev inputs)

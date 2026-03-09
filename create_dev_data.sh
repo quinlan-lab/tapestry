@@ -23,7 +23,7 @@ DEV_REGION="chr22:1-10700000"
 echo "Creating dev data in ${DEV_DIR} for region ${DEV_REGION}..."
 
 # Create PED file
-dev_ped="${DEV_DIR}/trio.ped"
+dev_ped="${DEV_DIR}/input/trio.ped"
 echo "Creating pedigree file..."
 cat << 'EOF' > ${dev_ped}
 # https://github.com/Platinum-Pedigree-Consortium/Platinum-Pedigree-Datasets?tab=readme-ov-file#accessing-controlled-samples
@@ -50,7 +50,7 @@ subset_bam "${palladium_bam_dir}/${dad_id}.GRCh38.haplotagged.bam"
 subset_bam "${palladium_bam_dir}/${mom_id}.GRCh38.haplotagged.bam"
 
 # Subset reference FASTA from UCSC
-dev_ref="${DEV_DIR}/dev_reference.fa"
+dev_ref="${DEV_DIR}/input/dev_reference.fa"
 dev_chrom="${DEV_REGION%%:*}"
 echo "Fetching reference for ${dev_chrom} from UCSC..."
 curl -sS "https://hgdownload.soe.ucsc.edu/goldenPath/hg38/chromosomes/${dev_chrom}.fa.gz" | gunzip > "${dev_ref}"
