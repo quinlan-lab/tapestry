@@ -7,7 +7,7 @@ if [ "$#" -ne 1 ]; then
     exit 1
 fi
 
-DEV_DIR=$1
+DEV_DIR="${1%/}"
 mkdir -p "${DEV_DIR}/dev_bams"
 
 # --- Source Configurations ---
