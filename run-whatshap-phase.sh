@@ -20,7 +20,7 @@ done
 source src/util/logging.sh 
 
 # --- Default Configurations (Production) ---
-trio_ped="trio.ped"
+trio_ped="XXX" # TODO: fill this in
 reference="/scratch/ucgd/lustre-labs/quinlan/data-shared/constraint-tools/reference/grch38/hg38.analysisSet.fa.gz" 
 output_dir="/scratch/ucgd/lustre-labs/quinlan/data-shared/whatshap-phasing"
 
@@ -32,9 +32,9 @@ mom_id="NA12892"
 vcf_joint_called="/scratch/ucgd/lustre-labs/quinlan/data-shared/datasets/Palladium/deepvariant/CEPH-1463.joint.GRCh38.deepvariant.glnexus.phased.vcf.gz"
 palladium_bam_dir="/scratch/ucgd/lustre-labs/quinlan/data-shared/datasets/Palladium/hifi-bams/GRCh38"
 
-bam_kid="${palladium_bam_dir}/${kid_id}.GRCh38.haplotagged.bam"
-bam_dad="${palladium_bam_dir}/${dad_id}.GRCh38.haplotagged.bam"
-bam_mom="${palladium_bam_dir}/${mom_id}.GRCh38.haplotagged.bam"
+bam_kid="${palladium_bam_dir}/${kid_id}.GRCh38.haplotagged.bam" # not topped off
+bam_dad="${palladium_bam_dir}/${dad_id}.GRCh38.haplotagged.bam" # not topped off
+bam_mom="${palladium_bam_dir}/${mom_id}.GRCh38.haplotagged.bam" # not topped off
 
 # --- Optional Dev Data Overrides ---
 if [ -n "$DEV_DIR" ]; then
@@ -95,4 +95,4 @@ whatshap phase \
 log_info "Indexing: '${vcf_joint_called_phased}'" 
 tabix ${vcf_joint_called_phased}
 
-log_info "${kid_id} phased in: '${vcf_joint_called_phased}'"
+log_info "${kid_id} ${dad_id} ${mom_id} phased in: '${vcf_joint_called_phased}'"
