@@ -1,0 +1,3 @@
+#!/bin/bash
+
+DEV_REGION="chr1:1000000-2000000"

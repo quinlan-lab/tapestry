@@ -18,7 +18,7 @@ kid_id="NA12878"
 dad_id="NA12891" 
 mom_id="NA12892"
 
-DEV_REGION="chr1:1000000-2000000"
+source "$(dirname "$0")/dev_data_config.sh"
 
 echo "Creating dev data in ${DEV_DIR} for region ${DEV_REGION}..."
 
@@ -48,17 +48,5 @@ subset_bam() {
 subset_bam "${palladium_bam_dir}/${kid_id}.GRCh38.haplotagged.bam" # not topped off
 subset_bam "${palladium_bam_dir}/${dad_id}.GRCh38.haplotagged.bam" # not topped off
 subset_bam "${palladium_bam_dir}/${mom_id}.GRCh38.haplotagged.bam" # not topped off
-
-# Subset reference FASTA from UCSC (download full chrom, extract region, clean up)
-dev_ref="${DEV_DIR}/input/dev_reference.fa"
-dev_chrom="${DEV_REGION%%:*}"
-tmp_chrom_fa=$(mktemp "${DEV_DIR}/input/tmp_${dev_chrom}.XXXXXX.fa")
-echo "Fetching reference for ${dev_chrom} from UCSC..."
-curl -sS "https://hgdownload.soe.ucsc.edu/goldenPath/hg38/chromosomes/${dev_chrom}.fa.gz" | gunzip > "${tmp_chrom_fa}"
-samtools faidx "${tmp_chrom_fa}"
-echo "Extracting region ${DEV_REGION}..."
-samtools faidx "${tmp_chrom_fa}" "${DEV_REGION}" > "${dev_ref}"
-samtools faidx "${dev_ref}"
-rm -f "${tmp_chrom_fa}" "${tmp_chrom_fa}.fai"
 
 echo "Dev data creation complete! You can now ingest this with the workflow script."
