@@ -79,7 +79,7 @@ tabix ${vcf_joint_called_unphased}.gz
 # Step 2: pedigree-aware phasing
 vcf_joint_called_phased="${output_dir}/CEPH-1463.joint.GRCh38.deepvariant.glnexus.phased.vcf.gz"
 
-log_info "Phasing: ${kid_id}" 
+log_info "Phasing: ${kid_id} ${dad_id} ${mom_id}" 
 
 whatshap phase \
     --ped ${trio_ped} \
@@ -95,4 +95,6 @@ whatshap phase \
 log_info "Indexing: '${vcf_joint_called_phased}'" 
 tabix ${vcf_joint_called_phased}
 
-log_info "${kid_id} ${dad_id} ${mom_id} phased in: '${vcf_joint_called_phased}'"
+log_info "${kid_id} iht-phased" 
+log_info "${dad_id} ${mom_id} read-backed phased" 
+log_info "Phased VCF: '${vcf_joint_called_phased}'"
