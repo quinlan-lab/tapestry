@@ -18,7 +18,7 @@ kid_id="NA12878"
 dad_id="NA12891" 
 mom_id="NA12892"
 
-DEV_REGION="chr22:20000000-21000000"
+DEV_REGION="chr1:1000000-2000000"
 
 echo "Creating dev data in ${DEV_DIR} for region ${DEV_REGION}..."
 
