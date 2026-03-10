@@ -45,9 +45,9 @@ subset_bam() {
     samtools index ${out_bam}
 }
 
-subset_bam "${palladium_bam_dir}/${kid_id}.GRCh38.haplotagged.bam"
-subset_bam "${palladium_bam_dir}/${dad_id}.GRCh38.haplotagged.bam"
-subset_bam "${palladium_bam_dir}/${mom_id}.GRCh38.haplotagged.bam"
+subset_bam "${palladium_bam_dir}/${kid_id}.GRCh38.haplotagged.bam" # not topped off
+subset_bam "${palladium_bam_dir}/${dad_id}.GRCh38.haplotagged.bam" # not topped off
+subset_bam "${palladium_bam_dir}/${mom_id}.GRCh38.haplotagged.bam" # not topped off
 
 # Subset reference FASTA from UCSC
 dev_ref="${DEV_DIR}/input/dev_reference.fa"
