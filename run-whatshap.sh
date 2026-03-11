@@ -63,6 +63,20 @@ fi
 # Create the output directory (whether production or dev)
 mkdir -p ${output_dir}
 
+get_bam() {
+    local id=$1
+    if [ "$id" == "$kid_id" ]; then
+        echo "$bam_kid"
+    elif [ "$id" == "$dad_id" ]; then
+        echo "$bam_dad"
+    elif [ "$id" == "$mom_id" ]; then
+        echo "$bam_mom"
+    else
+        echo "Error: Unknown sample ID: $id" >&2
+        exit 1
+    fi
+}
+
 # --- Main Workflow ---
 
 log_info "Unphasing: '${vcf_joint_called}'" 
@@ -70,8 +84,7 @@ log_info "Unphasing: '${vcf_joint_called}'"
 # Step 1: unphase the input VCF to avoid mixed phasing
 vcf_joint_called_unphased="${output_dir}/CEPH-1463.joint.GRCh38.deepvariant.glnexus.unphased.vcf"
 whatshap unphase ${vcf_joint_called} \
-    > ${vcf_joint_called_unphased} \
-    2> ${output_dir}/CEPH-1463.joint.GRCh38.deepvariant.glnexus.unphased.log 
+    > ${vcf_joint_called_unphased} 
 
 bgzip -f ${vcf_joint_called_unphased}
 tabix ${vcf_joint_called_unphased}.gz
@@ -81,6 +94,7 @@ vcf_joint_called_phased="${output_dir}/CEPH-1463.joint.GRCh38.deepvariant.glnexu
 
 log_info "Phasing: ${kid_id} ${dad_id} ${mom_id}" 
 
+# https://whatshap.readthedocs.io/en/latest/guide.html#phasing-pedigrees
 whatshap phase \
     --ped ${trio_ped} \
     --sample ${kid_id} \
@@ -89,12 +103,45 @@ whatshap phase \
     --reference ${reference} \
     --output ${vcf_joint_called_phased} \
     ${vcf_joint_called_unphased}.gz \
-    ${bam_kid} ${bam_dad} ${bam_mom} \
-    2> ${output_dir}/CEPH-1463.joint.GRCh38.deepvariant.glnexus.${kid_id}.phased.log
+    ${bam_kid} ${bam_dad} ${bam_mom}
 
 log_info "Indexing: '${vcf_joint_called_phased}'" 
 tabix ${vcf_joint_called_phased}
 
-log_info "${kid_id} iht-phased" 
-log_info "${dad_id} ${mom_id} read-backed phased" 
 log_info "Phased VCF: '${vcf_joint_called_phased}'"
+
+log_info "Creating phasing statistics ..." 
+
+for id in ${kid_id} ${dad_id} ${mom_id}; do 
+	echo ""
+	gtf_phased="${output_dir}/CEPH-1463.joint.GRCh38.deepvariant.glnexus.phased.${id}.gtf"	
+	whatshap stats \
+		--gtf ${gtf_phased} \
+		--sample ${id} \
+		${vcf_joint_called_phased}
+done 
+
+log_info "Created haplotype blocks from: '${vcf_joint_called_phased}'"
+
+# Step 3: haplotag the bams
+for id in ${kid_id} ${dad_id} ${mom_id}; do
+	echo ""
+	log_info "Stripping HP/PS tags from BAM for: ${id}"
+	input_bam=$(get_bam ${id})
+	stripped_bam="${output_dir}/${id}.GRCh38.stripped.bam"
+	samtools view -b -x HP -x PS ${input_bam} -o ${stripped_bam}
+	samtools index ${stripped_bam}
+
+	log_info "Haplotagging: ${id}"
+	output_bam="${output_dir}/${id}.GRCh38.haplotagged.bam"
+	whatshap haplotag \
+		--reference ${reference} \
+		--sample ${id} \
+		--output ${output_bam} \
+		--output-threads 4 \
+		${vcf_joint_called_phased} \
+		${stripped_bam}
+	samtools index ${output_bam}
+	log_info "Haplotagged BAM: '${output_bam}'"
+	echo ""
+done 
