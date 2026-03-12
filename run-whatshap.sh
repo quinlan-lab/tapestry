@@ -136,13 +136,19 @@ for id in ${kid_id} ${dad_id} ${mom_id}; do
 
 	log_info "Haplotagging: ${id}"
 	output_bam="${output_dir}/${id}.GRCh38.haplotagged.bam"
-	OPENSSL_CONF=/dev/null whatshap haplotag \
-		--reference ${reference} \
-		--sample ${id} \
-		--output ${output_bam} \
-		--output-threads 4 \
-		${vcf_joint_called_phased} \
-		${stripped_bam}
+	python -c "
+import hashlib, functools
+hashlib.md5 = functools.partial(hashlib.md5, usedforsecurity=False)
+from whatshap.__main__ import main
+main(argv=[
+    'haplotag',
+    '--reference', '${reference}',
+    '--sample', '${id}',
+    '--output', '${output_bam}',
+    '--output-threads', '4',
+    '${vcf_joint_called_phased}',
+    '${stripped_bam}',
+])"
 	samtools index ${output_bam}
 	log_info "Haplotagged BAM: '${output_bam}'"
 	echo ""
