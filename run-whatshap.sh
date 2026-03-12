@@ -136,7 +136,7 @@ for id in ${kid_id} ${dad_id} ${mom_id}; do
 
 	log_info "Haplotagging: ${id}"
 	output_bam="${output_dir}/${id}.GRCh38.haplotagged.bam"
-	whatshap haplotag \
+	OPENSSL_CONF=/dev/null whatshap haplotag \
 		--reference ${reference} \
 		--sample ${id} \
 		--output ${output_bam} \
