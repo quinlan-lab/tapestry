@@ -51,7 +51,7 @@ if [ -n "$DEV_DIR" ]; then
 
     # Override output dir to write entirely inside the dev directory
     # (Appending '/output' to keep the generated files separate from the raw dev inputs)
-    output_dir="${DEV_DIR}/output"
+    output_dir="${DEV_DIR}/output/trio-phasing"
     
     # Fail fast if dev data doesn't exist
     if [ ! -f "$vcf_joint_called" ]; then
