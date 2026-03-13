@@ -11,7 +11,20 @@ We assume the following command-line tools are in the user's PATH:
 * `hiphase` (https://github.com/PacificBiosciences/HiPhase)
 * `aligned_bam_to_cpg_scores` (https://github.com/PacificBiosciences/pb-CpG-tools)
 
-## Installation 
+## Installation
+
+Install `bedGraphToBigWig` into the virtual environment's bin directory:
+
+```
+# macOS:
+curl -O https://hgdownload.cse.ucsc.edu/admin/exe/macOSX.x86_64/bedGraphToBigWig
+
+# Linux:
+curl -O https://hgdownload.cse.ucsc.edu/admin/exe/linux.x86_64/bedGraphToBigWig
+
+chmod +x bedGraphToBigWig
+mv bedGraphToBigWig .venv/bin/
+```
 
 Install the python dependencies:
 
