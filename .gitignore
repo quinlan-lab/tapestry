@@ -10,5 +10,6 @@ analysis/delta_meth_all_samples.log
 analysis/imprinted_meth_all_samples.bed
 
 dev-data/output
+!dev-data/output/dna-methylation
 dev-data/input/dev_reference.fa
 dev-data/input/dev_reference.fa.fai
