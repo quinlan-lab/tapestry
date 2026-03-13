@@ -77,7 +77,7 @@ def read_meth_level(bed: Path, pb_cpg_tool_mode: str) -> pl.DataFrame:
 
     return df
 
-def get_meth_hap1_hap2(pb_cpg_tool_mode, bed_hap1, bed_hap2): 
+def read_meth_hap1_hap2(pb_cpg_tool_mode, bed_hap1, bed_hap2):
     df_meth_hap1 = read_meth_level(
         bed_hap1,
         pb_cpg_tool_mode
