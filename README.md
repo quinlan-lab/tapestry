@@ -13,34 +13,33 @@ We assume the following command-line tools are in the user's PATH:
 
 ## Installation
 
+Install the python dependencies:
+
+```
+/path/to/python3.11 -m venv .venv
+source .venv/bin/activate
+
+# https://github.com/brentp/cyvcf2?tab=readme-ov-file#github-building-htslib-and-cyvcf2-from-source
+cd $HOME
+git clone --recursive https://github.com/brentp/cyvcf2
+cd cyvcf2
+pip install -r requirements.txt
+CYVCF2_HTSLIB_MODE=EXTERNAL python setup.py install
+
+cd /path/to/tapestry
+pip install -r requirements.txt
+```
+
 Install `bedGraphToBigWig` into the virtual environment's bin directory:
 
 ```
 # macOS:
 curl -O https://hgdownload.cse.ucsc.edu/admin/exe/macOSX.x86_64/bedGraphToBigWig
-
-# Linux:
-curl -O https://hgdownload.cse.ucsc.edu/admin/exe/linux.x86_64/bedGraphToBigWig
-
 chmod +x bedGraphToBigWig
 mv bedGraphToBigWig .venv/bin/
-```
 
-Install the python dependencies:
-
-```
-/path/to/python3.11 -m venv .venv 
-source .venv/bin/activate 
-
-# https://github.com/brentp/cyvcf2?tab=readme-ov-file#github-building-htslib-and-cyvcf2-from-source
-cd $HOME 
-git clone --recursive https://github.com/brentp/cyvcf2
-cd cyvcf2
-pip install -r requirements.txt 
-CYVCF2_HTSLIB_MODE=EXTERNAL python setup.py install
-
-cd /path/to/tapestry
-pip install -r requirements.txt
+# Linux (the latest UCSC binary requires glibc ≥ 2.34, so use an older version):
+cp ~/bin/bedGraphToBigWig .venv/bin/
 ```
 
 ## Pedigree-wise workflow 
