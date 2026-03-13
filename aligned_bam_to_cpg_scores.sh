@@ -3,8 +3,8 @@
 # Usage:
 #   Pedigree mode (default): ./aligned_bam_to_cpg_scores.sh
 #   Trio mode:                ./aligned_bam_to_cpg_scores.sh -t <kid_id> <dad_id> <mom_id>
-#   Trio mode with dev data:  ./aligned_bam_to_cpg_scores.sh -t <kid_id> <dad_id> <mom_id> --dev-dir dev-data
-#   Example trio usage:       ./aligned_bam_to_cpg_scores.sh -t NA12878 NA12891 NA12892 --dev-dir dev-data
+#   Trio mode with dev data:  ./aligned_bam_to_cpg_scores.sh -t <kid_id> <dad_id> <mom_id> --dev-dir trio-dev-data
+#   Example trio usage:       ./aligned_bam_to_cpg_scores.sh -t NA12878 NA12891 NA12892 --dev-dir trio-dev-data
 
 source src/util/logging.sh
 
@@ -50,7 +50,7 @@ if [ "$MODE" == "trio" ]; then
 
     if [ -n "$DEV_DIR" ]; then
         log_info "DEV MODE ENABLED: Reading from and writing to ${DEV_DIR}"
-        bam_dir="${DEV_DIR}/output"
+        bam_dir="${DEV_DIR}/output/trio-phasing"
         base_output_dir="${DEV_DIR}/output/dna-methylation"
 
         if [ ! -f "${bam_dir}/${kid_id}.GRCh38.haplotagged.bam" ]; then
@@ -64,7 +64,7 @@ if [ "$MODE" == "trio" ]; then
     fi
 
     for mode in "model" "count"; do
-        output_dir="${base_output_dir}/CEPH1463.GRCh38.hifi.${mode}.trio-phased"
+        output_dir="${base_output_dir}/CEPH1463.GRCh38.hifi.${mode}.read-backed-phased"
         log_info "Starting mode: '${mode}'"
         log_info "Output will be written to: ${output_dir}"
         mkdir -p ${output_dir}

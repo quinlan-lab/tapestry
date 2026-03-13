@@ -35,7 +35,7 @@ Python 3.11 is required. Pyright is configured via `pyrightconfig.json` with `ex
 4. **Phase methylation to founder/parent haplotypes**: `phase_meth_to_founder_haps.sh` / `phase_meth_to_parent_haps.sh`
 5. **Expand to all CpGs**: `expand_to_all_cpgs.sh` / `expand_to_all_cpgs.trio.sh` — add reference CpGs, unphased methylation, allele-specific CpG flags
 
-Shell scripts accept `--dev-dir` for local development with small test data in `dev-data/`.
+Shell scripts accept `--dev-dir` for local development with small test data in `trio-dev-data/`.
 
 ### Core Python Modules (`src/`)
 
@@ -63,7 +63,7 @@ Shell scripts accept `--dev-dir` for local development with small test data in `
 
 ## Development Data
 
-`dev-data/` contains small BAMs and VCF for the NA12878 trio (chr21 subset). Run `create_dev_data.sh` to regenerate. Shell scripts accept `--dev-dir dev-data` to use this data instead of production paths.
+`trio-dev-data/` contains small BAMs and VCF for the NA12878 trio (chr21 subset). Run `create_dev_data.sh` to regenerate. Shell scripts accept `--dev-dir trio-dev-data` to use this data instead of production paths.
 
 ## Snakemake
 
