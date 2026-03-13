@@ -121,9 +121,8 @@ def phase_meth_to_founder_haps(df_meth_hap1_hap2, df_hap_map):
 
 def write_bigwig(df, uid, parental, pb_cpg_tool_mode, output_dir, logger=None):
     """
-    Write a bigwig file for a given parental haplotype and given pb-cpg-tools pileup mode 
+    Write a bigwig file for a given parental haplotype and given pb-cpg-tools pileup mode
     """
-    
     df_bed_graph = (
         df 
         .filter(pl.col(f"methylation_level_{parental}_{pb_cpg_tool_mode}").is_not_null())        
@@ -136,7 +135,7 @@ def write_bigwig(df, uid, parental, pb_cpg_tool_mode, output_dir, logger=None):
         .to_pandas()  # Convert to pandas DataFrame for bioframe compatibility
     )
 
-    file_path = f"{output_dir}/{uid}.dna-methylation.founder-phased.{parental}.{pb_cpg_tool_mode}.{REFERENCE_GENOME}.bw"
+    file_path = f"{output_dir}/{uid}.dna-methylation.{parental}.{pb_cpg_tool_mode}.{REFERENCE_GENOME}.bw"
 
     # https://bioframe.readthedocs.io/en/latest/api-fileops.html#bioframe.io.fileops.to_bigwig
     bf.to_bigwig(
@@ -247,7 +246,7 @@ def main():
     df_meth_founder_phased = combine_count_and_model_based_methylation_levels(df_meth_count_founder_phased, df_meth_model_founder_phased)
     logger.info(f"Combined count- and model-based methylation levels: {len(df_meth_founder_phased)} rows, {len(df_meth_founder_phased.columns)} columns")
 
-    write_bed(args.output_dir, df_meth_founder_phased, filename_stem=f"{args.uid}.dna-methylation.founder-phased")
+    write_bed(args.output_dir, df_meth_founder_phased, filename_stem=f"{args.uid}.dna-methylation")
     logger.info(f"Wrote count- and model-based methylation levels, phased to founder haplotypes, to: '{args.output_dir}'")
     
     for parental in ['pat', 'mat']: 
