@@ -1,10 +1,13 @@
+import shutil
 import subprocess
+
+BASH = shutil.which('bash')
 
 def shell(cmd):
   completed_process = subprocess.run(
     cmd,
     shell=True,
-    executable='/usr/bin/bash',  # default shell is /bin/sh, but we need bash for <()
+    executable=BASH,  # default shell is /bin/sh, but we need bash for <()
     stdout=subprocess.PIPE,
     stderr=subprocess.PIPE,
   ) 
