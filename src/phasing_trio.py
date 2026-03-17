@@ -152,6 +152,16 @@ def get_all_phasing(
     df_kid_mom = _annotate_phase_blocks(df_kid_mom, df_blocks_kid, "kid")
     df_kid_mom = _annotate_phase_blocks(df_kid_mom, df_blocks_mom, "mom")
 
+    # Cast phase block columns from f64 (pandas round-trip artifact) to Int64
+    phase_block_cols_dad = {
+        col: pl.Int64 for col in df_kid_dad.columns if col.startswith(("start_phase_block", "end_phase_block"))
+    }
+    phase_block_cols_mom = {
+        col: pl.Int64 for col in df_kid_mom.columns if col.startswith(("start_phase_block", "end_phase_block"))
+    }
+    df_kid_dad = df_kid_dad.cast(phase_block_cols_dad)
+    df_kid_mom = df_kid_mom.cast(phase_block_cols_mom)
+
     return df_kid_dad, df_kid_mom
 
 
