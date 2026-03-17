@@ -13,9 +13,9 @@ from phasing_pedigree import (
 )
 from hap_map_pedigree import (
     get_hap_map,
-    write_hap_map_blocks,
     write_bit_vector_sites_and_mismatches,
 )
+from util.hap_map import write_hap_map_blocks
 from get_meth_hap1_hap2 import read_meth_hap1_hap2
 from util.write_data import write_bed, write_bed_and_header
 from util.version_sort import version_sort

@@ -2,42 +2,17 @@ import numpy as np
 import polars as pl
 
 from util.shell import shell
-from util.write_data import write_bed # type: ignore 
+from util.write_data import write_df_to_vcf
+from util.hap_map import extract_bit_vector
 
-def extract_bit_vector(l): 
-    return np.array([int(x) for x in l[0]], dtype=np.uint8)
 
 def extract_bit_vectors(record):
     bit_vector_hap1 = extract_bit_vector(record["allele_seq_hap1"])
     bit_vector_pat = extract_bit_vector(record["allele_seq_pat"])
     return bit_vector_hap1, bit_vector_pat
 
-def write_df_to_vcf(df, vcf, uid):
-    df = df.sort(["chrom", "start", "end"]) 
 
-    header = [
-        '##fileformat=VCFv4.2',
-        '#CHROM\tPOS\tID\tREF\tALT\tQUAL\tFILTER\tINFO\tFORMAT\t' + uid
-    ]
-    
-    with open(vcf, 'w') as f:
-        for line in header:
-            f.write(line + '\n')
-        
-        for row in df.iter_rows(named=True):
-            chrom = row['chrom']
-            pos = row['start'] + 1  # VCF is 1-based
-            id_ = '.'
-            ref = row['REF']
-            alt = row['ALT']
-            qual = '.'
-            flt = '.'
-            info = '.'
-            fmt_keys = '.'
-            fmt_vals = '.'
-            f.write(f"{chrom}\t{pos}\t{id_}\t{ref}\t{alt}\t{qual}\t{flt}\t{info}\t{fmt_keys}\t{fmt_vals}\n")
-
-# For visualization in IGV 
+# For visualization in IGV
 def write_bit_vector_sites_and_mismatches(df_sites, df_sites_mismatch, uid, output_dir, logger):
     dfs = {
         # "sites": df_sites,
@@ -52,26 +27,7 @@ def write_bit_vector_sites_and_mismatches(df_sites, df_sites_mismatch, uid, outp
             f'src/util/compress-index-vcf'
             f' --name {output_dir}/{uid}.bit-vector-{name}'
         )
-        shell(cmd) 
-
-# For visualization in IGV 
-def write_hap_map_blocks(df_hap_map, uid, parental, output_dir): 
-    df_hap_map_blocks = df_hap_map.select([
-        pl.col("chrom"),
-        pl.col("start"),
-        pl.col("end"),
-        # pl.col(f"{parental}_haplotype").str.split("_").list.get(0).alias(f"founder_haplotype_{parental}")
-        pl.col(f"{parental}_haplotype")
-    ])
-    write_bed(output_dir, df_hap_map_blocks, f"{uid}.hap-map-blocks.{parental}")
-
-    cmd = (
-        f'cat {output_dir}/{uid}.hap-map-blocks.{parental}.bed'
-        f' | src/util/sort-compress-index-bed'
-        f' --name {output_dir}/{uid}.hap-map-blocks.{parental}'
-    )
-    shell(cmd) 
-    shell(f'rm {output_dir}/{uid}.hap-map-blocks.{parental}.bed')
+        shell(cmd)
 
 def get_hap_map(df_all_phasing):
     df_sites = df_all_phasing.select(["chrom", "start", "end", "REF", "ALT"])

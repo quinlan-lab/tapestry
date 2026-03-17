@@ -1,5 +1,5 @@
 from pathlib import Path
-import polars as pl 
+import polars as pl
 
 # https://samtools.github.io/hts-specs/BEDv1.pdf
 # "We recommend that only a single tab (\t) be used as field separator."
@@ -49,11 +49,37 @@ def write_bed(output_dir, df, filename_stem):
 def write_bedgraph(output_dir, df, filename_stem):
     write_data(output_dir, df, filename_stem, suffix='bedgraph')
 
-def write_bed_and_header(file_path, df): 
+def write_bed_and_header(file_path, df):
     file_path = Path(file_path)
     parent_dir = file_path.parent
     file_stem = file_path.stem
     file_suffix = file_path.suffix
     assert file_suffix == ".bed"
     write_bed(parent_dir, df, file_stem)
+
+
+def write_df_to_vcf(df, vcf, uid):
+    df = df.sort(["chrom", "start", "end"])
+
+    header = [
+        '##fileformat=VCFv4.2',
+        '#CHROM\tPOS\tID\tREF\tALT\tQUAL\tFILTER\tINFO\tFORMAT\t' + uid
+    ]
+
+    with open(vcf, 'w') as f:
+        for line in header:
+            f.write(line + '\n')
+
+        for row in df.iter_rows(named=True):
+            chrom = row['chrom']
+            pos = row['start'] + 1  # VCF is 1-based
+            id_ = '.'
+            ref = row['REF']
+            alt = row['ALT']
+            qual = '.'
+            flt = '.'
+            info = '.'
+            fmt_keys = '.'
+            fmt_vals = '.'
+            f.write(f"{chrom}\t{pos}\t{id_}\t{ref}\t{alt}\t{qual}\t{flt}\t{info}\t{fmt_keys}\t{fmt_vals}\n")
 

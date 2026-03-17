@@ -2,37 +2,8 @@ import numpy as np
 import polars as pl
 
 from util.shell import shell
-from util.write_data import write_bed
-
-
-def extract_bit_vector(l):
-    return np.array([int(x) for x in l[0]], dtype=np.uint8)
-
-
-def write_df_to_vcf(df, vcf, uid):
-    df = df.sort(["chrom", "start", "end"])
-
-    header = [
-        '##fileformat=VCFv4.2',
-        '#CHROM\tPOS\tID\tREF\tALT\tQUAL\tFILTER\tINFO\tFORMAT\t' + uid
-    ]
-
-    with open(vcf, 'w') as f:
-        for line in header:
-            f.write(line + '\n')
-
-        for row in df.iter_rows(named=True):
-            chrom = row['chrom']
-            pos = row['start'] + 1  # VCF is 1-based
-            id_ = '.'
-            ref = row['REF']
-            alt = row['ALT']
-            qual = '.'
-            flt = '.'
-            info = '.'
-            fmt_keys = '.'
-            fmt_vals = '.'
-            f.write(f"{chrom}\t{pos}\t{id_}\t{ref}\t{alt}\t{qual}\t{flt}\t{info}\t{fmt_keys}\t{fmt_vals}\n")
+from util.write_data import write_df_to_vcf
+from util.hap_map import extract_bit_vector
 
 
 def write_bit_vector_sites_and_mismatches(df_sites_mismatch, uid, parental, output_dir, logger):
@@ -45,25 +16,6 @@ def write_bit_vector_sites_and_mismatches(df_sites_mismatch, uid, parental, outp
         f' --name {output_dir}/{uid}.bit-vector-sites-mismatches.{parental}'
     )
     shell(cmd)
-
-
-def write_hap_map_blocks(df_hap_map, uid, parental, output_dir):
-    """Write hap-map blocks BED for IGV visualization."""
-    df_blocks = df_hap_map.select([
-        pl.col("chrom"),
-        pl.col("start"),
-        pl.col("end"),
-        pl.col(f"{parental}_haplotype"),
-    ])
-    write_bed(output_dir, df_blocks, f"{uid}.hap-map-blocks.{parental}")
-
-    cmd = (
-        f'cat {output_dir}/{uid}.hap-map-blocks.{parental}.bed'
-        f' | src/util/sort-compress-index-bed'
-        f' --name {output_dir}/{uid}.hap-map-blocks.{parental}'
-    )
-    shell(cmd)
-    shell(f'rm {output_dir}/{uid}.hap-map-blocks.{parental}.bed')
 
 
 def _build_hap_map(df, kid_allele_col, parent_allele_col,
