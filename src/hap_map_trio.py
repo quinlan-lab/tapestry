@@ -6,6 +6,74 @@ from util.shell import shell
 from util.write_data import write_bed
 
 
+def get_hap_map_blocks(
+    df_blocks_kid: pl.DataFrame,
+    df_blocks_dad: pl.DataFrame,
+    df_blocks_mom: pl.DataFrame,
+) -> pl.DataFrame:
+    """
+    Compute the intersection of phase blocks across all three individuals.
+    Each resulting interval is a hap-map block.
+    """
+    # Intersect kid and dad blocks
+    df_kd = pl.from_pandas(bf.overlap(
+        df_blocks_kid.select(["chrom", "start", "end"]).to_pandas(),
+        df_blocks_dad.select(["chrom", "start", "end"]).to_pandas(),
+        how='inner',
+        suffixes=('_kid', '_dad'),
+    ))
+
+    # Compute the intersection interval
+    df_kd = df_kd.with_columns(
+        pl.max_horizontal("start_kid", "start_dad").alias("start"),
+        pl.min_horizontal("end_kid", "end_dad").alias("end"),
+    ).filter(pl.col("start") < pl.col("end"))
+
+    # Now intersect with mom blocks
+    df_kdm = pl.from_pandas(bf.overlap(
+        df_kd.select(["chrom_kid", "start", "end"]).rename({"chrom_kid": "chrom"}).to_pandas(),
+        df_blocks_mom.select(["chrom", "start", "end"]).to_pandas(),
+        how='inner',
+        suffixes=('_kd', '_mom'),
+    ))
+
+    df_hap_map_blocks = (
+        df_kdm
+        .with_columns(
+            pl.max_horizontal("start_kd", "start_mom").alias("start"),
+            pl.min_horizontal("end_kd", "end_mom").alias("end"),
+        )
+        .filter(pl.col("start") < pl.col("end"))
+        .select([
+            pl.col("chrom_kd").alias("chrom"),
+            "start",
+            "end",
+        ])
+        .sort(["chrom", "start", "end"])
+    )
+
+    return df_hap_map_blocks
+
+
+def write_hap_map_blocks(df_hap_map, uid, parental, output_dir):
+    """Write hap-map blocks BED for IGV visualization."""
+    df_blocks = df_hap_map.select([
+        pl.col("chrom"),
+        pl.col("start"),
+        pl.col("end"),
+        pl.col(f"{parental}_haplotype"),
+    ])
+    write_bed(output_dir, df_blocks, f"{uid}.hap-map-blocks.{parental}")
+
+    cmd = (
+        f'cat {output_dir}/{uid}.hap-map-blocks.{parental}.bed'
+        f' | src/util/sort-compress-index-bed'
+        f' --name {output_dir}/{uid}.hap-map-blocks.{parental}'
+    )
+    shell(cmd)
+    shell(f'rm {output_dir}/{uid}.hap-map-blocks.{parental}.bed')
+
+
 def assign_snvs_to_hap_map_blocks(df_phasing: pl.DataFrame, df_hap_map_blocks: pl.DataFrame) -> pl.DataFrame:
     """
     Overlap het SNVs with hap-map blocks so each SNV is assigned to a block.
@@ -24,17 +92,14 @@ def assign_snvs_to_hap_map_blocks(df_phasing: pl.DataFrame, df_hap_map_blocks: p
     return df
 
 
-def get_trio_hap_map(
+def get_hap_map(
     df_kid: pl.DataFrame,
     df_dad: pl.DataFrame,
     df_mom: pl.DataFrame,
-    df_hap_map_blocks: pl.DataFrame,
-    kid_id: str,
-    dad_id: str,
-    mom_id: str,
+    df_blocks_kid, df_blocks_dad, df_blocks_mom,
 ):
     """
-    Build the trio haplotype map by comparing bit vectors.
+    Build the haplotype map by comparing bit vectors.
 
     Labeling convention:
         A = dad's hap1, B = dad's hap2 (fixed)
@@ -52,9 +117,6 @@ def get_trio_hap_map(
         - similarity > 0.5 → kid's hap2 matches mom's hap1 → maternal_haplotype = "C"
         - similarity <= 0.5 → kid's hap2 matches mom's hap2 → maternal_haplotype = "D"
 
-    Note: due to meiotic recombination, the kid's paternal haplotype may
-    correspond to A in some blocks and B in others.
-
     Returns:
         df_hap_map with columns:
             chrom, start, end,
@@ -63,6 +125,9 @@ def get_trio_hap_map(
             paternal_concordance, maternal_concordance,
             num_het_SNVs_pat, num_het_SNVs_mat
     """
+
+    df_hap_map_blocks = get_hap_map_blocks(df_blocks_kid, df_blocks_dad, df_blocks_mom)
+
     # Assign kid, dad, mom SNVs to hap-map blocks
     df_kid_in_blocks = assign_snvs_to_hap_map_blocks(df_kid, df_hap_map_blocks)
     df_dad_in_blocks = assign_snvs_to_hap_map_blocks(df_dad, df_hap_map_blocks)
@@ -192,20 +257,3 @@ def get_trio_hap_map(
     return df_hap_map
 
 
-def write_trio_hap_map_blocks(df_hap_map, uid, parental, output_dir):
-    """Write hap-map blocks BED for IGV visualization."""
-    df_blocks = df_hap_map.select([
-        pl.col("chrom"),
-        pl.col("start"),
-        pl.col("end"),
-        pl.col(f"{parental}_haplotype"),
-    ])
-    write_bed(output_dir, df_blocks, f"{uid}.hap-map-blocks.{parental}")
-
-    cmd = (
-        f'cat {output_dir}/{uid}.hap-map-blocks.{parental}.bed'
-        f' | src/util/sort-compress-index-bed'
-        f' --name {output_dir}/{uid}.hap-map-blocks.{parental}'
-    )
-    shell(cmd)
-    shell(f'rm {output_dir}/{uid}.hap-map-blocks.{parental}.bed')

@@ -4,14 +4,14 @@ from pathlib import Path
 import bioframe as bf # https://bioframe.readthedocs.io/en/latest/index.html
 import polars as pl
 
-from get_all_phasing import (
+from phasing_pedigree import (
     get_read_phasing, 
     get_read_phase_blocks, 
     get_iht_phasing, 
     get_iht_blocks, 
     get_all_phasing
 )
-from get_hap_map import (
+from hap_map_pedigree import (
     get_hap_map,
     write_hap_map_blocks,
     write_bit_vector_sites_and_mismatches,

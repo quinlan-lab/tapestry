@@ -4,14 +4,14 @@ from pathlib import Path
 import bioframe as bf
 import polars as pl
 
-from get_trio_phasing import (
-    get_trio_read_phasing,
-    get_trio_phase_blocks,
-    get_trio_hap_map_blocks,
+from phasing_trio import (
+    get_pedmec_phasing,
+    get_phase_blocks,
 )
-from get_trio_hap_map import (
-    get_trio_hap_map,
-    write_trio_hap_map_blocks,
+from hap_map_trio import (
+    get_hap_map,
+    write_hap_map_blocks,
+    get_hap_map_blocks,
 )
 from get_meth_hap1_hap2 import read_meth_hap1_hap2
 from phase_meth_to_founder_haps import (
@@ -251,7 +251,7 @@ def main():
 
     # Step 1: Read phasing data from the multi-sample WhatsHap VCF
     logger.info("Reading trio phasing data from VCF...")
-    phasing = get_trio_read_phasing(args.vcf_trio_phased, kid_id, dad_id, mom_id)
+    phasing = get_pedmec_phasing(args.vcf_trio_phased, kid_id, dad_id, mom_id)
     df_kid = phasing[kid_id]
     df_dad = phasing[dad_id]
     df_mom = phasing[mom_id]
@@ -259,28 +259,27 @@ def main():
 
     # Step 2: Get phase blocks for each individual (pre-computed by run-whatshap.sh)
     logger.info("Reading phase blocks for each individual...")
-    df_blocks_kid = get_trio_phase_blocks(args.blocks_tsv_kid, kid_id)
-    df_blocks_dad = get_trio_phase_blocks(args.blocks_tsv_dad, dad_id)
-    df_blocks_mom = get_trio_phase_blocks(args.blocks_tsv_mom, mom_id)
+    df_blocks_kid = get_phase_blocks(args.blocks_tsv_kid, kid_id)
+    df_blocks_dad = get_phase_blocks(args.blocks_tsv_dad, dad_id)
+    df_blocks_mom = get_phase_blocks(args.blocks_tsv_mom, mom_id)
     logger.info(f"Phase blocks: kid={len(df_blocks_kid)}, dad={len(df_blocks_dad)}, mom={len(df_blocks_mom)}")
 
     # Step 3: Compute hap-map blocks (intersection of all three)
     logger.info("Computing hap-map blocks (intersection of phase blocks)...")
-    df_hap_map_blocks = get_trio_hap_map_blocks(df_blocks_kid, df_blocks_dad, df_blocks_mom)
+    df_hap_map_blocks = get_hap_map_blocks(df_blocks_kid, df_blocks_dad, df_blocks_mom)
     logger.info(f"Hap-map blocks: {len(df_hap_map_blocks)}")
 
     # Step 4: Build the haplotype map via bit-vector comparison
     logger.info("Building trio haplotype map...")
-    df_hap_map = get_trio_hap_map(
+    df_hap_map = get_hap_map(
         df_kid, df_dad, df_mom,
-        df_hap_map_blocks,
-        kid_id, dad_id, mom_id,
+        df_blocks_kid, df_blocks_dad, df_blocks_mom
     )
     logger.info(f"Hap map: {len(df_hap_map)} blocks")
 
     # Write hap-map blocks for IGV
-    write_trio_hap_map_blocks(df_hap_map, kid_id, "paternal", args.output_dir)
-    write_trio_hap_map_blocks(df_hap_map, kid_id, "maternal", args.output_dir)
+    write_hap_map_blocks(df_hap_map, kid_id, "paternal", args.output_dir)
+    write_hap_map_blocks(df_hap_map, kid_id, "maternal", args.output_dir)
     write_bed(args.output_dir, df_hap_map, f"{kid_id}.hap-map-blocks")
     logger.info(f"Wrote hap-map blocks to '{args.output_dir}'")
 

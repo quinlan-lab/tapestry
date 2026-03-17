@@ -1,17 +1,9 @@
 from cyvcf2 import VCF  # type: ignore
 import polars as pl
-import bioframe as bf
 
+from phasing import stringify, is_snv_het
 
-def is_snv_het(variant, sample_index):
-    gt_types = variant.gt_types
-    is_het = gt_types[sample_index] == 1
-    is_snp = variant.is_snp
-    has_single_ALT_allele = len(variant.ALT) == 1
-    return is_het and is_snp and has_single_ALT_allele
-
-
-def get_trio_read_phasing(vcf_path: str, kid_id: str, dad_id: str, mom_id: str):
+def get_pedmec_phasing(vcf_path: str, kid_id: str, dad_id: str, mom_id: str):
     """
     Read the multi-sample WhatsHap trio-phased VCF and extract per-sample
     het SNV alleles and phase block IDs for all three individuals.
@@ -60,7 +52,7 @@ def get_trio_read_phasing(vcf_path: str, kid_id: str, dad_id: str, mom_id: str):
                 phase_block_id = '.'
             else:
                 pb = phase_block_all[si, 0]
-                phase_block_id = '.' if pb == -2147483648 else str(pb)
+                phase_block_id = stringify(pb)
 
             dfs[uid].append({
                 "chrom": chrom,
@@ -77,7 +69,7 @@ def get_trio_read_phasing(vcf_path: str, kid_id: str, dad_id: str, mom_id: str):
     return {uid: pl.DataFrame(records) for uid, records in dfs.items()}
 
 
-def get_trio_phase_blocks(blocks_tsv: str, uid: str) -> pl.DataFrame:
+def get_phase_blocks(blocks_tsv: str, uid: str) -> pl.DataFrame:
     """
     Read the whatshap stats --block-list TSV (produced by run-whatshap.sh) for a sample.
     Returns DataFrame with columns: chrom, start, end, phase_block_id, num_variants
@@ -101,50 +93,3 @@ def get_trio_phase_blocks(blocks_tsv: str, uid: str) -> pl.DataFrame:
     return df
 
 
-def get_trio_hap_map_blocks(
-    df_blocks_kid: pl.DataFrame,
-    df_blocks_dad: pl.DataFrame,
-    df_blocks_mom: pl.DataFrame,
-) -> pl.DataFrame:
-    """
-    Compute the intersection of phase blocks across all three individuals.
-    Each resulting interval is a hap-map block.
-    """
-    # Intersect kid and dad blocks
-    df_kd = pl.from_pandas(bf.overlap(
-        df_blocks_kid.select(["chrom", "start", "end"]).to_pandas(),
-        df_blocks_dad.select(["chrom", "start", "end"]).to_pandas(),
-        how='inner',
-        suffixes=('_kid', '_dad'),
-    ))
-
-    # Compute the intersection interval
-    df_kd = df_kd.with_columns(
-        pl.max_horizontal("start_kid", "start_dad").alias("start"),
-        pl.min_horizontal("end_kid", "end_dad").alias("end"),
-    ).filter(pl.col("start") < pl.col("end"))
-
-    # Now intersect with mom blocks
-    df_kdm = pl.from_pandas(bf.overlap(
-        df_kd.select(["chrom_kid", "start", "end"]).rename({"chrom_kid": "chrom"}).to_pandas(),
-        df_blocks_mom.select(["chrom", "start", "end"]).to_pandas(),
-        how='inner',
-        suffixes=('_kd', '_mom'),
-    ))
-
-    df_hap_map_blocks = (
-        df_kdm
-        .with_columns(
-            pl.max_horizontal("start_kd", "start_mom").alias("start"),
-            pl.min_horizontal("end_kd", "end_mom").alias("end"),
-        )
-        .filter(pl.col("start") < pl.col("end"))
-        .select([
-            pl.col("chrom_kd").alias("chrom"),
-            "start",
-            "end",
-        ])
-        .sort(["chrom", "start", "end"])
-    )
-
-    return df_hap_map_blocks
