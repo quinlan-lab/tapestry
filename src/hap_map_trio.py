@@ -1,58 +1,50 @@
 import numpy as np
 import polars as pl
-import bioframe as bf
 
 from util.shell import shell
 from util.write_data import write_bed
 
 
-def get_hap_map_blocks(
-    df_blocks_kid: pl.DataFrame,
-    df_blocks_dad: pl.DataFrame,
-    df_blocks_mom: pl.DataFrame,
-) -> pl.DataFrame:
-    """
-    Compute the intersection of phase blocks across all three individuals.
-    Each resulting interval is a hap-map block.
-    """
-    # Intersect kid and dad blocks
-    df_kd = pl.from_pandas(bf.overlap(
-        df_blocks_kid.select(["chrom", "start", "end"]).to_pandas(),
-        df_blocks_dad.select(["chrom", "start", "end"]).to_pandas(),
-        how='inner',
-        suffixes=('_kid', '_dad'),
-    ))
+def extract_bit_vector(l):
+    return np.array([int(x) for x in l[0]], dtype=np.uint8)
 
-    # Compute the intersection interval
-    df_kd = df_kd.with_columns(
-        pl.max_horizontal("start_kid", "start_dad").alias("start"),
-        pl.min_horizontal("end_kid", "end_dad").alias("end"),
-    ).filter(pl.col("start") < pl.col("end"))
 
-    # Now intersect with mom blocks
-    df_kdm = pl.from_pandas(bf.overlap(
-        df_kd.select(["chrom_kid", "start", "end"]).rename({"chrom_kid": "chrom"}).to_pandas(),
-        df_blocks_mom.select(["chrom", "start", "end"]).to_pandas(),
-        how='inner',
-        suffixes=('_kd', '_mom'),
-    ))
+def write_df_to_vcf(df, vcf, uid):
+    df = df.sort(["chrom", "start", "end"])
 
-    df_hap_map_blocks = (
-        df_kdm
-        .with_columns(
-            pl.max_horizontal("start_kd", "start_mom").alias("start"),
-            pl.min_horizontal("end_kd", "end_mom").alias("end"),
-        )
-        .filter(pl.col("start") < pl.col("end"))
-        .select([
-            pl.col("chrom_kd").alias("chrom"),
-            "start",
-            "end",
-        ])
-        .sort(["chrom", "start", "end"])
+    header = [
+        '##fileformat=VCFv4.2',
+        '#CHROM\tPOS\tID\tREF\tALT\tQUAL\tFILTER\tINFO\tFORMAT\t' + uid
+    ]
+
+    with open(vcf, 'w') as f:
+        for line in header:
+            f.write(line + '\n')
+
+        for row in df.iter_rows(named=True):
+            chrom = row['chrom']
+            pos = row['start'] + 1  # VCF is 1-based
+            id_ = '.'
+            ref = row['REF']
+            alt = row['ALT']
+            qual = '.'
+            flt = '.'
+            info = '.'
+            fmt_keys = '.'
+            fmt_vals = '.'
+            f.write(f"{chrom}\t{pos}\t{id_}\t{ref}\t{alt}\t{qual}\t{flt}\t{info}\t{fmt_keys}\t{fmt_vals}\n")
+
+
+def write_bit_vector_sites_and_mismatches(df_sites_mismatch, uid, parental, output_dir, logger):
+    vcf = f"{output_dir}/{uid}.bit-vector-sites-mismatches.{parental}.vcf"
+    write_df_to_vcf(df_sites_mismatch, vcf, uid)
+    logger.info(f"Wrote {parental} bit-vector-sites-mismatches (for IGV) to: '{vcf}'")
+
+    cmd = (
+        f'src/util/compress-index-vcf'
+        f' --name {output_dir}/{uid}.bit-vector-sites-mismatches.{parental}'
     )
-
-    return df_hap_map_blocks
+    shell(cmd)
 
 
 def write_hap_map_blocks(df_hap_map, uid, parental, output_dir):
@@ -74,30 +66,109 @@ def write_hap_map_blocks(df_hap_map, uid, parental, output_dir):
     shell(f'rm {output_dir}/{uid}.hap-map-blocks.{parental}.bed')
 
 
-def assign_snvs_to_hap_map_blocks(df_phasing: pl.DataFrame, df_hap_map_blocks: pl.DataFrame) -> pl.DataFrame:
+def _build_hap_map(df, kid_allele_col, parent_allele_col,
+                   phase_block_kid_cols, phase_block_parent_cols,
+                   hap_labels, hap_col_name):
     """
-    Overlap het SNVs with hap-map blocks so each SNV is assigned to a block.
+    Build hap-map for one parental comparison.
+
+    Groups SNVs by the intersection of kid's and parent's phase blocks,
+    compares bit vectors, and assigns haplotype labels.
+
+    Args:
+        df: DataFrame from get_all_phasing (df_kid_dad or df_kid_mom)
+        kid_allele_col: column name for kid's allele (e.g. "kid_allele_pat")
+        parent_allele_col: column name for parent's hap1 allele (e.g. "dad_allele_A")
+        phase_block_kid_cols: [start_col, end_col] for kid's phase block
+        phase_block_parent_cols: [start_col, end_col] for parent's phase block
+        hap_labels: (match_label, mismatch_label) e.g. ("A", "B")
+        hap_col_name: output column name e.g. "paternal_haplotype"
+
+    Returns:
+        df_hap_map: DataFrame with chrom, start, end, haplotype, concordance, num_het_SNVs
+        df_mismatch: DataFrame of mismatch sites with chrom, start, end, REF, ALT
     """
-    df = pl.from_pandas(bf.overlap(
-        df_phasing.to_pandas(),
-        df_hap_map_blocks.to_pandas(),
-        how='inner',
-        suffixes=('', '_block'),
-    ))
-    df = df.rename({
-        "chrom_block": "chrom_hap_map_block",
-        "start_block": "start_hap_map_block",
-        "end_block": "end_hap_map_block",
-    })
-    return df
+    group_cols = ["chrom"] + phase_block_kid_cols + phase_block_parent_cols
+
+    # Group SNVs by (chrom, kid_phase_block, parent_phase_block),
+    # which implicitly finds the intersection of these two types of blocks,
+    # and compute the kid's and parent's allele bit vectors in those intersections
+    df_grouped = (
+        df
+        .group_by(group_cols)
+        .agg([
+            pl.col("start").implode().alias("start_seq"),
+            pl.col("end").implode().alias("end_seq"),
+            pl.col(kid_allele_col).implode().alias("kid_allele_seq"),
+            pl.col(parent_allele_col).implode().alias("parent_allele_seq"),
+            pl.col("REF").implode().alias("REF_seq"),
+            pl.col("ALT").implode().alias("ALT_seq"),
+        ])
+        .sort(phase_block_kid_cols[0])  # Sort for reproducibility
+    )
+
+    records = []
+    data_mismatch = []
+    for row in df_grouped.iter_rows(named=True):
+        kid_vec = extract_bit_vector(row["kid_allele_seq"])
+        parent_vec = extract_bit_vector(row["parent_allele_seq"])
+
+        n = len(kid_vec)
+
+        mismatch = kid_vec != parent_vec
+        edit_distance = np.sum(mismatch)
+        # Similarity of kid to parent's hap1 vs hap2 sum to 1.0
+        # (the parent is het, so hap1 and hap2 are complementary)
+        similarity = 1 - (edit_distance / n)
+
+        starts = np.array(row["start_seq"][0])
+        ends = np.array(row["end_seq"][0])
+        REFs = np.array(row["REF_seq"][0])
+        ALTs = np.array(row["ALT_seq"][0])
+
+        if similarity > 0.5:
+            haplotype = hap_labels[0]
+            concordance = similarity
+            mismatch_mask = mismatch
+        else:
+            haplotype = hap_labels[1]
+            concordance = 1.0 - similarity
+            mismatch_mask = ~mismatch
+
+        record = {col: row[col] for col in group_cols}
+        record[hap_col_name] = haplotype
+        record["haplotype_concordance"] = concordance
+        record["num_het_SNVs"] = n
+        records.append(record)
+
+        data_mismatch.append({
+            "chrom": row["chrom"],
+            "start": starts[mismatch_mask],
+            "end": ends[mismatch_mask],
+            "REF": REFs[mismatch_mask],
+            "ALT": ALTs[mismatch_mask],
+        })
+
+    df_hap_map = (
+        pl.DataFrame(records)
+        .with_columns(
+            pl.max_horizontal(phase_block_kid_cols[0], phase_block_parent_cols[0]).alias("start"),  # start of intersection
+            pl.min_horizontal(phase_block_kid_cols[1], phase_block_parent_cols[1]).alias("end"),  # end of intersection
+        )
+        .select([
+            "chrom", "start", "end",
+            hap_col_name, "haplotype_concordance", "num_het_SNVs",
+        ])
+        .sort(["chrom", "start", "end"])
+    )
+
+    schema = {"chrom": pl.String, "start": pl.Int64, "end": pl.Int64, "REF": pl.String, "ALT": pl.String}
+    df_mismatch = pl.concat([pl.DataFrame(dm, schema=schema) for dm in data_mismatch])
+
+    return df_hap_map, df_mismatch
 
 
-def get_hap_map(
-    df_kid: pl.DataFrame,
-    df_dad: pl.DataFrame,
-    df_mom: pl.DataFrame,
-    df_blocks_kid, df_blocks_dad, df_blocks_mom,
-):
+def get_hap_map(df_kid_dad, df_kid_mom):
     """
     Build the haplotype map by comparing bit vectors.
 
@@ -105,155 +176,33 @@ def get_hap_map(
         A = dad's hap1, B = dad's hap2 (fixed)
         C = mom's hap1, D = mom's hap2 (fixed)
 
-    For each hap-map block, we determine which of A or B the kid's paternal
-    haplotype (hap1) matches, and which of C or D the kid's maternal
-    haplotype (hap2) matches.
-
-    We compare the kid's paternal bit-vector (allele_hap1, since whatshap
-    phases hap1=paternal) to the dad's hap1 bit-vector:
-        - similarity > 0.5 → kid's hap1 matches dad's hap1 → paternal_haplotype = "A"
-        - similarity <= 0.5 → kid's hap1 matches dad's hap2 → paternal_haplotype = "B"
-    Similarly for maternal:
-        - similarity > 0.5 → kid's hap2 matches mom's hap1 → maternal_haplotype = "C"
-        - similarity <= 0.5 → kid's hap2 matches mom's hap2 → maternal_haplotype = "D"
+    For each block (intersection of kid's and parent's phase blocks),
+    compare the kid's allele sequence to the parent's hap1 allele sequence:
+        - Paternal: kid_allele_pat vs dad_allele_A
+          similarity > 0.5 → paternal_haplotype = "A", else "B"
+        - Maternal: kid_allele_mat vs mom_allele_C
+          similarity > 0.5 → maternal_haplotype = "C", else "D"
 
     Returns:
-        df_hap_map with columns:
-            chrom, start, end,
-            paternal_haplotype ("A" or "B"),
-            maternal_haplotype ("C" or "D"),
-            paternal_concordance, maternal_concordance,
-            num_het_SNVs_pat, num_het_SNVs_mat
+        df_pat: DataFrame with chrom, start, end, paternal_haplotype,
+                haplotype_concordance, num_het_SNVs
+        df_mat: DataFrame with chrom, start, end, maternal_haplotype,
+                haplotype_concordance, num_het_SNVs
+        df_mismatch_pat: mismatch sites for paternal comparison
+        df_mismatch_mat: mismatch sites for maternal comparison
     """
-
-    df_hap_map_blocks = get_hap_map_blocks(df_blocks_kid, df_blocks_dad, df_blocks_mom)
-
-    # Assign kid, dad, mom SNVs to hap-map blocks
-    df_kid_in_blocks = assign_snvs_to_hap_map_blocks(df_kid, df_hap_map_blocks)
-    df_dad_in_blocks = assign_snvs_to_hap_map_blocks(df_dad, df_hap_map_blocks)
-    df_mom_in_blocks = assign_snvs_to_hap_map_blocks(df_mom, df_hap_map_blocks)
-
-    # Join kid with dad on shared het SNV positions within the same hap-map block
-    df_kid_dad = (
-        df_kid_in_blocks
-        .join(
-            df_dad_in_blocks,
-            on=["chrom", "start", "end", "REF", "ALT",
-                "start_hap_map_block", "end_hap_map_block"],
-            how="inner",
-            suffix="_dad",
-        )
+    df_pat, df_mismatch_pat = _build_hap_map(
+        df_kid_dad, "kid_allele_pat", "dad_allele_A",
+        ["start_phase_block_kid", "end_phase_block_kid"],
+        ["start_phase_block_dad", "end_phase_block_dad"],
+        ("A", "B"), "paternal_haplotype",
     )
 
-    # Join kid with mom on shared het SNV positions within the same hap-map block
-    df_kid_mom = (
-        df_kid_in_blocks
-        .join(
-            df_mom_in_blocks,
-            on=["chrom", "start", "end", "REF", "ALT",
-                "start_hap_map_block", "end_hap_map_block"],
-            how="inner",
-            suffix="_mom",
-        )
+    df_mat, df_mismatch_mat = _build_hap_map(
+        df_kid_mom, "kid_allele_mat", "mom_allele_C",
+        ["start_phase_block_kid", "end_phase_block_kid"],
+        ["start_phase_block_mom", "end_phase_block_mom"],
+        ("C", "D"), "maternal_haplotype",
     )
 
-    # Group by hap-map block and build bit vectors for paternal comparison
-    df_pat_grouped = (
-        df_kid_dad
-        .group_by(["chrom", "start_hap_map_block", "end_hap_map_block"])
-        .agg([
-            pl.col("allele_hap1").implode().alias("kid_pat_seq"),
-            pl.col("allele_hap1_dad").implode().alias("dad_hap1_seq"),
-        ])
-    )
-
-    # Group by hap-map block and build bit vectors for maternal comparison
-    df_mat_grouped = (
-        df_kid_mom
-        .group_by(["chrom", "start_hap_map_block", "end_hap_map_block"])
-        .agg([
-            pl.col("allele_hap2").implode().alias("kid_mat_seq"),
-            pl.col("allele_hap1_mom").implode().alias("mom_hap1_seq"),
-        ])
-    )
-
-    # Process paternal comparisons
-    pat_records = []
-    for row in df_pat_grouped.iter_rows(named=True):
-        kid_pat = np.array([int(x) for x in row["kid_pat_seq"][0]], dtype=np.uint8)
-        dad_hap1 = np.array([int(x) for x in row["dad_hap1_seq"][0]], dtype=np.uint8)
-
-        n = len(kid_pat)
-        match_hap1 = np.sum(kid_pat == dad_hap1)
-        similarity_to_dad_hap1 = match_hap1 / n
-
-        if similarity_to_dad_hap1 > 0.5:
-            pat_haplotype = "A"
-            pat_concordance = similarity_to_dad_hap1
-        else:
-            pat_haplotype = "B"
-            pat_concordance = 1.0 - similarity_to_dad_hap1
-
-        pat_records.append({
-            "chrom": row["chrom"],
-            "start_hap_map_block": row["start_hap_map_block"],
-            "end_hap_map_block": row["end_hap_map_block"],
-            "paternal_haplotype": pat_haplotype,
-            "paternal_concordance": pat_concordance,
-            "num_het_SNVs_pat": n,
-        })
-
-    # Process maternal comparisons
-    mat_records = []
-    for row in df_mat_grouped.iter_rows(named=True):
-        kid_mat = np.array([int(x) for x in row["kid_mat_seq"][0]], dtype=np.uint8)
-        mom_hap1 = np.array([int(x) for x in row["mom_hap1_seq"][0]], dtype=np.uint8)
-
-        n = len(kid_mat)
-        match_hap1 = np.sum(kid_mat == mom_hap1)
-        similarity_to_mom_hap1 = match_hap1 / n
-
-        if similarity_to_mom_hap1 > 0.5:
-            mat_haplotype = "C"
-            mat_concordance = similarity_to_mom_hap1
-        else:
-            mat_haplotype = "D"
-            mat_concordance = 1.0 - similarity_to_mom_hap1
-
-        mat_records.append({
-            "chrom": row["chrom"],
-            "start_hap_map_block": row["start_hap_map_block"],
-            "end_hap_map_block": row["end_hap_map_block"],
-            "maternal_haplotype": mat_haplotype,
-            "maternal_concordance": mat_concordance,
-            "num_het_SNVs_mat": n,
-        })
-
-    df_pat = pl.DataFrame(pat_records)
-    df_mat = pl.DataFrame(mat_records)
-
-    # Join paternal and maternal results
-    df_hap_map = (
-        df_pat
-        .join(
-            df_mat,
-            on=["chrom", "start_hap_map_block", "end_hap_map_block"],
-            how="full",
-            coalesce=True,
-        )
-        .rename({
-            "start_hap_map_block": "start",
-            "end_hap_map_block": "end",
-        })
-        .select([
-            "chrom", "start", "end",
-            "paternal_haplotype", "maternal_haplotype",
-            "paternal_concordance", "maternal_concordance",
-            "num_het_SNVs_pat", "num_het_SNVs_mat",
-        ])
-        .sort(["chrom", "start", "end"])
-    )
-
-    return df_hap_map
-
-
+    return df_pat, df_mat, df_mismatch_pat, df_mismatch_mat
