@@ -64,7 +64,7 @@ if [ "$MODE" == "trio" ]; then
     fi
 
     for mode in "model" "count"; do
-        output_dir="${base_output_dir}/CEPH1463.GRCh38.hifi.${mode}.read-backed-phased"
+        output_dir="${base_output_dir}/CEPH1463.GRCh38.hifi.${mode}.pedmec-phased"
         log_info "Starting mode: '${mode}'"
         log_info "Output will be written to: ${output_dir}"
         mkdir -p ${output_dir}
