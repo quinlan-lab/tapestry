@@ -3,6 +3,9 @@ import polars as pl
 
 from util.shell import shell
 from util.write_data import write_df_to_vcf
+import importlib
+import util.hap_map
+importlib.reload(util.hap_map)
 from util.hap_map import extract_bit_vector
 
 
@@ -44,17 +47,18 @@ def _build_hap_map(df, kid_allele_col, parent_allele_col,
 
     # Group SNVs by (chrom, kid_phase_block, parent_phase_block),
     # which implicitly finds the intersection of these two types of blocks,
-    # and compute the kid's and parent's allele bit vectors in those intersections
+    # and compute the kid's and parent's allele bit vectors in those intersections. 
+    # Assumes SNVs are phased in kid and parent. 
     df_grouped = (
         df
         .group_by(group_cols)
         .agg([
-            pl.col("start").implode().alias("start_seq"),
-            pl.col("end").implode().alias("end_seq"),
-            pl.col(kid_allele_col).implode().alias("kid_allele_seq"),
-            pl.col(parent_allele_col).implode().alias("parent_allele_seq"),
-            pl.col("REF").implode().alias("REF_seq"),
-            pl.col("ALT").implode().alias("ALT_seq"),
+            pl.col("start").alias("start_seq"),
+            pl.col("end").alias("end_seq"),
+            pl.col(kid_allele_col).alias("kid_allele_seq"),
+            pl.col(parent_allele_col).alias("parent_allele_seq"),
+            pl.col("REF").alias("REF_seq"),
+            pl.col("ALT").alias("ALT_seq"),
         ])
         .sort(phase_block_kid_cols[0])  # Sort for reproducibility
     )
@@ -69,15 +73,15 @@ def _build_hap_map(df, kid_allele_col, parent_allele_col,
 
         mismatch = kid_vec != parent_vec
         edit_distance = np.sum(mismatch)
-        # Similarity of kid to parent's hap1 vs hap2 sum to 1.0
-        # (the parent is het, so hap1 and hap2 are complementary)
         similarity = 1 - (edit_distance / n)
 
-        starts = np.array(row["start_seq"][0])
-        ends = np.array(row["end_seq"][0])
-        REFs = np.array(row["REF_seq"][0])
-        ALTs = np.array(row["ALT_seq"][0])
+        starts = np.array(row["start_seq"])
+        ends = np.array(row["end_seq"])
+        REFs = np.array(row["REF_seq"])
+        ALTs = np.array(row["ALT_seq"])
 
+        # Similarity of kid to parent's hap1 vs hap2 sum to 1.0
+        # (the parent is het, so hap1 and hap2 are complementary)
         if similarity > 0.5:
             haplotype = hap_labels[0]
             concordance = similarity
@@ -90,7 +94,7 @@ def _build_hap_map(df, kid_allele_col, parent_allele_col,
         record = {col: row[col] for col in group_cols}
         record[hap_col_name] = haplotype
         record["haplotype_concordance"] = concordance
-        record["num_het_SNVs"] = n
+        record["num_het_SNVs_in_parent"] = n
         records.append(record)
 
         data_mismatch.append({
@@ -109,7 +113,7 @@ def _build_hap_map(df, kid_allele_col, parent_allele_col,
         )
         .select([
             "chrom", "start", "end",
-            hap_col_name, "haplotype_concordance", "num_het_SNVs",
+            hap_col_name, "haplotype_concordance", "num_het_SNVs_in_parent",
         ])
         .sort(["chrom", "start", "end"])
     )

@@ -6,7 +6,7 @@ from util.write_data import write_bed
 
 
 def extract_bit_vector(l):
-    return np.array([int(x) for x in l[0]], dtype=np.uint8)
+    return np.array([int(x) for x in l], dtype=np.uint8)
 
 
 def write_hap_map_blocks(df_hap_map, uid, parental, output_dir):
