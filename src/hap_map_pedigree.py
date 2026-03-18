@@ -34,7 +34,8 @@ def get_hap_map(df_all_phasing):
 
     # Group het SNVs by (chrom, phase_block, iht_block), 
     # which implicitly finds the intersection of these two types of blocks, 
-    # and compute the read-backed and inheritance-backed bit vectors in those intersections
+    # and compute the read-backed and inheritance-backed bit vectors in those intersections.
+    # Assumes SNVs are phased in kid and parent. 
     df_grouped = (
         df_all_phasing
         .group_by([
