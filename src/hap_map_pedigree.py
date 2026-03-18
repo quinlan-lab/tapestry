@@ -45,12 +45,12 @@ def get_hap_map(df_all_phasing):
             "founder_label_pat_iht_block", "founder_label_mat_iht_block"
         ])
         .agg([
-            pl.col("start").implode().alias("start_seq"),
-            pl.col("end").implode().alias("end_seq"),
-            pl.col("allele_hap1").implode().alias("allele_seq_hap1"),
-            pl.col("allele_pat").implode().alias("allele_seq_pat"),
-            pl.col("REF").implode().alias("REF_seq"),
-            pl.col("ALT").implode().alias("ALT_seq"),
+            pl.col("start").alias("start_seq"),
+            pl.col("end").alias("end_seq"),
+            pl.col("allele_hap1").alias("allele_seq_hap1"),
+            pl.col("allele_pat").alias("allele_seq_pat"),
+            pl.col("REF").alias("REF_seq"),
+            pl.col("ALT").alias("ALT_seq"),
         ])
         .sort("start_phase_block")  # Sort by phase_block_id for reproducibility 
     )
@@ -65,10 +65,10 @@ def get_hap_map(df_all_phasing):
 
         record_hap_map["num_het_SNVs"] = len(bit_vector_hap1)
 
-        starts = np.array(record_hap_map["start_seq"][0])
-        ends = np.array(record_hap_map["end_seq"][0])
-        REFs = np.array(record_hap_map["REF_seq"][0])
-        ALTs = np.array(record_hap_map["ALT_seq"][0])
+        starts = np.array(record_hap_map["start_seq"])
+        ends = np.array(record_hap_map["end_seq"])
+        REFs = np.array(record_hap_map["REF_seq"])
+        ALTs = np.array(record_hap_map["ALT_seq"])
 
         hap1_pat_mismatch = bit_vector_hap1 != bit_vector_pat 
         edit_distance_hap1_pat = np.sum(hap1_pat_mismatch)
