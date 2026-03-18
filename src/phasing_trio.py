@@ -29,11 +29,11 @@ def get_phase_blocks(blocks_tsv: str, uid: str) -> pl.DataFrame:
 
 
 def _annotate_phase_blocks(df_snvs, df_blocks, label):
-    """Annotate SNVs with the phase block they fall in for a given individual."""
+    """Annotate phased SNVs with the phase block they fall in for a given individual."""
     df = pl.from_pandas(bf.overlap(
         df_snvs.to_pandas(),
         df_blocks.select(["chrom", "start", "end"]).to_pandas(),
-        how='left',
+        how='inner', # restrict to phased SNVs
         suffixes=('', f'_{label}'),
     ))
     return (
