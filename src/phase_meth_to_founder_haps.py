@@ -170,7 +170,7 @@ def combine_count_and_model_based_methylation_levels(
     df = df_meth_count.join(
         df_meth_model,
         on=common_cols,
-        nulls_equal=True,
+        nulls_equal=True, # join on nulls, e.g., total_read_count_XXX is null in both df_meth_count and df_meth_model
         # "how=full" will capture CpG sites where count-based meth levels are available, but not model-based meth levels, and vice versa,
         # though, for sample 200081, I didn't see any such CpG sites: 
         how="full", 
