@@ -70,7 +70,7 @@ def read_meth_unphased(bed_meth_count_unphased, bed_meth_model_unphased):
     df = df_meth_count_unphased.join(
         df_meth_model_unphased,
         on=['chrom', 'start', 'end'],
-        nulls_equal=True, # join on nulls
+        nulls_equal=True, # join on nulls (3/19/26: probably unnecessary since join cols cannot be null)
         # "how=full" will capture CpG sites where count-based meth levels are available, but not model-based meth levels, and vice versa.
         # This is also why I did not join on "total_read_count", e.g., this could be null for count-based meth and non-null for model-based meth in the same record. 
         how="full", 
