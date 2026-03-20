@@ -244,10 +244,10 @@ def main():
     logger.info(f"Wrote hap-map blocks to '{args.output_dir}'")
 
     # Write bitvector mismatch sites to BED (for later proximity computation) and VCF (for IGV visualization)
-    write_bit_vector_mismatches_bed(args.output_dir, df_mismatch_pat, logger, parental="paternal")
-    write_bit_vector_mismatches_bed(args.output_dir, df_mismatch_mat, logger, parental="maternal")
-    write_bit_vector_mismatches_vcf(args.output_dir, df_mismatch_pat, logger, parental="paternal")
-    write_bit_vector_mismatches_vcf(args.output_dir, df_mismatch_mat, logger, parental="maternal")
+    write_bit_vector_mismatches_bed(args.output_dir, df_mismatch_pat, logger, uid=kid_id, parental="paternal")
+    write_bit_vector_mismatches_bed(args.output_dir, df_mismatch_mat, logger, uid=kid_id, parental="maternal")
+    write_bit_vector_mismatches_vcf(args.output_dir, df_mismatch_pat, logger, uid=kid_id, parental="paternal")
+    write_bit_vector_mismatches_vcf(args.output_dir, df_mismatch_mat, logger, uid=kid_id, parental="maternal")
 
     # Step 4: Get HiFi DNA methylation levels (both count-based and model-based)
     # in kid, dad, and mom at CpG sites phased to hap1/hap2
