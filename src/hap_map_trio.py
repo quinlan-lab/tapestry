@@ -1,24 +1,10 @@
 import numpy as np
 import polars as pl
 
-from util.shell import shell
-from util.write_data import write_df_to_vcf
 import importlib
 import util.hap_map
 importlib.reload(util.hap_map)
 from util.hap_map import extract_bit_vector
-
-
-def write_bit_vector_sites_and_mismatches(df_sites_mismatch, uid, parental, output_dir, logger):
-    vcf = f"{output_dir}/{uid}.bit-vector-sites-mismatches.{parental}.vcf"
-    write_df_to_vcf(df_sites_mismatch, vcf, uid)
-    logger.info(f"Wrote {parental} bit-vector-sites-mismatches (for IGV) to: '{vcf}'")
-
-    cmd = (
-        f'src/util/compress-index-vcf'
-        f' --name {output_dir}/{uid}.bit-vector-sites-mismatches.{parental}'
-    )
-    shell(cmd)
 
 
 def _build_hap_map(df, kid_allele_col, parent_allele_col,

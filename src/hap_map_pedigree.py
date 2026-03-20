@@ -1,8 +1,6 @@
 import numpy as np
 import polars as pl
 
-from util.shell import shell
-from util.write_data import write_df_to_vcf
 from util.hap_map import extract_bit_vector
 
 
@@ -11,23 +9,6 @@ def extract_bit_vectors(record):
     bit_vector_pat = extract_bit_vector(record["allele_seq_pat"])
     return bit_vector_hap1, bit_vector_pat
 
-
-# For visualization in IGV
-def write_bit_vector_sites_and_mismatches(df_sites, df_sites_mismatch, uid, output_dir, logger):
-    dfs = {
-        # "sites": df_sites,
-        "sites-mismatches": df_sites_mismatch,
-    }
-    for name, df in dfs.items():
-        vcf = f"{output_dir}/{uid}.bit-vector-{name}.vcf"
-        write_df_to_vcf(df, vcf, uid)
-        logger.info(f"Wrote bit-vector-{name} (for IGV visualization) to: '{vcf}'")
-
-        cmd = (
-            f'src/util/compress-index-vcf'
-            f' --name {output_dir}/{uid}.bit-vector-{name}'
-        )
-        shell(cmd)
 
 def get_hap_map(df_all_phasing):
     df_sites = df_all_phasing.select(["chrom", "start", "end", "REF", "ALT"])

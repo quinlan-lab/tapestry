@@ -11,13 +11,10 @@ from phasing_pedigree import (
     get_iht_blocks, 
     get_all_phasing
 )
-from hap_map_pedigree import (
-    get_hap_map,
-    write_bit_vector_sites_and_mismatches,
-)
+from hap_map_pedigree import get_hap_map
 from util.hap_map import write_hap_map_blocks
 from get_meth_hap1_hap2 import read_meth_hap1_hap2
-from util.write_data import write_bed, write_bed_and_header
+from util.write_data import write_bed, write_bit_vector_mismatches_bed, write_bit_vector_mismatches_vcf
 from util.version_sort import version_sort
 
 REFERENCE_GENOME = "hg38"
@@ -43,11 +40,6 @@ def get_all_phasing_wrapper(uid, vcf_read_phased, tsv_read_phase_blocks, vcf_iht
     )
     
     return df_all_phasing
-
-def write_bit_vector_mismatches(output_dir, uid, df_sites_mismatch, logger):
-    bed = f"{output_dir}/{uid}.bit-vector-sites-mismatches.bed"
-    write_bed_and_header(bed, df_sites_mismatch)
-    logger.info(f"Wrote sites where bit vectors are mismatched, for later computation of proximity of (all) cpg sites to mismatch sites to: '{bed}'")
 
 def phase_meth_to_founder_haps(df_meth_hap1_hap2, df_hap_map):
     df = bf.overlap(
@@ -223,8 +215,8 @@ def main():
     write_bed(args.output_dir, df_hap_map, f"{args.uid}.hap-map-blocks")
     logger.info(f"Wrote hap-map blocks to '{args.output_dir}'")
     
-    write_bit_vector_sites_and_mismatches(df_sites, df_sites_mismatch, args.uid, args.output_dir, logger)
-    write_bit_vector_mismatches(args.output_dir, args.uid, df_sites_mismatch, logger)    
+    write_bit_vector_mismatches_vcf(args.output_dir, df_sites_mismatch, logger, uid=args.uid)
+    write_bit_vector_mismatches_bed(args.output_dir, df_sites_mismatch, logger, uid=args.uid)    
 
     df_meth_count_hap1_hap2 = read_meth_hap1_hap2(
         pb_cpg_tool_mode='count', 

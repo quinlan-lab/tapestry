@@ -1,6 +1,8 @@
 from pathlib import Path
 import polars as pl
 
+from util.shell import shell
+
 # https://samtools.github.io/hts-specs/BEDv1.pdf
 # "We recommend that only a single tab (\t) be used as field separator."
 # "Comment lines start with # with no horizontal whitespace beforehand. A # appearing anywhere else in a data line is treated as feature data, not a comment."
@@ -58,12 +60,42 @@ def write_bed_and_header(file_path, df):
     write_bed(parent_dir, df, file_stem)
 
 
-def write_df_to_vcf(df, vcf, uid):
+def write_bit_vector_mismatches_bed(output_dir, df_sites_mismatch, logger, uid=None, parental=None):
+    """Write bitvector mismatch sites to BED for later proximity computation.
+
+    Used by both pedigree-wise and trio-wise workflows.
+    """
+    prefix = f"{uid}." if uid else ""
+    suffix = f".{parental}" if parental else ""
+    bed = f"{output_dir}/{prefix}bit-vector-sites-mismatches{suffix}.bed"
+    write_bed_and_header(bed, df_sites_mismatch)
+    logger.info(f"Wrote sites where bit vectors are mismatched to: '{bed}'")
+    logger.info("These will be used for later computation of proximity of (all) cpg sites to mismatch sites")
+
+
+def write_bit_vector_mismatches_vcf(output_dir, df_sites_mismatch, logger, uid=None, parental=None):
+    """Write bitvector mismatch sites to VCF for IGV visualization, then compress and index.
+
+    Used by both pedigree-wise and trio-wise workflows.
+    """
+    prefix = f"{uid}." if uid else ""
+    suffix = f".{parental}" if parental else ""
+    stem = f"{output_dir}/{prefix}bit-vector-sites-mismatches{suffix}"
+    vcf = f"{stem}.vcf"
+    write_df_to_vcf(df_sites_mismatch, vcf, uid=uid)
+    logger.info(f"Wrote bit-vector-sites-mismatches (for IGV) to: '{vcf}'")
+
+    cmd = f'src/util/compress-index-vcf --name {stem}'
+    shell(cmd)
+
+
+def write_df_to_vcf(df, vcf, uid=None):
     df = df.sort(["chrom", "start", "end"])
 
+    sample = uid if uid else "SAMPLE"
     header = [
         '##fileformat=VCFv4.2',
-        '#CHROM\tPOS\tID\tREF\tALT\tQUAL\tFILTER\tINFO\tFORMAT\t' + uid
+        '#CHROM\tPOS\tID\tREF\tALT\tQUAL\tFILTER\tINFO\tFORMAT\t' + sample
     ]
 
     with open(vcf, 'w') as f:
