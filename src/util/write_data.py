@@ -83,10 +83,11 @@ def write_bit_vector_mismatches_vcf(output_dir, df_sites_mismatch, logger, uid=N
     stem = f"{output_dir}/{prefix}bit-vector-sites-mismatches{suffix}"
     vcf = f"{stem}.vcf"
     write_df_to_vcf(df_sites_mismatch, vcf, uid=uid)
-    logger.info(f"Wrote bit-vector-sites-mismatches (for IGV) to: '{vcf}'")
 
     cmd = f'src/util/compress-index-vcf --name {stem}'
     shell(cmd)
+
+    logger.info(f"Wrote bit-vector-sites-mismatches (for IGV) to: '{vcf}.gz'")
 
 
 def write_df_to_vcf(df, vcf, uid=None):
