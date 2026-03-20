@@ -176,7 +176,7 @@ def main():
     parser.add_argument('--kid_id', required=True, help='Child sample ID')
     parser.add_argument('--dad_id', required=True, help='Father sample ID')
     parser.add_argument('--mom_id', required=True, help='Mother sample ID')
-    parser.add_argument('--vcf_trio_phased', required=True, help='WhatsHap trio-phased VCF (multi-sample)')
+    parser.add_argument('--vcf_pedmec_phased', required=True, help='WhatsHap pedmec-phased trio VCF')
     parser.add_argument('--blocks_tsv_kid', required=True, help='WhatsHap blocks TSV for child')
     parser.add_argument('--blocks_tsv_dad', required=True, help='WhatsHap blocks TSV for father')
     parser.add_argument('--blocks_tsv_mom', required=True, help='WhatsHap blocks TSV for mother')
@@ -223,10 +223,10 @@ def main():
     df_blocks_mom = get_phase_blocks(args.blocks_tsv_mom, mom_id)
     logger.info(f"Phase blocks: kid={len(df_blocks_kid)}, dad={len(df_blocks_dad)}, mom={len(df_blocks_mom)}")
 
-    # Step 2: Get paired parent-child alleles from the WhatsHap trio-phased VCF (PedMEC algorithm)
-    logger.info("Getting paired kid-parent allele sequences from the WhatsHap trio-phased VCF...")
+    # Step 2: Get paired parent-child alleles from the WhatsHap pedmec-phased VCF
+    logger.info("Getting paired kid-parent allele sequences from the WhatsHap pedmec-phased VCF...")
     df_kid_dad, df_kid_mom = get_all_phasing(
-        args.vcf_trio_phased, kid_id, dad_id, mom_id,
+        args.vcf_pedmec_phased, kid_id, dad_id, mom_id,
         df_blocks_kid, df_blocks_dad, df_blocks_mom,
     )
     logger.info(f"Number of het sites in dad: {len(df_kid_dad)}, Number of het sites in mom: {len(df_kid_mom)}")
