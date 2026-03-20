@@ -1,5 +1,9 @@
 #!/bin/bash
 
+# Usage:
+#   Production:  ./run-whatshap.sh
+#   Dev mode:    ./run-whatshap.sh --dev-dir trio-dev-data
+
 DEV_DIR=""
 
 # Argument handling
@@ -22,7 +26,7 @@ source src/util/logging.sh
 # --- Default Configurations (Production) ---
 trio_ped="XXX" # TODO: fill this in
 reference="/scratch/ucgd/lustre-labs/quinlan/data-shared/constraint-tools/reference/grch38/hg38.analysisSet.fa.gz" 
-output_dir="/scratch/ucgd/lustre-labs/quinlan/data-shared/whatshap-phasing"
+output_dir="/scratch/ucgd/lustre-labs/quinlan/data-shared/pedmec-phasing"
 
 # https://github.com/Platinum-Pedigree-Consortium/Platinum-Pedigree-Datasets?tab=readme-ov-file#accessing-controlled-samples
 kid_id="NA12878"
@@ -51,7 +55,7 @@ if [ -n "$DEV_DIR" ]; then
 
     # Override output dir to write entirely inside the dev directory
     # (Appending '/output' to keep the generated files separate from the raw dev inputs)
-    output_dir="${DEV_DIR}/output/trio-phasing"
+    output_dir="${DEV_DIR}/output/pedmec-phasing"
     
     # Fail fast if dev data doesn't exist
     if [ ! -f "$vcf_joint_called" ]; then

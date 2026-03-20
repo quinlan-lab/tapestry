@@ -50,7 +50,7 @@ if [ "$MODE" == "trio" ]; then
 
     if [ -n "$DEV_DIR" ]; then
         log_info "DEV MODE ENABLED: Reading from and writing to ${DEV_DIR}"
-        bam_dir="${DEV_DIR}/output/trio-phasing"
+        bam_dir="${DEV_DIR}/output/pedmec-phasing"
         base_output_dir="${DEV_DIR}/output/dna-methylation"
 
         if [ ! -f "${bam_dir}/${kid_id}.GRCh38.haplotagged.bam" ]; then
@@ -59,7 +59,7 @@ if [ "$MODE" == "trio" ]; then
             exit 1
         fi
     else
-        bam_dir="/scratch/ucgd/lustre-labs/quinlan/data-shared/whatshap-phasing"
+        bam_dir="/scratch/ucgd/lustre-labs/quinlan/data-shared/pedmec-phasing"
         base_output_dir="/scratch/ucgd/lustre-labs/quinlan/data-shared/dna-methylation"
     fi
 
