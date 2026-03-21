@@ -14,7 +14,7 @@ fi
 DEV_DIR="${1%/}"
 mkdir -p "${DEV_DIR}/input"
 
-source "$(dirname "$0")/dev_data_config.sh"
+source "$(dirname "$0")/trio_dev_data_config.sh"
 
 dev_ref="${DEV_DIR}/input/dev_reference.fa"
 dev_chrom="${DEV_REGION%%:*}"

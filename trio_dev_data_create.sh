@@ -18,7 +18,7 @@ kid_id="NA12878"
 dad_id="NA12891" 
 mom_id="NA12892"
 
-source "$(dirname "$0")/dev_data_config.sh"
+source "$(dirname "$0")/trio_dev_data_config.sh"
 
 echo "Creating dev data in ${DEV_DIR} for region ${DEV_REGION}..."
 
