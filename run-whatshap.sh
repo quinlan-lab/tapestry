@@ -59,7 +59,7 @@ if [ -n "$DEV_DIR" ]; then
     
     # Fail fast if dev data doesn't exist
     if [ ! -f "$vcf_joint_called" ]; then
-        echo "Error: Dev VCF not found. Did you run create_dev_data.sh?"
+        echo "Error: Dev VCF not found. Did you run trio_dev_data_create.sh?"
         exit 1
     fi
 fi

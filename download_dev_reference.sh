@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # Download the full chromosome reference FASTA for the dev region.
-# This is separate from create_dev_data.sh because it requires downloading
+# This is separate from trio_dev_data_create.sh because it requires downloading
 # the entire chromosome (~250MB for chr1) to preserve correct coordinates,
 # and only needs to be run once.
 
