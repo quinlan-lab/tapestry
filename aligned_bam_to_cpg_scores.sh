@@ -3,8 +3,8 @@
 # Usage:
 #   Pedigree mode (default): ./aligned_bam_to_cpg_scores.sh
 #   Trio mode:                ./aligned_bam_to_cpg_scores.sh -t <kid_id> <dad_id> <mom_id>
-#   Trio mode with dev data:  ./aligned_bam_to_cpg_scores.sh -t <kid_id> <dad_id> <mom_id> --dev-dir trio-dev-data
-#   Example trio usage:       ./aligned_bam_to_cpg_scores.sh -t NA12878 NA12891 NA12892 --dev-dir trio-dev-data
+#   Trio mode with dev data:  ./aligned_bam_to_cpg_scores.sh -t <kid_id> <dad_id> <mom_id> --dev-dir trio_dev_data
+#   Example trio usage:       ./aligned_bam_to_cpg_scores.sh -t NA12878 NA12891 NA12892 --dev-dir trio_dev_data
 
 source src/util/logging.sh
 

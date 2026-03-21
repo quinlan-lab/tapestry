@@ -2,7 +2,7 @@
 
 # Usage:
 #   Production:  ./phase_meth_to_parent_haps.sh
-#   Dev mode:    ./phase_meth_to_parent_haps.sh --dev-dir trio-dev-data
+#   Dev mode:    ./phase_meth_to_parent_haps.sh --dev-dir trio_dev_data
 
 source src/util/logging.sh
 

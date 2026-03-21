@@ -2,7 +2,7 @@
 
 # Usage:
 #   Production:  ./run-whatshap.sh
-#   Dev mode:    ./run-whatshap.sh --dev-dir trio-dev-data
+#   Dev mode:    ./run-whatshap.sh --dev-dir trio_dev_data
 
 DEV_DIR=""
 
