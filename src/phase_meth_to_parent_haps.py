@@ -1,5 +1,6 @@
 import argparse
 import logging
+import os
 from pathlib import Path
 import bioframe as bf
 import polars as pl
@@ -162,7 +163,7 @@ def _symlink_bigwig(source: str, output_dir: str, uid: str, hap_label: str,
     """Create a soft-link from the aligned_bam_to_cpg_scores bigwig to the parent-phased naming."""
     link_name = f"{uid}.dna-methylation.{hap_label}.{pb_cpg_tool_mode}.{REFERENCE_GENOME}.bw"
     link_path = Path(output_dir) / link_name
-    source_path = Path(source).resolve()
+    source_path = os.path.relpath(Path(source).resolve(), Path(output_dir).resolve())
     if link_path.exists() or link_path.is_symlink():
         link_path.unlink()
     link_path.symlink_to(source_path)
