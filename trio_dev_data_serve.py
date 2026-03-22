@@ -10,7 +10,7 @@ Then point IGV at e.g. http://localhost:8000/input/NA12878.GRCh38.haplotagged.ba
 import argparse
 import mimetypes
 import os
-from http.server import HTTPServer, SimpleHTTPRequestHandler
+from http.server import ThreadingHTTPServer, SimpleHTTPRequestHandler
 
 DATA_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "trio_dev_data")
 
@@ -112,7 +112,7 @@ def main():
     parser.add_argument("--port", type=int, default=8000)
     args = parser.parse_args()
 
-    server = HTTPServer(("localhost", args.port), RangeRequestHandler)
+    server = ThreadingHTTPServer(("localhost", args.port), RangeRequestHandler)
     print(f"Serving {DATA_DIR} on http://localhost:{args.port}")
     print("Press Ctrl+C to stop")
     try:
