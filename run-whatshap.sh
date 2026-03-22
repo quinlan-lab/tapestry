@@ -51,7 +51,9 @@ if [ -n "$DEV_DIR" ]; then
     bam_dad="${DEV_DIR}/input/${dad_id}.GRCh38.haplotagged.bam"
     bam_mom="${DEV_DIR}/input/${mom_id}.GRCh38.haplotagged.bam"
     
-    reference="${DEV_DIR}/input/dev_reference.fa"
+    source "$(dirname "$0")/trio_dev_data_config.sh"
+    dev_chrom="${DEV_REGION%%:*}"
+    reference="${DEV_DIR}/input/${dev_chrom}.fa"
 
     # Override output dir to write entirely inside the dev directory
     # (Appending '/output' to keep the generated files separate from the raw dev inputs)

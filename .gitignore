@@ -10,5 +10,5 @@ analysis/delta_meth_all_samples.log
 analysis/imprinted_meth_all_samples.bed
 
 trio_dev_data/output
-trio_dev_data/input/dev_reference.fa
-trio_dev_data/input/dev_reference.fa.fai
+trio_dev_data/input/chr*.fa
+trio_dev_data/input/chr*.fa.fai

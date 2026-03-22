@@ -16,8 +16,8 @@ mkdir -p "${DEV_DIR}/input"
 
 source "$(dirname "$0")/trio_dev_data_config.sh"
 
-dev_ref="${DEV_DIR}/input/dev_reference.fa"
 dev_chrom="${DEV_REGION%%:*}"
+dev_ref="${DEV_DIR}/input/${dev_chrom}.fa"
 
 echo "Downloading reference for ${dev_chrom} from UCSC..."
 curl -sS "https://hgdownload.soe.ucsc.edu/goldenPath/hg38/chromosomes/${dev_chrom}.fa.gz" | gunzip > "${dev_ref}"
