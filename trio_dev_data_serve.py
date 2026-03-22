@@ -95,16 +95,15 @@ class RangeRequestHandler(SimpleHTTPRequestHandler):
 
     def do_HEAD(self):
         path = self.translate_path(self.path)
-        if not os.path.isfile(path):
-            self.send_error(404)
-            return
-
-        file_size = os.path.getsize(path)
-        self.send_response(200)
-        self.send_header("Content-Type", self.guess_type(path))
-        self.send_header("Content-Length", str(file_size))
-        self.send_header("Accept-Ranges", "bytes")
-        self.end_headers()
+        if os.path.isfile(path):
+            file_size = os.path.getsize(path)
+            self.send_response(200)
+            self.send_header("Content-Type", self.guess_type(path))
+            self.send_header("Content-Length", str(file_size))
+            self.send_header("Accept-Ranges", "bytes")
+            self.end_headers()
+        else:
+            super().do_HEAD()
 
 
 def main():
