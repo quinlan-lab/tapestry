@@ -272,7 +272,11 @@ def write_bigwig(df, uid, hap_label, person_hap, pb_cpg_tool_mode, output_dir, l
         .to_pandas()
     )
 
-    file_path = f"{output_dir}/{uid}.dna-methylation.{hap_label}.{pb_cpg_tool_mode}.{REFERENCE_GENOME}.bw"
+    file_path = Path(output_dir) / f"{uid}.dna-methylation.{hap_label}.{pb_cpg_tool_mode}.{REFERENCE_GENOME}.bw"
+
+    # Remove any existing file or symlink (bedGraphToBigWig refuses to overwrite)
+    if file_path.exists() or file_path.is_symlink():
+        file_path.unlink()
 
     bf.to_bigwig(
         df_bed_graph,
