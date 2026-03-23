@@ -43,10 +43,10 @@
             <DataRange baseline="0.0" drawBaseline="true" flipAxis="false" maximum="100.0" minimum="0.0" type="LINEAR"/>
         </Track>
         <Track attributeKey="NA12878.dna-methylation.pat.count.hg38.bw" autoScale="false" clazz="org.broad.igv.track.DataSourceTrack" fontSize="10" id="http://localhost:8000/output/dna-methylation/CEPH1463.GRCh38.hifi.parent-phased/NA12878.dna-methylation.pat.count.hg38.bw" name="NA12878 count-meth pat" renderer="BAR_CHART" visible="true" color="0,0,255">
-            <DataRange baseline="0.0" drawBaseline="true" flipAxis="false" maximum="100.0" minimum="0.0" type="LINEAR"/>
+            <DataRange baseline="0.0" drawBaseline="true" flipAxis="false" maximum="1.0" minimum="0.0" type="LINEAR"/>
         </Track>
         <Track attributeKey="NA12878.dna-methylation.mat.count.hg38.bw" autoScale="false" clazz="org.broad.igv.track.DataSourceTrack" fontSize="10" id="http://localhost:8000/output/dna-methylation/CEPH1463.GRCh38.hifi.parent-phased/NA12878.dna-methylation.mat.count.hg38.bw" name="NA12878 count-meth mat" renderer="BAR_CHART" visible="true" color="255,0,0">
-            <DataRange baseline="0.0" drawBaseline="true" flipAxis="false" maximum="100.0" minimum="0.0" type="LINEAR"/>
+            <DataRange baseline="0.0" drawBaseline="true" flipAxis="false" maximum="1.0" minimum="0.0" type="LINEAR"/>
         </Track>
         <Track attributeKey="NA12878.hap-map-blocks.paternal.sorted.bed.gz" clazz="org.broad.igv.track.FeatureTrack" fontSize="10" id="http://localhost:8000/output/dna-methylation/CEPH1463.GRCh38.hifi.parent-phased/NA12878.hap-map-blocks.paternal.sorted.bed.gz" name="NA12878 hap-map blks pat" visible="true"/>
         <Track attributeKey="NA12878.hap-map-blocks.maternal.sorted.bed.gz" clazz="org.broad.igv.track.FeatureTrack" fontSize="10" id="http://localhost:8000/output/dna-methylation/CEPH1463.GRCh38.hifi.parent-phased/NA12878.hap-map-blocks.maternal.sorted.bed.gz" name="NA12878 hap-map blks mat" visible="true"/>
@@ -63,10 +63,10 @@
             <DataRange baseline="0.0" drawBaseline="true" flipAxis="false" maximum="100.0" minimum="0.0" type="LINEAR"/>
         </Track>
         <Track attributeKey="NA12891.dna-methylation.A.count.hg38.bw" autoScale="false" clazz="org.broad.igv.track.DataSourceTrack" fontSize="10" id="http://localhost:8000/output/dna-methylation/CEPH1463.GRCh38.hifi.parent-phased/NA12891.dna-methylation.A.count.hg38.bw" name="NA12891 count-meth A" renderer="BAR_CHART" visible="true" color="0,0,255">
-            <DataRange baseline="0.0" drawBaseline="true" flipAxis="false" maximum="100.0" minimum="0.0" type="LINEAR"/>
+            <DataRange baseline="0.0" drawBaseline="true" flipAxis="false" maximum="1.0" minimum="0.0" type="LINEAR"/>
         </Track>
         <Track attributeKey="NA12891.dna-methylation.B.count.hg38.bw" autoScale="false" clazz="org.broad.igv.track.DataSourceTrack" fontSize="10" id="http://localhost:8000/output/dna-methylation/CEPH1463.GRCh38.hifi.parent-phased/NA12891.dna-methylation.B.count.hg38.bw" name="NA12891 count-meth B" renderer="BAR_CHART" visible="true" color="255,0,0">
-            <DataRange baseline="0.0" drawBaseline="true" flipAxis="false" maximum="100.0" minimum="0.0" type="LINEAR"/>
+            <DataRange baseline="0.0" drawBaseline="true" flipAxis="false" maximum="1.0" minimum="0.0" type="LINEAR"/>
         </Track>
     </Panel>
     <!-- Mom (NA12892): BAM + methylation bigwigs -->
@@ -81,10 +81,10 @@
             <DataRange baseline="0.0" drawBaseline="true" flipAxis="false" maximum="100.0" minimum="0.0" type="LINEAR"/>
         </Track>
         <Track attributeKey="NA12892.dna-methylation.C.count.hg38.bw" autoScale="false" clazz="org.broad.igv.track.DataSourceTrack" fontSize="10" id="http://localhost:8000/output/dna-methylation/CEPH1463.GRCh38.hifi.parent-phased/NA12892.dna-methylation.C.count.hg38.bw" name="NA12892 count-meth C" renderer="BAR_CHART" visible="true" color="0,0,255">
-            <DataRange baseline="0.0" drawBaseline="true" flipAxis="false" maximum="100.0" minimum="0.0" type="LINEAR"/>
+            <DataRange baseline="0.0" drawBaseline="true" flipAxis="false" maximum="1.0" minimum="0.0" type="LINEAR"/>
         </Track>
         <Track attributeKey="NA12892.dna-methylation.D.count.hg38.bw" autoScale="false" clazz="org.broad.igv.track.DataSourceTrack" fontSize="10" id="http://localhost:8000/output/dna-methylation/CEPH1463.GRCh38.hifi.parent-phased/NA12892.dna-methylation.D.count.hg38.bw" name="NA12892 count-meth D" renderer="BAR_CHART" visible="true" color="255,0,0">
-            <DataRange baseline="0.0" drawBaseline="true" flipAxis="false" maximum="100.0" minimum="0.0" type="LINEAR"/>
+            <DataRange baseline="0.0" drawBaseline="true" flipAxis="false" maximum="1.0" minimum="0.0" type="LINEAR"/>
         </Track>
     </Panel>
     <!-- Feature panel: phase blocks + reference -->
