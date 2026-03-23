@@ -112,7 +112,7 @@ This will produce a log file that looks like:
 and phases count- and model-based DNA methylation to founder haplotypes. 
 The tool also creates files that collectively enable visualization of phased DNA methylation in IGV, e.g., 
 
-<img src="images/tapestry.png" alt="XXX" width="900"/>
+<img src="images/tapestry.pedigree.png" alt="XXX" width="900"/>
 
 ## Step 4 of workflow: Expanding the dataset to include all CpG sites in the reference and the sample genome, and to include unphased DNA methylation, and to flag CpGs as "allele-specific" 
 
