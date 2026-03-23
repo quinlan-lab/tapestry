@@ -154,6 +154,14 @@ cpg_overlaps_at_least_one_snv | does the CpG dinucleotide overlap an SNV?
 snv_genotypes | are the SNVs (if any) that overlap CpG dinucleotide `hom` or `het`? 
 cpg_is_allele_specific | does the CpG dinucleotide appear in the reads corresponding to one haplotype, but not the reads of the other haplotype? 
 
+## Trio-wise workflow
+
+Phase DNA methylation in a trio to parental haplotypes (A/B in dad, C/D in mom) using the `phase_meth_to_parent_haps.sh` script.
+
+<img src="images/tapestry.trio.alignments.png" alt="Trio alignments in IGV" width="900"/>
+
+<img src="images/tapestry.trio.methylation.png" alt="Trio methylation in IGV" width="900"/>
+
 ## TODO
 
 - [ ] Convert manual workflow into a Snakemake workflow (see `Snakefile`), creating a subdirectory called, e.g., `CEPH1463.GRCh38` in `read-backed-phasing` (output of `run-hiphase.sh`)
