@@ -1,6 +1,5 @@
 import argparse
 import logging
-import os
 from pathlib import Path
 import bioframe as bf
 import polars as pl
@@ -255,21 +254,36 @@ def phase_meth_to_parent_haplotypes(
     return df
 
 
-def _bigwig_path_from_bed(bed_path: str) -> str:
-    """Derive bigwig path from BED path (replace .bed.gz with .bw)."""
-    return bed_path.replace('.bed.gz', '.bw')
+def write_bigwig(df, uid, hap_label, person_hap, pb_cpg_tool_mode, output_dir, logger=None):
+    """
+    Write a bigwig file for a given haplotype and pb-cpg-tools pileup mode,
+    recording only non-null methylation values.
+    """
+    meth_col = f"methylation_level_{person_hap}_{pb_cpg_tool_mode}"
+    df_bed_graph = (
+        df
+        .filter(pl.col(meth_col).is_not_null())
+        .select([
+            pl.col("chrom"),
+            pl.col("start"),
+            pl.col("end"),
+            pl.col(meth_col),
+        ])
+        .to_pandas()
+    )
 
+    file_path = f"{output_dir}/{uid}.dna-methylation.{hap_label}.{pb_cpg_tool_mode}.{REFERENCE_GENOME}.bw"
 
-def _symlink_bigwig(source: str, output_dir: str, uid: str, hap_label: str,
-                    pb_cpg_tool_mode: str, logger):
-    """Create a soft-link from the aligned_bam_to_cpg_scores bigwig to the parent-phased naming."""
-    link_name = f"{uid}.dna-methylation.{hap_label}.{pb_cpg_tool_mode}.{REFERENCE_GENOME}.bw"
-    link_path = Path(output_dir) / link_name
-    source_path = os.path.relpath(Path(source).resolve(), Path(output_dir).resolve())
-    if link_path.exists() or link_path.is_symlink():
-        link_path.unlink()
-    link_path.symlink_to(source_path)
-    logger.info(f"Soft-linked '{link_path}' -> '{source_path}'")
+    bf.to_bigwig(
+        df_bed_graph,
+        bf.fetch_chromsizes(db=REFERENCE_GENOME),
+        outpath=file_path,
+        # we assume that user has bedGraphToBigWig in their PATH: 
+        path_to_binary="bedGraphToBigWig",  # type: ignore
+    )
+
+    if logger:
+        logger.info(f"Wrote bigwig file for {person_hap} {pb_cpg_tool_mode}-based methylation levels, ASSUMING {REFERENCE_GENOME}, to: '{file_path}'")
 
 
 def main():
@@ -381,30 +395,23 @@ def main():
     write_bed(args.output_dir, df_meth_phased, filename_stem=f"trio.dna-methylation")
     logger.info(f"Wrote phased methylation to '{args.output_dir}'")
 
-    # Step 7: Soft-link bigwig files
-    # aligned_bam_to_cpg_scores already produces methylation phased to pat/mat, A/B, C/D
-    # via WhatsHap trio phasing, so we soft-link rather than rewrite bigwigs.
-    logger.info("Soft-linking bigwig files from aligned_bam_to_cpg_scores (already phased to pat/mat, A/B, C/D via WhatsHap trio phasing)...")
-    bigwig_links = [
+    # Step 7: Write bigwig files with only non-null methylation values
+    logger.info("Writing bigwig files for phased methylation...")
+    bigwig_specs = [
+        # (uid, hap_label for filename, person_hap for column name)
         # Kid: hap1=paternal, hap2=maternal
-        (kid_id, args.bed_meth_count_hap1_kid, 'pat', 'count'),
-        (kid_id, args.bed_meth_count_hap2_kid, 'mat', 'count'),
-        (kid_id, args.bed_meth_model_hap1_kid, 'pat', 'model'),
-        (kid_id, args.bed_meth_model_hap2_kid, 'mat', 'model'),
+        (kid_id, 'pat', 'kid_pat'),
+        (kid_id, 'mat', 'kid_mat'),
         # Dad: hap1=A, hap2=B
-        (dad_id, args.bed_meth_count_hap1_dad, 'A', 'count'),
-        (dad_id, args.bed_meth_count_hap2_dad, 'B', 'count'),
-        (dad_id, args.bed_meth_model_hap1_dad, 'A', 'model'),
-        (dad_id, args.bed_meth_model_hap2_dad, 'B', 'model'),
+        (dad_id, 'A', 'dad_A'),
+        (dad_id, 'B', 'dad_B'),
         # Mom: hap1=C, hap2=D
-        (mom_id, args.bed_meth_count_hap1_mom, 'C', 'count'),
-        (mom_id, args.bed_meth_count_hap2_mom, 'D', 'count'),
-        (mom_id, args.bed_meth_model_hap1_mom, 'C', 'model'),
-        (mom_id, args.bed_meth_model_hap2_mom, 'D', 'model'),
+        (mom_id, 'C', 'mom_C'),
+        (mom_id, 'D', 'mom_D'),
     ]
-    for uid, bed_path, hap_label, mode in bigwig_links:
-        bw_source = _bigwig_path_from_bed(bed_path)
-        _symlink_bigwig(bw_source, args.output_dir, uid, hap_label, mode, logger)
+    for uid, hap_label, person_hap in bigwig_specs:
+        for pb_cpg_tool_mode in ['count', 'model']:
+            write_bigwig(df_meth_phased, uid, hap_label, person_hap, pb_cpg_tool_mode, args.output_dir, logger)
 
     logger.info(f"Done running '{__file__}'")
 
