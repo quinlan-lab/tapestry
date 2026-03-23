@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="UTF-8" standalone="no"?>
-<Session genome="hg38" locus="chr1:1,000,000-2,000,000" version="8">
+<Session genome="hg38" locus="chr1:1,989,050-2,001,868" version="8">
     <Resources>
         <!-- PedMEC-phasing: phased VCF -->
         <Resource path="http://localhost:8000/output/pedmec-phasing/CEPH-1463.joint.GRCh38.deepvariant.glnexus.phased.vcf.gz" type="vcf"/>
@@ -35,11 +35,9 @@
         <Track attributeKey="CEPH-1463.joint.GRCh38.deepvariant.glnexus.phased.vcf.gz" clazz="org.broad.igv.variant.VariantTrack" displayMode="EXPANDED" fontSize="10" id="http://localhost:8000/output/pedmec-phasing/CEPH-1463.joint.GRCh38.deepvariant.glnexus.phased.vcf.gz" name="CEPH-1463.joint.GRCh38.deepvariant.glnexus.phased.vcf.gz" siteColorMode="ALLELE_FREQUENCY" visible="true"/>
     </Panel>
     <!-- Kid (NA12878): BAM + methylation bigwigs + hap-map blocks -->
-    <Panel height="400" name="PanelKid" width="2163">
-        <Track attributeKey="NA12878.GRCh38.haplotagged.bam Coverage" autoScale="true" clazz="org.broad.igv.sam.CoverageTrack" fontSize="10" id="http://localhost:8000/output/pedmec-phasing/NA12878.GRCh38.haplotagged.bam_coverage" name="NA12878 Coverage" snpThreshold="0.2" visible="true">
-            <DataRange baseline="0.0" drawBaseline="true" flipAxis="false" maximum="100.0" minimum="0.0" type="LINEAR"/>
-        </Track>
-        <Track attributeKey="NA12878.GRCh38.haplotagged.bam" clazz="org.broad.igv.sam.AlignmentTrack" color="185,185,185" displayMode="SQUISHED" experimentType="THIRD_GEN" fontSize="10" id="http://localhost:8000/output/pedmec-phasing/NA12878.GRCh38.haplotagged.bam" name="NA12878 BAM" visible="true">
+    <Panel height="500" name="PanelKid" width="2163">
+        <Track attributeKey="NA12878.GRCh38.haplotagged.bam Coverage" clazz="org.broad.igv.sam.CoverageTrack" fontSize="10" id="http://localhost:8000/output/pedmec-phasing/NA12878.GRCh38.haplotagged.bam_coverage" name="NA12878 Coverage" visible="false"/>
+        <Track attributeKey="NA12878.GRCh38.haplotagged.bam" clazz="org.broad.igv.sam.AlignmentTrack" color="185,185,185" displayMode="SQUISHED" experimentType="THIRD_GEN" fontSize="10" height="150" id="http://localhost:8000/output/pedmec-phasing/NA12878.GRCh38.haplotagged.bam" name="NA12878 BAM" visible="true">
             <RenderOptions colorByTag="PS" colorOption="TAG" groupByOption="PHASE" hideSmallIndels="true" smallIndelThreshold="100"/>
         </Track>
         <Track attributeKey="NA12878.dna-methylation.combined.count.hg38.bw" autoScale="false" clazz="org.broad.igv.track.DataSourceTrack" fontSize="10" id="http://localhost:8000/output/dna-methylation/CEPH1463.GRCh38.hifi.parent-phased/NA12878.dna-methylation.combined.count.hg38.bw" name="NA12878 count-meth combined" renderer="BAR_CHART" visible="true" color="0,128,0">
@@ -58,10 +56,8 @@
     </Panel>
     <!-- Dad (NA12891): BAM + methylation bigwigs -->
     <Panel height="350" name="PanelDad" width="2163">
-        <Track attributeKey="NA12891.GRCh38.haplotagged.bam Coverage" autoScale="true" clazz="org.broad.igv.sam.CoverageTrack" fontSize="10" id="http://localhost:8000/output/pedmec-phasing/NA12891.GRCh38.haplotagged.bam_coverage" name="NA12891 Coverage" snpThreshold="0.2" visible="true">
-            <DataRange baseline="0.0" drawBaseline="true" flipAxis="false" maximum="100.0" minimum="0.0" type="LINEAR"/>
-        </Track>
-        <Track attributeKey="NA12891.GRCh38.haplotagged.bam" clazz="org.broad.igv.sam.AlignmentTrack" color="185,185,185" displayMode="SQUISHED" experimentType="THIRD_GEN" fontSize="10" id="http://localhost:8000/output/pedmec-phasing/NA12891.GRCh38.haplotagged.bam" name="NA12891 BAM" visible="true">
+        <Track attributeKey="NA12891.GRCh38.haplotagged.bam Coverage" clazz="org.broad.igv.sam.CoverageTrack" fontSize="10" id="http://localhost:8000/output/pedmec-phasing/NA12891.GRCh38.haplotagged.bam_coverage" name="NA12891 Coverage" visible="false"/>
+        <Track attributeKey="NA12891.GRCh38.haplotagged.bam" clazz="org.broad.igv.sam.AlignmentTrack" color="185,185,185" displayMode="SQUISHED" experimentType="THIRD_GEN" fontSize="10" height="150" id="http://localhost:8000/output/pedmec-phasing/NA12891.GRCh38.haplotagged.bam" name="NA12891 BAM" visible="true">
             <RenderOptions colorByTag="PS" colorOption="TAG" groupByOption="PHASE" hideSmallIndels="true" smallIndelThreshold="100"/>
         </Track>
         <Track attributeKey="NA12891.dna-methylation.combined.count.hg38.bw" autoScale="false" clazz="org.broad.igv.track.DataSourceTrack" fontSize="10" id="http://localhost:8000/output/dna-methylation/CEPH1463.GRCh38.hifi.parent-phased/NA12891.dna-methylation.combined.count.hg38.bw" name="NA12891 count-meth combined" renderer="BAR_CHART" visible="true" color="0,128,0">
@@ -76,10 +72,8 @@
     </Panel>
     <!-- Mom (NA12892): BAM + methylation bigwigs -->
     <Panel height="350" name="PanelMom" width="2163">
-        <Track attributeKey="NA12892.GRCh38.haplotagged.bam Coverage" autoScale="true" clazz="org.broad.igv.sam.CoverageTrack" fontSize="10" id="http://localhost:8000/output/pedmec-phasing/NA12892.GRCh38.haplotagged.bam_coverage" name="NA12892 Coverage" snpThreshold="0.2" visible="true">
-            <DataRange baseline="0.0" drawBaseline="true" flipAxis="false" maximum="100.0" minimum="0.0" type="LINEAR"/>
-        </Track>
-        <Track attributeKey="NA12892.GRCh38.haplotagged.bam" clazz="org.broad.igv.sam.AlignmentTrack" color="185,185,185" displayMode="SQUISHED" experimentType="THIRD_GEN" fontSize="10" id="http://localhost:8000/output/pedmec-phasing/NA12892.GRCh38.haplotagged.bam" name="NA12892 BAM" visible="true">
+        <Track attributeKey="NA12892.GRCh38.haplotagged.bam Coverage" clazz="org.broad.igv.sam.CoverageTrack" fontSize="10" id="http://localhost:8000/output/pedmec-phasing/NA12892.GRCh38.haplotagged.bam_coverage" name="NA12892 Coverage" visible="false"/>
+        <Track attributeKey="NA12892.GRCh38.haplotagged.bam" clazz="org.broad.igv.sam.AlignmentTrack" color="185,185,185" displayMode="SQUISHED" experimentType="THIRD_GEN" fontSize="10" height="150" id="http://localhost:8000/output/pedmec-phasing/NA12892.GRCh38.haplotagged.bam" name="NA12892 BAM" visible="true">
             <RenderOptions colorByTag="PS" colorOption="TAG" groupByOption="PHASE" hideSmallIndels="true" smallIndelThreshold="100"/>
         </Track>
         <Track attributeKey="NA12892.dna-methylation.combined.count.hg38.bw" autoScale="false" clazz="org.broad.igv.track.DataSourceTrack" fontSize="10" id="http://localhost:8000/output/dna-methylation/CEPH1463.GRCh38.hifi.parent-phased/NA12892.dna-methylation.combined.count.hg38.bw" name="NA12892 count-meth combined" renderer="BAR_CHART" visible="true" color="0,128,0">
