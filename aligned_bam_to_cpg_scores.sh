@@ -70,7 +70,7 @@ if [ "$MODE" == "trio" ]; then
         mkdir -p ${output_dir}
 
         for id in ${kid_id} ${dad_id} ${mom_id}; do
-            log_info "Submitting job for sample '${id}' in '${mode}' mode..."
+            log_info "Running aligned_bam_to_cpg_scores on sample '${id}' in '${mode}' mode..."
 
             aligned_bam_to_cpg_scores \
                 --bam "${bam_dir}/${id}.GRCh38.haplotagged.bam" \
@@ -81,6 +81,7 @@ if [ "$MODE" == "trio" ]; then
                 --pileup-mode "${mode}"
         done
     done
+	log_info "All jobs have been run."
 
 else
     # --- Pedigree Mode (original behavior) ---
@@ -113,6 +114,6 @@ else
                 > /dev/null 2>&1 &
         done
     done
+	log_info "All jobs have been submitted."
 fi
 
-log_info "All jobs have been submitted."
