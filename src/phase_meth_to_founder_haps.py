@@ -65,6 +65,8 @@ def phase_meth_to_founder_haps(df_meth_hap1_hap2, df_hap_map):
         })
         .cast({
             "num_het_SNVs_in_hap_map_block": pl.Int64,
+            "total_read_count_hap1": pl.Int64,
+            "total_read_count_hap2": pl.Int64,
         })
         .with_columns(
             methylation_level_pat=(
