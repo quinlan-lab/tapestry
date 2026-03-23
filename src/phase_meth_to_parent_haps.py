@@ -11,6 +11,7 @@ from phasing_trio import (
 from hap_map_trio import get_hap_map
 from util.hap_map import write_hap_map_blocks
 from get_meth_hap1_hap2 import read_meth_hap1_hap2
+from util.shell import shell
 from util.write_data import (
     write_bit_vector_mismatches_bed, 
     write_bit_vector_mismatches_vcf,
@@ -395,9 +396,17 @@ def main():
     )
     logger.info(f"Phased methylation: {len(df_meth_phased)} rows")
 
-    # Step 6: Write phased methylation BED
-    write_bed(args.output_dir, df_meth_phased, filename_stem=f"trio.dna-methylation")
-    logger.info(f"Wrote phased methylation to '{args.output_dir}'")
+    # Step 6: Write phased methylation BED, then sort, compress and index
+    bed_stem = f"trio.dna-methylation"
+    write_bed(args.output_dir, df_meth_phased, filename_stem=bed_stem)
+    logger.info(f"Wrote '{args.output_dir}/{bed_stem}.bed'")
+    cmd = (
+        f'cat {args.output_dir}/{bed_stem}.bed'
+        f' | src/util/sort-compress-index-bed'
+        f' --name {args.output_dir}/{bed_stem}'
+    )
+    shell(cmd)
+    logger.info(f"Wrote '{args.output_dir}/{bed_stem}.sorted.bed.gz'")
 
     # Step 7: Write bigwig files with only non-null methylation values
     logger.info("Writing bigwig files for phased methylation...")
