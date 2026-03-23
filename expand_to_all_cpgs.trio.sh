@@ -46,6 +46,11 @@ if [ -n "$DEV_DIR" ]; then
     meth_count_dir="${meth_dir}/CEPH1463.GRCh38.hifi.count.pedmec-phased" # output dir of aligned_bam_to_cpg_scores (containing count-based unphased meth)
     meth_model_dir="${meth_dir}/CEPH1463.GRCh38.hifi.model.pedmec-phased" # output dir of aligned_bam_to_cpg_scores (containing model-based unphased meth)
 
+    # Use dev chromosome reference so that write_all_cpgs_in_reference.py only outputs CpGs on that chromosome
+    source "$(dirname "$0")/trio_dev_data_config.sh"
+    dev_chrom="${DEV_REGION%%:*}"
+    reference="${DEV_DIR}/input/${dev_chrom}.fa"
+
     # OUTPUT DIRS
     output_dir="${meth_dir}/CEPH1463.GRCh38.hifi.parent-phased.all-cpgs"
 fi
