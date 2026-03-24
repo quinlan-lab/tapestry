@@ -9,10 +9,10 @@ from phasing_trio import (
     get_all_phasing,
 )
 from hap_map_trio import get_hap_map
-from util.hap_map import write_hap_map_blocks
+from hap_map import write_hap_map_blocks
 from get_meth_hap1_hap2 import read_meth_hap1_hap2, read_meth_level
-from util.shell import shell
-from util.write_data import (
+from shell import shell
+from write_data import (
     write_bit_vector_mismatches_bed, 
     write_bit_vector_mismatches_vcf,
     write_bed, 

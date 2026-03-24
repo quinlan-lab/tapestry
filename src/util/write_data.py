@@ -1,7 +1,7 @@
 from pathlib import Path
 import polars as pl
 
-from util.shell import shell
+from shell import shell
 
 # https://samtools.github.io/hts-specs/BEDv1.pdf
 # "We recommend that only a single tab (\t) be used as field separator."

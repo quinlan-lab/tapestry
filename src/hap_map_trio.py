@@ -2,9 +2,9 @@ import numpy as np
 import polars as pl
 
 import importlib
-import util.hap_map
-importlib.reload(util.hap_map)
-from util.hap_map import extract_bit_vector
+import hap_map
+importlib.reload(hap_map)
+from hap_map import extract_bit_vector
 
 
 def _build_hap_map(df, kid_allele_col, parent_allele_col,

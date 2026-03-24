@@ -1,8 +1,8 @@
 import gzip
 from pathlib import Path
 import polars as pl
-from util.remove_funky_chromosomes import remove_funky_chromosomes
-from util.version_sort import version_sort
+from remove_funky_chromosomes import remove_funky_chromosomes
+from version_sort import version_sort
 
 def read_meth_level(bed: Path, pb_cpg_tool_mode: str) -> pl.DataFrame:
     """

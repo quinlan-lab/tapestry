@@ -1,8 +1,8 @@
 import numpy as np
 import polars as pl
 
-from util.shell import shell
-from util.write_data import write_bed
+from shell import shell
+from write_data import write_bed
 
 
 def extract_bit_vector(l):
