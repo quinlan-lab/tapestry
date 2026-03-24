@@ -43,7 +43,6 @@ def read_meth_unphased_individual(bed_meth_count, bed_meth_model, individual):
     df = df_count.join(
         df_model,
         on=['chrom', 'start', 'end'],
-        nulls_equal=True,
         how="full",
         coalesce=True,
     )
