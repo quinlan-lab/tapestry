@@ -161,7 +161,7 @@ def _compute_proximity_one_side(df, bed_het_site_mismatches, side):
                 df_sites_mismatch.to_pandas()
             )
         )
-        .cast(int_columns)
+        .cast(int_columns) # type: ignore 
         .with_columns(
             (pl.col('distance') < CPG_SITE_MISMATCH_SITE_DISTANCE)
             .alias(f'is_within_{CPG_SITE_MISMATCH_SITE_DISTANCE}bp_of_mismatch_site_{side}'),
