@@ -1,7 +1,10 @@
 import polars as pl
+import bioframe as bf
 
 from read_data import read_bed_and_header
 from get_meth_hap1_hap2 import read_meth_level
+
+CPG_SITE_MISMATCH_SITE_DISTANCE = 50 # bp
 
 
 def read_meth_unphased_individual(bed_meth_count, bed_meth_model, individual):
@@ -115,4 +118,78 @@ def expand_meth_to_all_cpgs(df_all_cpgs_in_reference, df_meth_unphased, df_meth_
         )
     )
 
+    return df
+
+
+def _compute_proximity_one_side(df, bed_het_site_mismatches, side):
+    """Compute proximity of each CpG site to the nearest mismatch site for one parental side.
+
+    Args:
+        df: DataFrame with all CpG sites
+        bed_het_site_mismatches: path to mismatch BED file (paternal or maternal)
+        side: 'pat' or 'mat'
+
+    Returns:
+        DataFrame with an added is_within_{distance}bp_of_mismatch_site_{side} column
+    """
+    df_sites_mismatch = read_bed_and_header(bed_het_site_mismatches)
+
+    # Integer columns that bioframe's closest() will convert to float (due to NaN)
+    int_columns = {
+        "start_hap_map_block_pat": pl.Int64,
+        "end_hap_map_block_pat": pl.Int64,
+        "num_het_SNVs_in_dad": pl.Int64,
+        "start_hap_map_block_mat": pl.Int64,
+        "end_hap_map_block_mat": pl.Int64,
+        "num_het_SNVs_in_mom": pl.Int64,
+        "total_read_count_kid_pat": pl.Int64,
+        "total_read_count_kid_mat": pl.Int64,
+        "total_read_count_dad_A": pl.Int64,
+        "total_read_count_dad_B": pl.Int64,
+        "total_read_count_mom_C": pl.Int64,
+        "total_read_count_mom_D": pl.Int64,
+        "total_read_count_kid": pl.Int64,
+        "total_read_count_dad": pl.Int64,
+        "total_read_count_mom": pl.Int64,
+    }
+
+    df = (
+        pl
+        .from_pandas(
+            bf.closest(
+                df.to_pandas(),
+                df_sites_mismatch.to_pandas()
+            )
+        )
+        .cast(int_columns)
+        .with_columns(
+            (pl.col('distance') < CPG_SITE_MISMATCH_SITE_DISTANCE)
+            .alias(f'is_within_{CPG_SITE_MISMATCH_SITE_DISTANCE}bp_of_mismatch_site_{side}'),
+        )
+        .drop([
+            "chrom_", "start_", "end_",
+            "REF_", "ALT_",
+            "distance"
+        ])
+    )
+
+    return df
+
+
+def compute_proximity_to_mismatched_heterozygous_sites(
+    df_meth_parent_phased_all_cpgs,
+    bed_het_site_mismatches_pat,
+    bed_het_site_mismatches_mat,
+):
+    """Compute proximity of each CpG site to nearest paternal and maternal mismatch sites."""
+    df = _compute_proximity_one_side(
+        df_meth_parent_phased_all_cpgs,
+        bed_het_site_mismatches_pat,
+        'pat',
+    )
+    df = _compute_proximity_one_side(
+        df,
+        bed_het_site_mismatches_mat,
+        'mat',
+    )
     return df
