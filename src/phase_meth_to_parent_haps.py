@@ -55,9 +55,13 @@ def phase_meth_to_parent_haplotypes(
     """
     Phase count-based and model-based methylation to parent haplotypes for a trio.
 
-    Combines count and model methylation for each individual, overlaps kid's CpG
-    methylation with the paternal and maternal hap maps, then joins dad's and
-    mom's methylation at the same CpG positions.
+    Steps:
+    1. Combine count and model methylation for each individual
+    2. Rename hap1/hap2 columns to named haplotypes (kid_pat/kid_mat, dad_A/dad_B, mom_C/mom_D)
+    3. Join kid, dad, and mom methylation at the same CpG positions
+    4. Overlap with paternal and maternal hap maps to determine which haplotype is inherited
+    5. Null out columns where the corresponding haplotype is unphased
+    6. Cast columns back to Int64 (bioframe overlap converts them to float)
 
     Haplotype labeling:
     - Kid: hap1=paternal (kid_pat), hap2=maternal (kid_mat)
@@ -68,14 +72,53 @@ def phase_meth_to_parent_haplotypes(
     - kid_pat, dad_A, dad_B columns are null when paternal_haplotype is null
     - kid_mat, mom_C, mom_D columns are null when maternal_haplotype is null
     """
-    # Combine count and model for each individual
+    # Step 1: Combine count and model for each individual
     df_kid = _combine_count_model(df_meth_count_hap1_hap2_kid, df_meth_model_hap1_hap2_kid)
     df_dad = _combine_count_model(df_meth_count_hap1_hap2_dad, df_meth_model_hap1_hap2_dad)
     df_mom = _combine_count_model(df_meth_count_hap1_hap2_mom, df_meth_model_hap1_hap2_mom)
 
-    # Overlap kid meth with paternal hap map
+    # Step 2: Rename hap1/hap2 columns to named haplotypes
+
+    # Kid: hap1=pat, hap2=mat
+    df_kid = df_kid.rename({
+        'methylation_level_hap1_count': 'methylation_level_kid_pat_count',
+        'methylation_level_hap2_count': 'methylation_level_kid_mat_count',
+        'methylation_level_hap1_model': 'methylation_level_kid_pat_model',
+        'methylation_level_hap2_model': 'methylation_level_kid_mat_model',
+        'total_read_count_hap1': 'total_read_count_kid_pat',
+        'total_read_count_hap2': 'total_read_count_kid_mat',
+    })
+
+    # Dad: hap1=A, hap2=B
+    df_dad = df_dad.rename({
+        'methylation_level_hap1_count': 'methylation_level_dad_A_count',
+        'methylation_level_hap2_count': 'methylation_level_dad_B_count',
+        'methylation_level_hap1_model': 'methylation_level_dad_A_model',
+        'methylation_level_hap2_model': 'methylation_level_dad_B_model',
+        'total_read_count_hap1': 'total_read_count_dad_A',
+        'total_read_count_hap2': 'total_read_count_dad_B',
+    })
+
+    # Mom: hap1=C, hap2=D
+    df_mom = df_mom.rename({
+        'methylation_level_hap1_count': 'methylation_level_mom_C_count',
+        'methylation_level_hap2_count': 'methylation_level_mom_D_count',
+        'methylation_level_hap1_model': 'methylation_level_mom_C_model',
+        'methylation_level_hap2_model': 'methylation_level_mom_D_model',
+        'total_read_count_hap1': 'total_read_count_mom_C',
+        'total_read_count_hap2': 'total_read_count_mom_D',
+    })
+
+    # Step 3: Join kid, dad, and mom
+    # Full joins capture CpG sites present in one individual but not another
+    df = df_kid.join(df_dad, on=['chrom', 'start', 'end'], how='full', coalesce=True)
+    df = df.join(df_mom, on=['chrom', 'start', 'end'], how='full', coalesce=True)
+
+    # Step 4: Overlap with paternal and maternal hap maps
+
+    # Overlap with paternal hap map
     df = bf.overlap(
-        df_kid.to_pandas(),
+        df.to_pandas(),
         df_hap_map_pat.to_pandas(),
         how='left', # we want to retain all CpG sites, including those that we cannot phase to haplotypes in the dad
         suffixes=('', '_'),
@@ -111,69 +154,41 @@ def phase_meth_to_parent_haplotypes(
         })
     )
 
-    # Kid: hap1=paternal, hap2=maternal; null when haplotype is unphased
-    df = (
-        df
-        .with_columns(
-            methylation_level_kid_pat_count=(
-                pl.when(pl.col("paternal_haplotype").is_not_null())
-                .then(pl.col("methylation_level_hap1_count"))
-                .otherwise(None)
-            ),
-            methylation_level_kid_mat_count=(
-                pl.when(pl.col("maternal_haplotype").is_not_null())
-                .then(pl.col("methylation_level_hap2_count"))
-                .otherwise(None)
-            ),
-            methylation_level_kid_pat_model=(
-                pl.when(pl.col("paternal_haplotype").is_not_null())
-                .then(pl.col("methylation_level_hap1_model"))
-                .otherwise(None)
-            ),
-            methylation_level_kid_mat_model=(
-                pl.when(pl.col("maternal_haplotype").is_not_null())
-                .then(pl.col("methylation_level_hap2_model"))
-                .otherwise(None)
-            ),
-            total_read_count_kid_pat=(
-                pl.when(pl.col("paternal_haplotype").is_not_null())
-                .then(pl.col("total_read_count_hap1"))
-                .otherwise(None)
-            ),
-            total_read_count_kid_mat=(
-                pl.when(pl.col("maternal_haplotype").is_not_null())
-                .then(pl.col("total_read_count_hap2"))
-                .otherwise(None)
-            ),
-        )
-        .drop(['methylation_level_hap1_count', 'methylation_level_hap2_count',
-               'methylation_level_hap1_model', 'methylation_level_hap2_model',
-               'total_read_count_hap1', 'total_read_count_hap2'])
+    # Step 5: Null out columns where the corresponding haplotype is unphased
+
+    # Null out kid columns where the corresponding haplotype is unphased
+    df = df.with_columns(
+        methylation_level_kid_pat_count=(
+            pl.when(pl.col("paternal_haplotype").is_not_null())
+            .then(pl.col("methylation_level_kid_pat_count"))
+            .otherwise(None)
+        ),
+        methylation_level_kid_mat_count=(
+            pl.when(pl.col("maternal_haplotype").is_not_null())
+            .then(pl.col("methylation_level_kid_mat_count"))
+            .otherwise(None)
+        ),
+        methylation_level_kid_pat_model=(
+            pl.when(pl.col("paternal_haplotype").is_not_null())
+            .then(pl.col("methylation_level_kid_pat_model"))
+            .otherwise(None)
+        ),
+        methylation_level_kid_mat_model=(
+            pl.when(pl.col("maternal_haplotype").is_not_null())
+            .then(pl.col("methylation_level_kid_mat_model"))
+            .otherwise(None)
+        ),
+        total_read_count_kid_pat=(
+            pl.when(pl.col("paternal_haplotype").is_not_null())
+            .then(pl.col("total_read_count_kid_pat"))
+            .otherwise(None)
+        ),
+        total_read_count_kid_mat=(
+            pl.when(pl.col("maternal_haplotype").is_not_null())
+            .then(pl.col("total_read_count_kid_mat"))
+            .otherwise(None)
+        ),
     )
-
-    # Join with dad: hap1=A, hap2=B
-    df_dad = df_dad.rename({
-        'methylation_level_hap1_count': 'methylation_level_dad_A_count',
-        'methylation_level_hap2_count': 'methylation_level_dad_B_count',
-        'methylation_level_hap1_model': 'methylation_level_dad_A_model',
-        'methylation_level_hap2_model': 'methylation_level_dad_B_model',
-        'total_read_count_hap1': 'total_read_count_dad_A',
-        'total_read_count_hap2': 'total_read_count_dad_B',
-    })
-    # Capture CpG sites present in dad's meth data but not in kid's
-    df = df.join(df_dad, on=['chrom', 'start', 'end'], how='full', coalesce=True)
-
-    # Join with mom: hap1=C, hap2=D
-    df_mom = df_mom.rename({
-        'methylation_level_hap1_count': 'methylation_level_mom_C_count',
-        'methylation_level_hap2_count': 'methylation_level_mom_D_count',
-        'methylation_level_hap1_model': 'methylation_level_mom_C_model',
-        'methylation_level_hap2_model': 'methylation_level_mom_D_model',
-        'total_read_count_hap1': 'total_read_count_mom_C',
-        'total_read_count_hap2': 'total_read_count_mom_D',
-    })
-    # Capture CpG sites present in mom's meth data but not in kid's
-    df = df.join(df_mom, on=['chrom', 'start', 'end'], how='full', coalesce=True)
 
     # Null out parent columns where the corresponding haplotype is unphased
     pat_not_null = pl.col("paternal_haplotype").is_not_null()
@@ -210,6 +225,7 @@ def phase_meth_to_parent_haplotypes(
             .then(pl.col("total_read_count_dad_B"))
             .otherwise(None)
         ),
+        
         # Mom columns: null when maternal_haplotype is null
         methylation_level_mom_C_count=(
             pl.when(mat_not_null)
@@ -243,7 +259,7 @@ def phase_meth_to_parent_haplotypes(
         ),
     )
 
-    # Cast columns that bf.overlap converts to f64 back to Int64
+    # Step 6: Cast columns that bf.overlap converts to f64 back to Int64
     int_cols = (
         [c for c in df.columns if c.startswith('total_read_count_')]
         + ['start_hap_map_block_pat', 'end_hap_map_block_pat',
