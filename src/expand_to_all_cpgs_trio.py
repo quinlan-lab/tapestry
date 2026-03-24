@@ -4,17 +4,6 @@ from read_data import read_bed_and_header
 from get_meth_hap1_hap2 import read_meth_level
 
 
-def read_all_cpgs_in_reference(bed):
-    df = pl.read_csv(
-        bed,
-        separator='\t',
-        has_header=False,
-        new_columns=['chrom', 'start', 'end'],
-        # n_rows=100000 # TESTING
-    )
-    return df
-
-
 def read_meth_unphased_individual(bed_meth_count, bed_meth_model, individual):
     """Read count-based and model-based unphased methylation for one individual.
 

@@ -28,6 +28,7 @@ from read_data import read_bed_and_header
 from write_data import write_dataframe_to_bed
 from get_meth_hap1_hap2 import read_meth_level
 from shell import shell
+from util import read_all_cpgs_in_reference
 
 # Note that polars uses hash joins to do equi-joins, 
 # and that requires keeping at least one of the dataframes in memory, 
@@ -40,15 +41,7 @@ from shell import shell
 
 CPG_SITE_MISMATCH_SITE_DISTANCE = 50 # bp
 
-def read_all_cpgs_in_reference(bed): 
-    df = pl.read_csv(
-        bed, 
-        separator='\t', 
-        has_header=False,
-        new_columns=['chrom', 'start', 'end'],
-        # n_rows=100000 # TESTING 
-    ) 
-    return df 
+
 
 def read_meth_unphased(bed_meth_count_unphased, bed_meth_model_unphased): 
     df_meth_count_unphased = (
