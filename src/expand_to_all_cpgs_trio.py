@@ -1,3 +1,5 @@
+from typing import Literal
+
 import polars as pl
 import bioframe as bf
 
@@ -193,3 +195,143 @@ def compute_proximity_to_mismatched_heterozygous_sites(
         'mat',
     )
     return df
+
+
+def reduce_to_phasable_chromosomes(df):
+    df = df.filter(
+        (pl.col('chrom') != 'chrM') &
+        (pl.col('chrom') != 'chrX') &
+        (pl.col('chrom') != 'chrY')
+    )
+    for side in ['pat', 'mat']:
+        col = f"is_within_{CPG_SITE_MISMATCH_SITE_DISTANCE}bp_of_mismatch_site_{side}"
+        assert df[col].is_not_null().all()
+    return df
+
+
+def compute_fraction_of_cpgs_that_are_close_to_mismatches(df, logger=None):
+    df = reduce_to_phasable_chromosomes(df)
+    for side in ['pat', 'mat']:
+        col = f"is_within_{CPG_SITE_MISMATCH_SITE_DISTANCE}bp_of_mismatch_site_{side}"
+        fraction = df[col].mean()
+        report = (
+            f"Percentage of CpG sites (in reference and sample genome, and on phasable chroms) "
+            f"that are within {CPG_SITE_MISMATCH_SITE_DISTANCE}bp of a {side}ernal heterozygous mismatch site: "
+            f"{fraction*100:.3f}%"
+        )
+        if logger:
+            logger.info(report)
+        else:
+            print(report)
+
+
+def compute_fraction_of_cpgs_at_which_unphased_meth_is_reported(df, individual, mode, logger=None):
+    df = reduce_to_phasable_chromosomes(df)
+    fraction = (
+        df
+        .select(pl.col(f"methylation_level_{individual}_{mode}").is_not_null())
+        .mean()
+        .item()
+    )
+    report = (
+        f"Percentage of CpG sites (in reference and sample genomes, and on phasable chroms) "
+        f"at which {mode}-based unphased methylation is reported for {individual}: "
+        f"{fraction*100:.2f}%"
+    )
+    if logger:
+        logger.info(report)
+    else:
+        print(report)
+
+
+def compute_fraction_of_cpgs_at_which_meth_is_phased_to_given_haplotype(df, haplotype, mode, logger=None):
+    df = reduce_to_phasable_chromosomes(df)
+    fraction = (
+        df
+        .select(pl.col(f"methylation_level_{haplotype}_{mode}").is_not_null())
+        .mean()
+        .item()
+    )
+    report = (
+        f"Percentage of CpG sites (in reference and sample genomes, and on phasable chroms) "
+        f"at which {mode}-based methylation is phased to {haplotype} haplotype: "
+        f"{fraction*100:.2f}%"
+    )
+    if logger:
+        logger.info(report)
+    else:
+        print(report)
+
+
+def create_meth_non_null_expr(
+    haplotype_1: str,
+    haplotype_2: str,
+    mode: str,
+    logic: Literal["any", "all"],
+    alias: str,
+) -> pl.Expr:
+    col_1 = pl.col(f"methylation_level_{haplotype_1}_{mode}")
+    col_2 = pl.col(f"methylation_level_{haplotype_2}_{mode}")
+
+    if logic == "any":
+        expression = col_1.is_not_null() | col_2.is_not_null()
+    elif logic == "all":
+        expression = col_1.is_not_null() & col_2.is_not_null()
+    else:
+        raise ValueError("`logic` parameter must be 'any' or 'all'")
+
+    return expression.alias(alias)
+
+
+def compute_fraction_of_cpgs_at_which_meth_is_phased(df, haplotype_1, haplotype_2, mode, logic, alias, logger=None):
+    df = reduce_to_phasable_chromosomes(df)
+    expr = create_meth_non_null_expr(haplotype_1, haplotype_2, mode, logic, alias)
+    fraction = (
+        df
+        .with_columns(expr)
+        .select(pl.col(alias))
+        .mean()
+        .item()
+    )
+    report = (
+        f"Percentage of CpG sites (in reference and sample genomes, and on phasable chroms) "
+        f"at which {mode}-based methylation is phased to {alias}: "
+        f"{fraction*100:.2f}%"
+    )
+    if logger:
+        logger.info(report)
+    else:
+        print(report)
+
+
+def compute_methylation_coverage_qc(df, logger=None):
+    # Phasing can be partial even within a hap-map block: if coverage on one haplotype
+    # is low but high on the other, methylation will be reported on one haplotype but
+    # not the other. This is why we distinguish "any" (at least one haplotype phased)
+    # from "all" (both haplotypes phased) below.
+    for mode in ['count', 'model']:
+        for haplotype in ['kid_pat', 'kid_mat']:
+            compute_fraction_of_cpgs_at_which_meth_is_phased_to_given_haplotype(
+                df, haplotype, mode, logger,
+            )
+        compute_fraction_of_cpgs_at_which_meth_is_phased(
+            df,
+            haplotype_1='kid_pat',
+            haplotype_2='kid_mat',
+            mode=mode,
+            logic='any',
+            alias='at least one parental haplotype (kid)',
+            logger=logger,
+        )
+        compute_fraction_of_cpgs_at_which_meth_is_phased(
+            df,
+            haplotype_1='kid_pat',
+            haplotype_2='kid_mat',
+            mode=mode,
+            logic='all',
+            alias='both parental haplotypes (kid)',
+            logger=logger,
+        )
+        compute_fraction_of_cpgs_at_which_unphased_meth_is_reported(
+            df, 'kid', mode, logger,
+        )
