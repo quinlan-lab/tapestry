@@ -162,6 +162,10 @@ Phase DNA methylation in a trio to parental haplotypes (A/B in dad, C/D in mom) 
 
 <img src="images/tapestry.trio.methylation.png" alt="Trio methylation in IGV" width="900"/>
 
+Informative example of allele-specific methylation resulting from a SNP in the trio: 
+
+<img src="images/tapestry.trio.allele-specific-methylation" alt="Trio alignments in IGV" width="900"/>
+
 ## TODO
 
 - [ ] Convert manual workflow into a Snakemake workflow (see `Snakefile`), creating a subdirectory called, e.g., `CEPH1463.GRCh38` in `read-backed-phasing` (output of `run-hiphase.sh`)
