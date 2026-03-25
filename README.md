@@ -164,7 +164,7 @@ Phase DNA methylation in a trio to parental haplotypes (A/B in dad, C/D in mom) 
 
 Informative example of allele-specific methylation resulting from a SNP in the trio: 
 
-<img src="images/tapestry.trio.allele-specific-methylation" alt="Trio alignments in IGV" width="900"/>
+<img src="images/tapestry.trio.allele-specific-methylation.png" alt="Trio alignments in IGV" width="900"/>
 
 ## TODO
 
