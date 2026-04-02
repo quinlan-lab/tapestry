@@ -25,6 +25,11 @@ while [[ "$#" -gt 0 ]]; do
     esac
 done
 
+# --- Configuration ---
+kid_id="NA12878"
+dad_id="NA12891"
+mom_id="NA12892"
+
 # --- Default Configurations (Production) ---
 
 # INPUT DIRS
@@ -66,3 +71,29 @@ python -m memory_profiler src/write_all_cpgs_in_reference.py \
 	--reference ${reference} \
 	--bed_all_cpgs_in_reference ${bed_all_cpgs_in_reference} \
 	> ${output_dir}/write_all_cpgs_in_reference.log 2>&1
+
+meth_bed() {
+    # Usage: meth_bed <mode> <uid> <hap>
+    local mode="$1" uid="$2" hap="$3"
+    if [ "$mode" = "count" ]; then
+        echo "${meth_count_dir}/${uid}.GRCh38.haplotagged.${hap}.bed.gz"
+    else
+        echo "${meth_model_dir}/${uid}.GRCh38.haplotagged.${hap}.bed.gz"
+    fi
+}
+
+log_info "Writing combined (unphased) methylation bigwig files to '${output_dir}' ..."
+
+PYTHONPATH=src:src/util .venv/bin/python src/expand_to_all_cpgs_trio.py \
+    --kid_id "$kid_id" \
+    --dad_id "$dad_id" \
+    --mom_id "$mom_id" \
+    --bed_meth_count_combined_kid "$(meth_bed count "$kid_id" combined)" \
+    --bed_meth_model_combined_kid "$(meth_bed model "$kid_id" combined)" \
+    --bed_meth_count_combined_dad "$(meth_bed count "$dad_id" combined)" \
+    --bed_meth_model_combined_dad "$(meth_bed model "$dad_id" combined)" \
+    --bed_meth_count_combined_mom "$(meth_bed count "$mom_id" combined)" \
+    --bed_meth_model_combined_mom "$(meth_bed model "$mom_id" combined)" \
+    --output_dir "$output_dir"
+
+log_info "Done writing combined (unphased) methylation bigwig files"

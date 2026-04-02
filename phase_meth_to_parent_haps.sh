@@ -93,12 +93,6 @@ PYTHONPATH=src:src/util .venv/bin/python src/phase_meth_to_parent_haps.py \
     --bed_meth_count_hap2_mom "$(meth_bed count "$mom_id" hap2)" \
     --bed_meth_model_hap1_mom "$(meth_bed model "$mom_id" hap1)" \
     --bed_meth_model_hap2_mom "$(meth_bed model "$mom_id" hap2)" \
-    --bed_meth_count_combined_kid "$(meth_bed count "$kid_id" combined)" \
-    --bed_meth_model_combined_kid "$(meth_bed model "$kid_id" combined)" \
-    --bed_meth_count_combined_dad "$(meth_bed count "$dad_id" combined)" \
-    --bed_meth_model_combined_dad "$(meth_bed model "$dad_id" combined)" \
-    --bed_meth_count_combined_mom "$(meth_bed count "$mom_id" combined)" \
-    --bed_meth_model_combined_mom "$(meth_bed model "$mom_id" combined)" \
     --output_dir "$output_dir"
 
 log_info "Done phasing methylation to parent haplotypes"

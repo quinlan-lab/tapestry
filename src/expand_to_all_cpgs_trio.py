@@ -1,3 +1,6 @@
+import argparse
+import logging
+from pathlib import Path
 from typing import Literal
 
 import polars as pl
@@ -6,6 +9,7 @@ import bioframe as bf
 from read_data import read_bed_and_header
 from get_meth_hap1_hap2 import read_meth_level
 
+REFERENCE_GENOME = "hg38"
 CPG_SITE_MISMATCH_SITE_DISTANCE = 50 # bp
 
 
@@ -335,3 +339,83 @@ def compute_methylation_coverage_qc(df, logger=None):
         compute_fraction_of_cpgs_at_which_unphased_meth_is_reported(
             df, 'kid', mode, logger,
         )
+
+
+def write_combined_bigwig(bed_path, pb_cpg_tool_mode, uid, output_dir, logger=None):
+    """
+    Write a combined (unphased) bigwig file on a 0-1 scale from a pb-CpG-tools BED file.
+    """
+    df = read_meth_level(bed_path, pb_cpg_tool_mode)
+    df_bed_graph = (
+        df
+        .filter(pl.col("methylation_level").is_not_null())
+        .select([
+            pl.col("chromosome").alias("chrom"),
+            pl.col("start"),
+            pl.col("end"),
+            pl.col("methylation_level"),
+        ])
+        .to_pandas()
+    )
+
+    file_path = Path(output_dir) / f"{uid}.dna-methylation.combined.{pb_cpg_tool_mode}.{REFERENCE_GENOME}.bw"
+
+    if file_path.exists() or file_path.is_symlink():
+        file_path.unlink()
+
+    bf.to_bigwig(
+        df_bed_graph,
+        bf.fetch_chromsizes(db=REFERENCE_GENOME),
+        outpath=file_path,
+        path_to_binary="bedGraphToBigWig",  # type: ignore
+    )
+
+    if logger:
+        logger.info(f"Wrote combined {pb_cpg_tool_mode}-based methylation bigwig, ASSUMING {REFERENCE_GENOME}, to: '{file_path}'")
+
+
+def main():
+    parser = argparse.ArgumentParser(
+        description='Write combined (unphased) methylation bigwig files for a trio'
+    )
+    parser.add_argument('--kid_id', required=True, help='Child sample ID')
+    parser.add_argument('--dad_id', required=True, help='Father sample ID')
+    parser.add_argument('--mom_id', required=True, help='Mother sample ID')
+
+    parser.add_argument('--bed_meth_count_combined_kid', required=True)
+    parser.add_argument('--bed_meth_model_combined_kid', required=True)
+    parser.add_argument('--bed_meth_count_combined_dad', required=True)
+    parser.add_argument('--bed_meth_model_combined_dad', required=True)
+    parser.add_argument('--bed_meth_count_combined_mom', required=True)
+    parser.add_argument('--bed_meth_model_combined_mom', required=True)
+
+    parser.add_argument('--output_dir', required=True, help='Output directory')
+    args = parser.parse_args()
+
+    logging.basicConfig(
+        level=logging.INFO,
+        format='%(asctime)s - %(levelname)s - %(filename)s - %(message)s',
+        datefmt='%Y-%m-%d %H:%M:%S'
+    )
+    logger = logging.getLogger(__name__)
+
+    logger.info(f"Starting '{__file__}'")
+    logger.info("Args: %s", vars(args))
+
+    Path(args.output_dir).mkdir(parents=True, exist_ok=True)
+
+    logger.info("Writing combined (unphased) methylation bigwig files...")
+    combined_specs = [
+        (args.kid_id, args.bed_meth_count_combined_kid, args.bed_meth_model_combined_kid),
+        (args.dad_id, args.bed_meth_count_combined_dad, args.bed_meth_model_combined_dad),
+        (args.mom_id, args.bed_meth_count_combined_mom, args.bed_meth_model_combined_mom),
+    ]
+    for uid, bed_count, bed_model in combined_specs:
+        write_combined_bigwig(bed_count, 'count', uid, args.output_dir, logger)
+        write_combined_bigwig(bed_model, 'model', uid, args.output_dir, logger)
+
+    logger.info(f"Done running '{__file__}'")
+
+
+if __name__ == "__main__":
+    main()
