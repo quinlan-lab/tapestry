@@ -507,6 +507,13 @@ def label_with_variants(df_meth_parent_phased_all_cpgs, df_joint_called_variants
         .alias("num_SNVs_overlapping_CG")
     )
 
+    # Rename allele columns: strip '_variant' suffix added by bioframe overlap
+    allele_renames = {
+        col + '_variant': col
+        for col in df_joint_called_variants.columns
+        if col.startswith('allele_')
+    }
+
     df = (
         df
         .rename({
@@ -514,6 +521,7 @@ def label_with_variants(df_meth_parent_phased_all_cpgs, df_joint_called_variants
             'end': 'end_cpg',
             'is_within_50bp_of_mismatch_site_pat': 'cpg_is_within_50bp_of_mismatch_site_pat',
             'is_within_50bp_of_mismatch_site_mat': 'cpg_is_within_50bp_of_mismatch_site_mat',
+            **allele_renames,
         })
         .drop(['chrom_variant'])
     )
