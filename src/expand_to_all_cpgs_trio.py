@@ -374,6 +374,153 @@ def write_combined_bigwig(bed_path, pb_cpg_tool_mode, uid, output_dir, logger=No
         logger.info(f"Wrote combined {pb_cpg_tool_mode}-based methylation bigwig, ASSUMING {REFERENCE_GENOME}, to: '{file_path}'")
 
 
+def _allele_exprs_for_uid(uid):
+    """Return a list of polars expressions that extract allele_1 and allele_2 for one UID."""
+    gt_raw_col = f"gt_raw_{uid}"
+    return [
+        # Parse GT string: take first field before ':', normalize separator, split into list, extract alleles
+        pl.col(gt_raw_col)
+            .str.split(":")
+            .list.get(0)
+            .str.replace("/", "|")
+            .str.split("|")
+            .list.get(0)
+            .alias(f"allele_1_{uid}"),
+        pl.col(gt_raw_col)
+            .str.split(":")
+            .list.get(0)
+            .str.replace("/", "|")
+            .str.split("|")
+            .list.get(1)
+            .alias(f"allele_2_{uid}"),
+    ]
+
+
+def get_joint_called_variants(kid_uid, dad_uid, mom_uid, vcf_path):
+    """Parse joint-called VCF once and extract SNV alleles for kid, dad, and mom.
+
+    Returns a dataframe with columns:
+        chrom, start, end,
+        allele_1_{kid_uid}, allele_2_{kid_uid},
+        allele_1_{dad_uid}, allele_2_{dad_uid},
+        allele_1_{mom_uid}, allele_2_{mom_uid}
+    """
+    return (
+        pl.scan_csv(
+            vcf_path,
+            separator='\t',
+            comment_prefix='##',
+            has_header=True,
+            null_values=['.'],
+            ignore_errors=True,
+        )
+        .rename({"#CHROM": "chrom", "POS": "pos"})
+        .select([
+            pl.col("chrom"),
+            pl.col("pos"),
+            pl.col("REF"),
+            pl.col("ALT"),
+            pl.col(kid_uid).alias(f"gt_raw_{kid_uid}"),
+            pl.col(dad_uid).alias(f"gt_raw_{dad_uid}"),
+            pl.col(mom_uid).alias(f"gt_raw_{mom_uid}"),
+        ])
+        # Strict SNV Filter (Multi-allelic safe)
+        .filter(
+            (pl.col("REF").str.len_chars() == 1) &
+            (pl.col("ALT").is_not_null()) &
+            (
+                pl
+                .col("ALT")
+                .str.split(",")
+                .list.eval(pl.element().str.len_chars() == 1)
+                .list.all()
+            )
+        )
+        .with_columns([
+            (pl.col("pos") - 1).alias("start"),
+            pl.col("pos").alias("end"),
+        ])
+        # Extract alleles for each family member
+        .with_columns(
+            _allele_exprs_for_uid(kid_uid)
+            + _allele_exprs_for_uid(dad_uid)
+            + _allele_exprs_for_uid(mom_uid)
+        )
+        .select([
+            "chrom", "start", "end",
+            f"allele_1_{kid_uid}", f"allele_2_{kid_uid}",
+            f"allele_1_{dad_uid}", f"allele_2_{dad_uid}",
+            f"allele_1_{mom_uid}", f"allele_2_{mom_uid}",
+        ])
+        .collect()
+    )
+
+
+def label_with_variants(df_meth_parent_phased_all_cpgs, df_joint_called_variants):
+    """Overlap CpG dinucleotides with joint-called SNVs for the trio.
+
+    Returns the input dataframe augmented with variant overlap information.
+    """
+    df_meth_dinucleotides = (
+        df_meth_parent_phased_all_cpgs
+        .with_columns((pl.col("end") + 1)) # enlarge interval from C nucleotide to CG dinucleotide
+    )
+    df_meth_dinucleotides_pd = df_meth_dinucleotides.to_pandas()
+
+    df_joint_called_variants_pd = df_joint_called_variants.to_pandas()
+
+    df = bf.overlap(
+        df_meth_dinucleotides_pd,
+        df_joint_called_variants_pd,
+        how='left',
+        suffixes=('', '_variant')
+    )
+
+    # Integer columns that bioframe's overlap() converts to float (due to NaN)
+    int_columns = {
+        "start_hap_map_block_pat": pl.Int64,
+        "end_hap_map_block_pat": pl.Int64,
+        "num_het_SNVs_in_dad": pl.Int64,
+        "start_hap_map_block_mat": pl.Int64,
+        "end_hap_map_block_mat": pl.Int64,
+        "num_het_SNVs_in_mom": pl.Int64,
+        "total_read_count_kid_pat": pl.Int64,
+        "total_read_count_kid_mat": pl.Int64,
+        "total_read_count_dad_A": pl.Int64,
+        "total_read_count_dad_B": pl.Int64,
+        "total_read_count_mom_C": pl.Int64,
+        "total_read_count_mom_D": pl.Int64,
+        "total_read_count_kid": pl.Int64,
+        "total_read_count_dad": pl.Int64,
+        "total_read_count_mom": pl.Int64,
+    }
+
+    df = pl.from_pandas(df).cast(int_columns) # type: ignore
+
+    # determine the number of overlapping SNVs for each CpG record
+    CG_cols = df_meth_dinucleotides.columns
+    df = df.with_columns(
+        pl
+        .when(pl.col("start_variant").is_null())
+        .then(pl.lit(0))
+        .otherwise(pl.col("start_variant").count().over(CG_cols))
+        .alias("num_SNVs_overlapping_CG")
+    )
+
+    df = (
+        df
+        .rename({
+            'start': 'start_cpg',
+            'end': 'end_cpg',
+            'is_within_50bp_of_mismatch_site_pat': 'cpg_is_within_50bp_of_mismatch_site_pat',
+            'is_within_50bp_of_mismatch_site_mat': 'cpg_is_within_50bp_of_mismatch_site_mat',
+        })
+        .drop(['chrom_variant'])
+    )
+
+    return df
+
+
 def main():
     parser = argparse.ArgumentParser(
         description='Write combined (unphased) methylation bigwig files for a trio'
