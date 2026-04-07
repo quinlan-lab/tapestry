@@ -529,6 +529,76 @@ def label_with_variants(df_meth_parent_phased_all_cpgs, df_joint_called_variants
     return df
 
 
+def label_cpgs_as_allele_specific(df, kid_uid, dad_uid, mom_uid):
+    """Label each unique CpG record with per-member allele-specific flags.
+
+    For each family member, adds columns:
+        snv_genotypes_{uid}: comma-separated genotype string ("het", "hom", or ".")
+        cpg_is_allele_specific_{uid}: True if any overlapping SNV is het for that member
+    Also adds cpg_overlaps_at_least_one_snv (shared across members).
+    """
+    # Columns that define a unique CpG record (everything except per-variant fields)
+    variant_cols = {'start_variant', 'end_variant', 'num_SNVs_overlapping_CG'}
+    for uid in [kid_uid, dad_uid, mom_uid]:
+        variant_cols.add(f'allele_1_{uid}')
+        variant_cols.add(f'allele_2_{uid}')
+    CG_cols = [col for col in df.columns if col not in variant_cols]
+
+    # Compute per-member genotype at each overlapping SNV
+    genotype_exprs = []
+    for uid in [kid_uid, dad_uid, mom_uid]:
+        a1 = f'allele_1_{uid}'
+        a2 = f'allele_2_{uid}'
+        genotype_exprs.append(
+            pl
+            .when(
+                pl.col(a1).is_null() &
+                pl.col(a2).is_null()
+            )
+            .then(pl.lit("."))
+            .when(
+                (pl.col(a1) == '.') |
+                (pl.col(a2) == '.')
+            )
+            .then(pl.lit("."))
+            .when(pl.col(a1) == pl.col(a2))
+            .then(pl.lit("hom"))
+            .otherwise(pl.lit("het"))
+            .alias(f"genotype_{uid}")
+        )
+
+    df = df.with_columns(genotype_exprs)
+
+    # Aggregate: group by CpG record, join genotypes, flag allele-specific
+    agg_exprs = []
+    for uid in [kid_uid, dad_uid, mom_uid]:
+        agg_exprs.extend([
+            pl.col(f"genotype_{uid}").str.join(",").alias(f"snv_genotypes_{uid}"),
+            (pl.col(f"genotype_{uid}") == "het").any().alias(f"cpg_is_allele_specific_{uid}"),
+        ])
+
+    df = (
+        df
+        .group_by(CG_cols)
+        .agg(agg_exprs)
+        .with_columns(
+            pl
+            .when(pl.col(f'snv_genotypes_{kid_uid}') == '.')
+            .then(False)
+            .otherwise(True)
+            .alias("cpg_overlaps_at_least_one_snv")
+        )
+        .sort(['chrom', 'start_cpg'])
+    )
+
+    # Reorder: move the new columns to the end
+    new_cols = ['cpg_overlaps_at_least_one_snv']
+    for uid in [kid_uid, dad_uid, mom_uid]:
+        new_cols.extend([f'snv_genotypes_{uid}', f'cpg_is_allele_specific_{uid}'])
+    base_cols = [col for col in df.columns if col not in new_cols]
+    return df.select(base_cols + new_cols)
+
+
 def main():
     parser = argparse.ArgumentParser(
         description='Write combined (unphased) methylation bigwig files for a trio'
