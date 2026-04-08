@@ -156,15 +156,88 @@ cpg_is_allele_specific | does the CpG dinucleotide appear in the reads correspon
 
 ## Trio-wise workflow
 
-Phase DNA methylation in a trio to parental haplotypes (A/B in dad, C/D in mom) using the `phase_meth_to_parent_haps.sh` script.
+1. Phase variants:
+   - Phase variants using pedMEC-based trio phasing with the `run-whatshap.sh` script.
+2. Use `aligned_bam_to_cpg_scores.sh` to generate count- and model-based methylation levels from the haplotagged BAM files produced in step 1, for each trio member (kid, dad, and mom).
+3. Phase count- and model-based methylation data to parental haplotypes (A/B in dad, C/D in mom, pat/mat in kid) using the `phase_meth_to_parent_haps.sh` script, which uses the data produced in steps 1 and 2.
+4. Use `expand_to_all_cpgs.trio.sh` to generalize tapestry's output to include all CpG sites in the reference and sample genomes, unphased count- and model-based methylation levels (for all three trio members, where available), and combined (unphased) bigwig files for IGV visualization. This step also uses heterozygous SNVs to flag CpG sites that are "allele-specific" for each family member individually. Uses output of steps 2 and 3. See `https://github.com/quinlan-lab/tapestry/blob/main/src/expand_to_all_cpgs.trio.ipynb` for examples.
+
+## Step 3 of trio workflow: Phasing count- and model-based DNA methylation to parental haplotypes
+
+The `phase_meth_to_parent_haps.sh` script calls `src/phase_meth_to_parent_haps.py`, which phases methylation levels for all three trio members to parental haplotypes and creates files for IGV visualization, e.g.,
 
 <img src="images/tapestry.trio.alignments.png" alt="Trio alignments in IGV" width="900"/>
 
 <img src="images/tapestry.trio.methylation.png" alt="Trio methylation in IGV" width="900"/>
 
-Informative example of allele-specific methylation resulting from a SNP in the trio: 
+## Step 4 of trio workflow: Expanding the dataset to include all CpG sites, unphased methylation, and per-member allele-specific CpG labeling
 
-<img src="images/tapestry.trio.allele-specific-methylation.png" alt="Trio alignments in IGV" width="900"/>
+This step mirrors step 4 of the pedigree-wise workflow but is adapted for a trio. The key differences are:
+
+- **Unphased methylation for all three members**: count- and model-based unphased methylation levels are included for kid, dad, and mom (rather than just a single sample).
+- **Per-member allele-specific labeling**: CpG sites are flagged as allele-specific independently for each family member (kid, dad, and mom), since a variant may be heterozygous in one member but homozygous in another.
+- **Separate paternal and maternal mismatch proximity**: proximity to mismatch sites is computed separately for the paternal and maternal sides.
+- **Combined bigwig files**: unphased methylation bigwig files are written for each trio member for IGV visualization.
+
+Informative example of allele-specific methylation resulting from a SNP in the trio:
+
+<img src="images/tapestry.trio.allele-specific-methylation.png" alt="Trio allele-specific methylation in IGV" width="900"/>
+
+### Bed file format
+
+The bed file output by step 4 includes a header containing run metadata and column headings. The header format provides key/value pairs as "##{key}={value}", and a final column header line in the form: "#col1 col2 col3...". In the column definitions below, `{kid_id}`, `{dad_id}`, and `{mom_id}` are replaced by the actual sample IDs (e.g., NA12878, NA12891, NA12892).
+
+Column | Definition
+:--- | :---
+chrom | chromosome on which CpG site is found
+start_cpg | start coordinate of CpG dinucleotide
+end_cpg | end coordinate of CpG dinucleotide
+total_read_count_kid | total number of HiFi reads overlapping CpG site in the kid
+methylation_level_kid_count | count-based unphased methylation level in the kid
+methylation_level_kid_model | model-based unphased methylation level in the kid
+total_read_count_dad | total number of HiFi reads overlapping CpG site in dad
+methylation_level_dad_count | count-based unphased methylation level in dad
+methylation_level_dad_model | model-based unphased methylation level in dad
+total_read_count_mom | total number of HiFi reads overlapping CpG site in mom
+methylation_level_mom_count | count-based unphased methylation level in mom
+methylation_level_mom_model | model-based unphased methylation level in mom
+total_read_count_kid_pat | number of reads from the kid's paternal haplotype
+methylation_level_kid_pat_count | count-based methylation level on the kid's paternal haplotype
+total_read_count_kid_mat | number of reads from the kid's maternal haplotype
+methylation_level_kid_mat_count | count-based methylation level on the kid's maternal haplotype
+methylation_level_kid_pat_model | model-based methylation level on the kid's paternal haplotype
+methylation_level_kid_mat_model | model-based methylation level on the kid's maternal haplotype
+total_read_count_dad_A | number of reads from dad's haplotype A (hap1)
+methylation_level_dad_A_count | count-based methylation level on dad's haplotype A
+total_read_count_dad_B | number of reads from dad's haplotype B (hap2)
+methylation_level_dad_B_count | count-based methylation level on dad's haplotype B
+methylation_level_dad_A_model | model-based methylation level on dad's haplotype A
+methylation_level_dad_B_model | model-based methylation level on dad's haplotype B
+total_read_count_mom_C | number of reads from mom's haplotype C (hap1)
+methylation_level_mom_C_count | count-based methylation level on mom's haplotype C
+total_read_count_mom_D | number of reads from mom's haplotype D (hap2)
+methylation_level_mom_D_count | count-based methylation level on mom's haplotype D
+methylation_level_mom_C_model | model-based methylation level on mom's haplotype C
+methylation_level_mom_D_model | model-based methylation level on mom's haplotype D
+start_hap_map_block_pat | start of the paternal hap-map block
+end_hap_map_block_pat | end of the paternal hap-map block
+paternal_haplotype | which of dad's haplotypes (A or B) corresponds to the kid's paternal haplotype in this block
+paternal_concordance | concordance of read-based vs pedMEC-based bit vectors on the paternal side
+num_het_SNVs_in_dad | number of heterozygous sites in dad within the paternal hap-map block
+start_hap_map_block_mat | start of the maternal hap-map block
+end_hap_map_block_mat | end of the maternal hap-map block
+maternal_haplotype | which of mom's haplotypes (C or D) corresponds to the kid's maternal haplotype in this block
+maternal_concordance | concordance of read-based vs pedMEC-based bit vectors on the maternal side
+num_het_SNVs_in_mom | number of heterozygous sites in mom within the maternal hap-map block
+cpg_is_within_50bp_of_mismatch_site_pat | is the CpG site within 50bp of a paternal heterozygous site at which the read-based and pedMEC-based bit vectors are mismatched
+cpg_is_within_50bp_of_mismatch_site_mat | is the CpG site within 50bp of a maternal heterozygous site at which the read-based and pedMEC-based bit vectors are mismatched
+cpg_overlaps_at_least_one_snv | does the CpG dinucleotide overlap an SNV?
+snv_genotypes_{kid_id} | are the SNVs (if any) that overlap the CpG dinucleotide `hom` or `het` in the kid?
+cpg_is_allele_specific_{kid_id} | does the CpG dinucleotide appear in the reads of only one haplotype in the kid?
+snv_genotypes_{dad_id} | are the SNVs (if any) that overlap the CpG dinucleotide `hom` or `het` in dad?
+cpg_is_allele_specific_{dad_id} | does the CpG dinucleotide appear in the reads of only one haplotype in dad?
+snv_genotypes_{mom_id} | are the SNVs (if any) that overlap the CpG dinucleotide `hom` or `het` in mom?
+cpg_is_allele_specific_{mom_id} | does the CpG dinucleotide appear in the reads of only one haplotype in mom?
 
 ## TODO
 
