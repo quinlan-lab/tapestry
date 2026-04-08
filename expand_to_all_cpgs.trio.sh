@@ -98,6 +98,7 @@ fi
 bed_meth_parent_phased_all_cpgs="${output_dir}/trio.dna-methylation.all_cpgs.bed"
 
 log_info "Expanding methylation to all CpG sites ..."
+log_info "Logs: '${output_dir}/expand_to_all_cpgs_trio.log'"
 
 PYTHONPATH=src:src/util python src/expand_to_all_cpgs_trio.py \
     --bed_all_cpgs_in_reference "$bed_all_cpgs_in_reference" \

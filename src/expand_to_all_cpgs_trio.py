@@ -681,7 +681,7 @@ def main():
 
     if Path(args.bed_meth_parent_phased).exists():
         df_meth_parent_phased = read_meth_parent_phased(args.bed_meth_parent_phased)
-        logger.info(f"Read CpG sites at which count- and model-based methylation levels have been phased to parental haplotypes")
+        logger.info(f"Read CpG sites at which count- and model-based methylation levels have been phased to parents")
         report_size(df_meth_parent_phased, 'Phased methylation levels', logger)
     else:
         logger.warning(f"Could not read CpG sites at which count- and model-based methylation levels have been phased to parental haplotypes")
