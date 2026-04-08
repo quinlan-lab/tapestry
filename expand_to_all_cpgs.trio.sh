@@ -35,10 +35,11 @@ mom_id="NA12892"
 # INPUT DIRS
 reference="/scratch/ucgd/lustre-labs/quinlan/data-shared/constraint-tools/reference/grch38/hg38.analysisSet.fa" # /scratch/ucgd/lustre-labs/quinlan/u6018199/constraint-tools/download-process-data/download-reference-grch38.sh
 meth_parent_phased_dir="/scratch/ucgd/lustre-labs/quinlan/data-shared/dna-methylation/CEPH1463.GRCh38.hifi.parent-phased" # output dir of phase_meth_to_parent_haps.py (containing count-based and model-based parent-phased meth)
-meth_count_dir="/scratch/ucgd/lustre-labs/quinlan/data-shared/dna-methylation/CEPH1463.GRCh38.hifi.count.pedmec-phased" # output dir of aligned_bam_to_cpg_scores (containing count-based unphased meth)
-meth_model_dir="/scratch/ucgd/lustre-labs/quinlan/data-shared/dna-methylation/CEPH1463.GRCh38.hifi.model.pedmec-phased" # output dir of aligned_bam_to_cpg_scores (containing model-based unphased meth)
+meth_count_pedmec_phased_dir="/scratch/ucgd/lustre-labs/quinlan/data-shared/dna-methylation/CEPH1463.GRCh38.hifi.count.pedmec-phased" # output dir of aligned_bam_to_cpg_scores (containing count-based unphased meth)
+meth_model_pedmec_phased_dir="/scratch/ucgd/lustre-labs/quinlan/data-shared/dna-methylation/CEPH1463.GRCh38.hifi.model.pedmec-phased" # output dir of aligned_bam_to_cpg_scores (containing model-based unphased meth)
 
 # OUTPUT DIRS
+# This is passed as an arg to src/expand_to_all_cpgs_trio.py so it knows where to write the unphased bigwig files 
 output_dir="/scratch/ucgd/lustre-labs/quinlan/data-shared/dna-methylation/CEPH1463.GRCh38.hifi.parent-phased.all-cpgs"
 
 # --- Optional Dev Data Overrides ---
@@ -48,8 +49,8 @@ if [ -n "$DEV_DIR" ]; then
     # INPUT DIRS
     meth_dir="${DEV_DIR}/output/dna-methylation"
     meth_parent_phased_dir="${meth_dir}/CEPH1463.GRCh38.hifi.parent-phased" # output dir of phase_meth_to_parent_haps.py
-    meth_count_dir="${meth_dir}/CEPH1463.GRCh38.hifi.count.pedmec-phased" # output dir of aligned_bam_to_cpg_scores (containing count-based unphased meth)
-    meth_model_dir="${meth_dir}/CEPH1463.GRCh38.hifi.model.pedmec-phased" # output dir of aligned_bam_to_cpg_scores (containing model-based unphased meth)
+    meth_count_pedmec_phased_dir="${meth_dir}/CEPH1463.GRCh38.hifi.count.pedmec-phased" # output dir of aligned_bam_to_cpg_scores (containing count-based unphased meth)
+    meth_model_pedmec_phased_dir="${meth_dir}/CEPH1463.GRCh38.hifi.model.pedmec-phased" # output dir of aligned_bam_to_cpg_scores (containing model-based unphased meth)
 
     # Use dev chromosome reference so that write_all_cpgs_in_reference.py only outputs CpGs on that chromosome
     source "$(dirname "$0")/trio_dev_data_config.sh"
@@ -76,24 +77,45 @@ meth_bed() {
     # Usage: meth_bed <mode> <uid> <hap>
     local mode="$1" uid="$2" hap="$3"
     if [ "$mode" = "count" ]; then
-        echo "${meth_count_dir}/${uid}.GRCh38.haplotagged.${hap}.bed.gz"
+        echo "${meth_count_pedmec_phased_dir}/${uid}.GRCh38.haplotagged.${hap}.bed.gz"
     else
-        echo "${meth_model_dir}/${uid}.GRCh38.haplotagged.${hap}.bed.gz"
+        echo "${meth_model_pedmec_phased_dir}/${uid}.GRCh38.haplotagged.${hap}.bed.gz"
     fi
 }
 
-log_info "Writing combined (unphased) methylation bigwig files to '${output_dir}' ..."
+# INPUT FILES
+bed_meth_parent_phased="${meth_parent_phased_dir}/trio.dna-methylation.bed" # parent-phased methylation levels from phase_meth_to_parent_haps.py
+bed_het_site_mismatches_pat="${meth_parent_phased_dir}/${kid_id}.bit-vector-sites-mismatches.paternal.bed"
+bed_het_site_mismatches_mat="${meth_parent_phased_dir}/${kid_id}.bit-vector-sites-mismatches.maternal.bed"
+vcf_joint_called="/scratch/ucgd/lustre-labs/quinlan/data-shared/datasets/Palladium/deepvariant/CEPH-1463.joint.GRCh38.deepvariant.glnexus.vcf.gz" # joint-called multi-sample vcf 
 
-PYTHONPATH=src:src/util .venv/bin/python src/expand_to_all_cpgs_trio.py \
+# Optional Dev Data Overrides for input files
+if [ -n "$DEV_DIR" ]; then
+    vcf_joint_called="${DEV_DIR}/input/CEPH-1463.joint.GRCh38.deepvariant.glnexus.vcf.gz"
+fi
+
+# OUTPUT FILE
+bed_meth_parent_phased_all_cpgs="${output_dir}/trio.dna-methylation.all_cpgs.bed"
+
+log_info "Expanding methylation to all CpG sites ..."
+
+PYTHONPATH=src:src/util python src/expand_to_all_cpgs_trio.py \
+    --bed_all_cpgs_in_reference "$bed_all_cpgs_in_reference" \
+    --bed_meth_parent_phased "$bed_meth_parent_phased" \
+    --bed_meth_count_unphased_kid "$(meth_bed count "$kid_id" combined)" \
+    --bed_meth_model_unphased_kid "$(meth_bed model "$kid_id" combined)" \
+    --bed_meth_count_unphased_dad "$(meth_bed count "$dad_id" combined)" \
+    --bed_meth_model_unphased_dad "$(meth_bed model "$dad_id" combined)" \
+    --bed_meth_count_unphased_mom "$(meth_bed count "$mom_id" combined)" \
+    --bed_meth_model_unphased_mom "$(meth_bed model "$mom_id" combined)" \
+    --bed_meth_parent_phased_all_cpgs "$bed_meth_parent_phased_all_cpgs" \
+    --bed_het_site_mismatches_pat "$bed_het_site_mismatches_pat" \
+    --bed_het_site_mismatches_mat "$bed_het_site_mismatches_mat" \
     --kid_id "$kid_id" \
     --dad_id "$dad_id" \
     --mom_id "$mom_id" \
-    --bed_meth_count_combined_kid "$(meth_bed count "$kid_id" combined)" \
-    --bed_meth_model_combined_kid "$(meth_bed model "$kid_id" combined)" \
-    --bed_meth_count_combined_dad "$(meth_bed count "$dad_id" combined)" \
-    --bed_meth_model_combined_dad "$(meth_bed model "$dad_id" combined)" \
-    --bed_meth_count_combined_mom "$(meth_bed count "$mom_id" combined)" \
-    --bed_meth_model_combined_mom "$(meth_bed model "$mom_id" combined)" \
-    --output_dir "$output_dir"
+    --vcf_joint_called "$vcf_joint_called" \
+    --output_dir "$output_dir" \
+    > ${output_dir}/expand_to_all_cpgs_trio.log 2>&1
 
-log_info "Done writing combined (unphased) methylation bigwig files"
+log_info "Done expanding methylation to all CpG sites"

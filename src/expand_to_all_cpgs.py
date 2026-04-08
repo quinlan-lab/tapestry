@@ -25,7 +25,8 @@ import bioframe as bf # https://bioframe.readthedocs.io/en/latest/index.html
 from memory_profiler import profile
 
 from read_data import read_bed_and_header
-from write_data import write_dataframe_to_bed
+from write_data import write_methylation
+from logging_util import report_size
 from get_meth_hap1_hap2 import read_meth_level
 from shell import shell
 from util import read_all_cpgs_in_reference
@@ -445,32 +446,14 @@ def label_cpgs_as_allele_specific(df):
     cols_reordered = cols[:-3] + [cols[-1], cols[-3], cols[-2]]
     return df.select(cols_reordered)    
 
-def write_methylation(df, file_path, source): 
-    write_dataframe_to_bed(df, file_path, source)
-    root, suffix = os.path.splitext(file_path)
-
-    cmd = (
-        f'cat {file_path}'
-        f' | src/util/sort-compress-index-bed'
-        f' --name {root}'
-    )
-    shell(cmd) 
-    shell(f'rm {file_path}')
-
-    return root
-
-def report_size(df, df_name, logger): 
-    size_in_gb = df.estimated_size(unit="gb")
-    logger.info(f"{df_name}: {size_in_gb:.4f} GB")
-
-@profile # type:ignore 
+@profile # type:ignore
 def main(): 
-    parser = argparse.ArgumentParser(description='Expand output of tapestry to include all CpG sites and unphased DNA methylation levels')
+    parser = argparse.ArgumentParser(description='Expand output of tapestry pedigree workflow to include all CpG sites and unphased DNA methylation levels')
     parser.add_argument('--bed_all_cpgs_in_reference', required=True, help='All CpG sites observed in reference genome')
     parser.add_argument('--bed_meth_count_unphased', required=True, help='Unphased count-based methylation levels')
     parser.add_argument('--bed_meth_model_unphased', required=True, help='Unphased model-based methylation levels')
     parser.add_argument('--bed_meth_founder_phased', required=True, help='Founder-phased methylation levels')
-    parser.add_argument('--bed_het_site_mismatches', required=False, default=None, help='Heterozygous sites where bit vectors are mismatched (omit for trio workflow)')
+    parser.add_argument('--bed_het_site_mismatches', required=False, default=None, help='Heterozygous sites where bit vectors are mismatched')
     parser.add_argument('--bed_meth_founder_phased_all_cpgs', required=True, help='Founder-phased methylation levels at all CpG sites, both in reference and sample, including null methylation levels, and unphased methylation levels')
     parser.add_argument('--uid', required=True, help='Sample UID in joint-called multi-sample vcf')
     parser.add_argument('--vcf_joint_called', required=True, help='Joint-called multi-sample vcf')

@@ -2,12 +2,29 @@ import argparse
 import logging
 from pathlib import Path
 from typing import Literal
+import os
 
+# polars hogs memory by default:
+# https://quinlangroup.slack.com/archives/C02KEHXJ274/p1765314327680539
+# but we can force aggressive memory release using the following configuration:
+# https://github.com/pola-rs/polars/issues/23128#issuecomment-2978695783
+# Note: this configuration must be executed prior to importing polars
+JEMALLOC_CONFIG = "background_thread:true,dirty_decay_ms:1000,muzzy_decay_ms:1000,narenas:2"
+os.environ["MALLOC_CONF"] = JEMALLOC_CONFIG
+# Set this as well to cover specific Polars builds (e.g. PyPI wheels)
+os.environ["_RJEM_MALLOC_CONF"] = JEMALLOC_CONFIG
 import polars as pl
+
 import bioframe as bf
 
+from memory_profiler import profile
+
 from read_data import read_bed_and_header
+from write_data import write_methylation
 from get_meth_hap1_hap2 import read_meth_level
+from shell import shell
+from util import read_all_cpgs_in_reference
+from logging_util import report_size
 
 REFERENCE_GENOME = "hg38"
 CPG_SITE_MISMATCH_SITE_DISTANCE = 50 # bp
@@ -599,22 +616,27 @@ def label_cpgs_as_allele_specific(df, kid_uid, dad_uid, mom_uid):
     return df.select(base_cols + new_cols)
 
 
+@profile # type:ignore
 def main():
     parser = argparse.ArgumentParser(
-        description='Write combined (unphased) methylation bigwig files for a trio'
+        description='Expand output of tapestry trio workflow to include all CpG sites and unphased DNA methylation levels'
     )
-    parser.add_argument('--kid_id', required=True, help='Child sample ID')
-    parser.add_argument('--dad_id', required=True, help='Father sample ID')
-    parser.add_argument('--mom_id', required=True, help='Mother sample ID')
-
-    parser.add_argument('--bed_meth_count_combined_kid', required=True)
-    parser.add_argument('--bed_meth_model_combined_kid', required=True)
-    parser.add_argument('--bed_meth_count_combined_dad', required=True)
-    parser.add_argument('--bed_meth_model_combined_dad', required=True)
-    parser.add_argument('--bed_meth_count_combined_mom', required=True)
-    parser.add_argument('--bed_meth_model_combined_mom', required=True)
-
-    parser.add_argument('--output_dir', required=True, help='Output directory')
+    parser.add_argument('--bed_all_cpgs_in_reference', required=True, help='All CpG sites observed in reference genome')
+    parser.add_argument('--bed_meth_count_unphased_kid', required=True, help='Unphased count-based methylation levels for kid')
+    parser.add_argument('--bed_meth_model_unphased_kid', required=True, help='Unphased model-based methylation levels for kid')
+    parser.add_argument('--bed_meth_count_unphased_dad', required=True, help='Unphased count-based methylation levels for dad')
+    parser.add_argument('--bed_meth_model_unphased_dad', required=True, help='Unphased model-based methylation levels for dad')
+    parser.add_argument('--bed_meth_count_unphased_mom', required=True, help='Unphased count-based methylation levels for mom')
+    parser.add_argument('--bed_meth_model_unphased_mom', required=True, help='Unphased model-based methylation levels for mom')
+    parser.add_argument('--bed_meth_parent_phased', required=True, help='Parent-phased methylation levels')
+    parser.add_argument('--bed_het_site_mismatches_pat', required=True, help='Heterozygous sites where bit vectors are mismatched (paternal)')
+    parser.add_argument('--bed_het_site_mismatches_mat', required=True, help='Heterozygous sites where bit vectors are mismatched (maternal)')
+    parser.add_argument('--bed_meth_parent_phased_all_cpgs', required=True, help='Parent-phased methylation levels at all CpG sites, both in reference and sample, including null methylation levels, and unphased methylation levels')
+    parser.add_argument('--kid_id', required=True, help='Child sample ID in joint-called multi-sample vcf')
+    parser.add_argument('--dad_id', required=True, help='Father sample ID in joint-called multi-sample vcf')
+    parser.add_argument('--mom_id', required=True, help='Mother sample ID in joint-called multi-sample vcf')
+    parser.add_argument('--vcf_joint_called', required=True, help='Joint-called multi-sample vcf')
+    parser.add_argument('--output_dir', required=True, help='Output directory for bigwig files representing unphased methylation levels')
     args = parser.parse_args()
 
     logging.basicConfig(
@@ -625,19 +647,93 @@ def main():
     logger = logging.getLogger(__name__)
 
     logger.info(f"Starting '{__file__}'")
-    logger.info("Args: %s", vars(args))
+    logger.info("Script started with the following arguments: %s", vars(args))
+    logger.info(f"Polars version: {pl.__version__}")
+    logger.info(f"Polars thread pool size: {pl.thread_pool_size()}")
 
     Path(args.output_dir).mkdir(parents=True, exist_ok=True)
 
     logger.info("Writing combined (unphased) methylation bigwig files...")
     combined_specs = [
-        (args.kid_id, args.bed_meth_count_combined_kid, args.bed_meth_model_combined_kid),
-        (args.dad_id, args.bed_meth_count_combined_dad, args.bed_meth_model_combined_dad),
-        (args.mom_id, args.bed_meth_count_combined_mom, args.bed_meth_model_combined_mom),
+        (args.kid_id, args.bed_meth_count_unphased_kid, args.bed_meth_model_unphased_kid),
+        (args.dad_id, args.bed_meth_count_unphased_dad, args.bed_meth_model_unphased_dad),
+        (args.mom_id, args.bed_meth_count_unphased_mom, args.bed_meth_model_unphased_mom),
     ]
     for uid, bed_count, bed_model in combined_specs:
         write_combined_bigwig(bed_count, 'count', uid, args.output_dir, logger)
         write_combined_bigwig(bed_model, 'model', uid, args.output_dir, logger)
+    logger.info("Done writing combined (unphased) methylation bigwig files")
+
+    df_all_cpgs_in_reference = read_all_cpgs_in_reference(args.bed_all_cpgs_in_reference)
+    logger.info(f"Read all CpG sites in reference genome")
+    report_size(df_all_cpgs_in_reference, 'All CpGs in reference', logger)
+
+    df_meth_unphased = read_meth_unphased_trio(
+        bed_meth_count_kid=args.bed_meth_count_unphased_kid,
+        bed_meth_model_kid=args.bed_meth_model_unphased_kid,
+        bed_meth_count_dad=args.bed_meth_count_unphased_dad,
+        bed_meth_model_dad=args.bed_meth_model_unphased_dad,
+        bed_meth_count_mom=args.bed_meth_count_unphased_mom,
+        bed_meth_model_mom=args.bed_meth_model_unphased_mom,
+    )
+    logger.info(f"Read CpG sites at which unphased methylation levels are available for kid, dad, and mom")
+    report_size(df_meth_unphased, 'Unphased methylation levels', logger)
+
+    if Path(args.bed_meth_parent_phased).exists():
+        df_meth_parent_phased = read_meth_parent_phased(args.bed_meth_parent_phased)
+        logger.info(f"Read CpG sites at which count- and model-based methylation levels have been phased to parental haplotypes")
+        report_size(df_meth_parent_phased, 'Phased methylation levels', logger)
+    else:
+        logger.warning(f"Could not read CpG sites at which count- and model-based methylation levels have been phased to parental haplotypes")
+        logger.warning(f"Required file does not exist: '{args.bed_meth_parent_phased}'")
+        logger.info(f"Done running '{__file__}'")
+        return
+
+    # In the following, to save memory, we update what "df" points to
+    # (instead of creating new references for each updated dataframe of CpG sites)
+
+    df = expand_meth_to_all_cpgs(df_all_cpgs_in_reference, df_meth_unphased, df_meth_parent_phased)
+    logger.info(f"Expanded DNA methylation dataset to include (1) all CpG sites observed in reference and sample genomes, and (2) unphased methylation levels (where available)")
+    report_size(df, 'CpG Methylation', logger)
+
+    # Release memory:
+    del df_all_cpgs_in_reference
+    del df_meth_unphased
+    del df_meth_parent_phased
+    import gc
+    gc.collect() # type:ignore
+    logger.info(f"Removed df_all_cpgs_in_reference, df_meth_unphased, df_meth_parent_phased, which are no longer needed")
+
+    df = compute_proximity_to_mismatched_heterozygous_sites(
+        df,
+        args.bed_het_site_mismatches_pat,
+        args.bed_het_site_mismatches_mat,
+    )
+    logger.info(f"Computed proximity of all CpG sites to paternal and maternal heterozygous mismatch sites")
+    report_size(df, 'CpG Methylation', logger)
+    compute_fraction_of_cpgs_that_are_close_to_mismatches(df, logger)
+    compute_methylation_coverage_qc(df, logger)
+
+    df_joint_called_variants = get_joint_called_variants(args.kid_id, args.dad_id, args.mom_id, args.vcf_joint_called)
+    logger.info(f"Got SNVs from joint-called vcf for kid, dad, and mom")
+    report_size(df_joint_called_variants, 'Joint-called SNVs', logger)
+
+    df = label_with_variants(df, df_joint_called_variants)
+    logger.info(f"Determined which CpG sites overlap 1 or 2 SNVs")
+    report_size(df, 'CpG Methylation', logger)
+
+    # Release memory:
+    del df_joint_called_variants
+    gc.collect() # type:ignore
+    logger.info(f"Removed df_joint_called_variants, which is no longer needed")
+
+    df = label_cpgs_as_allele_specific(df, args.kid_id, args.dad_id, args.mom_id)
+    logger.info(f"Flagged CpG sites that are allele-specific by assessing overlap with het SNVs, for each family member")
+    report_size(df, 'CpG Methylation', logger)
+
+    methylation_data_root = write_methylation(df, args.bed_meth_parent_phased_all_cpgs, source=f"{__file__} with args {vars(args)}")
+    logger.info(f"Wrote expanded and allele-specific-flagged methylation dataframe to: '{methylation_data_root}.sorted.bed.gz'")
+    logger.info(f"Index exists at: '{methylation_data_root}.sorted.bed.gz.tbi'")
 
     logger.info(f"Done running '{__file__}'")
 

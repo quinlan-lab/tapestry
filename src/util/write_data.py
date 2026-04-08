@@ -1,3 +1,4 @@
+import os
 from pathlib import Path
 import polars as pl
 
@@ -115,4 +116,28 @@ def write_df_to_vcf(df, vcf, uid=None):
             fmt_keys = '.'
             fmt_vals = '.'
             f.write(f"{chrom}\t{pos}\t{id_}\t{ref}\t{alt}\t{qual}\t{flt}\t{info}\t{fmt_keys}\t{fmt_vals}\n")
+
+
+def write_methylation(df, file_path, source):
+    """Write a methylation dataframe to a sorted, compressed, and indexed BED file.
+
+    Writes the dataframe to a BED file, then sorts, compresses (bgzip), and indexes (tabix).
+    The original uncompressed file is removed.
+
+    Returns the root path (without .sorted.bed.gz suffix).
+    """
+    write_dataframe_to_bed(df, file_path, source)
+    root, suffix = os.path.splitext(file_path)
+
+    cmd = (
+        f'cat {file_path}'
+        f' | src/util/sort-compress-index-bed'
+        f' --name {root}'
+    )
+    shell(cmd)
+    shell(f'rm {file_path}')
+
+    return root
+
+
 
