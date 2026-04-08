@@ -1,6 +1,6 @@
 # tapestry
 
-A pipeline to phase DNA methylation from HiFi reads in a human pedigree to the haplotypes of the pedigree's founders. 
+A pipeline to phase DNA methylation from HiFi reads in a human pedigree (including as a special case a trio) to the haplotypes of the pedigree's founders. 
 
 ## Dependencies
 
@@ -51,7 +51,7 @@ cp ~/bin/bedGraphToBigWig .venv/bin/
 3. Phase count- and model-based methylation data to founder haplotypes using the `phase_meth_to_founder_haps.sh` script, which uses the data produced in steps 1 and 2.
 4. Use `expand_to_all_cpgs.sh` script to generalize tapestry's output to include all CpG sites in the reference and sample genome, and unphased count- and model-based methylation levels, where available. This step also uses heterozygous SNVs to flag CpG sites that are "allele-specific", i.e., exist in only one of the haplotypes in the sample in question. Uses output of steps 2 and 3.
 
-## Step 3 of workflow: Phasing count- and model-based DNA methylation to founder haplotypes 
+### Step 3 of workflow: Phasing count- and model-based DNA methylation to founder haplotypes 
 
 The `phase_meth_to_founder_haps.sh` script calls a CL tool called `src/phase_meth_to_founder_haps.py`: 
 
