@@ -117,6 +117,7 @@ log_info "Phasing ${#chromosomes[@]} chromosomes in parallel (${MAX_THREADS} at 
 phase_chrom() {
     local chrom=$1
     local chrom_vcf="${per_chrom_dir}/${chrom}.phased.vcf.gz"
+    local chrom_log="${per_chrom_dir}/${chrom}.phased.log"
     whatshap phase \
         --ped ${trio_ped} \
         --sample ${kid_id} \
@@ -126,7 +127,8 @@ phase_chrom() {
         --chromosome ${chrom} \
         --output ${chrom_vcf} \
         ${vcf_joint_called_unphased}.gz \
-        ${bam_kid} ${bam_dad} ${bam_mom}
+        ${bam_kid} ${bam_dad} ${bam_mom} \
+        > ${chrom_log} 2>&1
 }
 export -f phase_chrom
 export trio_ped kid_id dad_id mom_id reference vcf_joint_called_unphased bam_kid bam_dad bam_mom per_chrom_dir
