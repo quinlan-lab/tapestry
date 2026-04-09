@@ -238,6 +238,27 @@ cpg_is_allele_specific_dad | does the CpG dinucleotide appear in the reads of on
 snv_genotypes_mom | are the SNVs (if any) that overlap the CpG dinucleotide `hom` or `het` in mom?
 cpg_is_allele_specific_mom | does the CpG dinucleotide appear in the reads of only one haplotype in mom?
 
+### Trio dev data
+
+A small development dataset (region `chr1:1000000-2000000` for the CEPH1463 trio) can be created and used to run and test the trio workflow locally. The following files support this:
+
+File | Description
+:--- | :---
+`trio_dev_data_config.sh` | Defines the genomic region (`DEV_REGION`) used by all other dev data scripts.
+`trio_dev_data_create.sh` | Creates the dev dataset by subsetting the production VCF and BAM files to the dev region. Run on a machine with access to the production data: `./trio_dev_data_create.sh trio_dev_data`.
+`trio_dev_data_get_ref.sh` | Downloads the reference FASTA for the dev region chromosome from UCSC. Only needs to be run once: `./trio_dev_data_get_ref.sh trio_dev_data`.
+`trio_dev_data_serve.py` | HTTP server with range-request support for serving the `trio_dev_data/` directory to IGV. Start with `.venv/bin/python trio_dev_data_serve.py` (default port 8000).
+`trio_dev_data_igv_session.xml` | IGV session file that loads the dev data (haplotagged BAMs, phased VCFs, phase blocks, methylation bigwigs, and mismatch-site VCFs) from the local server. Open in IGV via File > Open Session after starting the server.
+
+To run the trio workflow on the dev data, pass `--dev-dir trio_dev_data` to each pipeline script, e.g.:
+
+```
+./run-whatshap.sh --dev-dir trio_dev_data
+./aligned_bam_to_cpg_scores.sh --dev-dir trio_dev_data
+./phase_meth_to_parent_haps.sh --dev-dir trio_dev_data
+./expand_to_all_cpgs.trio.sh --dev-dir trio_dev_data
+```
+
 ## TODO
 
 - [ ] Convert manual workflow into a Snakemake workflow (see `Snakefile` for early version of this)
