@@ -59,6 +59,9 @@ if [ -n "$DEV_DIR" ]; then
     # (Appending '/output' to keep the generated files separate from the raw dev inputs)
     output_dir="${DEV_DIR}/output/pedmec-phasing"
     
+    # In dev mode, only phase the single dev chromosome
+    dev_chromosomes=("${dev_chrom}")
+
     # Fail fast if dev data doesn't exist
     if [ ! -f "$vcf_joint_called" ]; then
         echo "Error: Dev VCF not found. Did you run trio_dev_data_create.sh?"
@@ -95,23 +98,54 @@ whatshap unphase ${vcf_joint_called} \
 bgzip -f ${vcf_joint_called_unphased}
 tabix ${vcf_joint_called_unphased}.gz
 
-# Step 2: pedigree-aware phasing
+# Step 2: pedigree-aware phasing (parallelized by chromosome)
 vcf_joint_called_phased="${output_dir}/CEPH-1463.joint.GRCh38.deepvariant.glnexus.phased.vcf.gz"
+per_chrom_dir="${output_dir}/per_chrom_phased"
+mkdir -p ${per_chrom_dir}
 
-log_info "pedMEC Phasing: ${kid_id} ${dad_id} ${mom_id}" 
+if [ ${#dev_chromosomes[@]} -gt 0 ] 2>/dev/null; then
+    chromosomes=("${dev_chromosomes[@]}")
+else
+    chromosomes=(chr{1..22} chrX chrY chrM)
+fi
+MAX_THREADS=4
+
+log_info "pedMEC Phasing: ${kid_id} ${dad_id} ${mom_id}"
+log_info "Phasing ${#chromosomes[@]} chromosomes in parallel (${MAX_THREADS} at a time)"
 
 # https://whatshap.readthedocs.io/en/latest/guide.html#phasing-pedigrees
-whatshap phase \
-    --ped ${trio_ped} \
-    --sample ${kid_id} \
-    --sample ${dad_id} \
-    --sample ${mom_id} \
-    --reference ${reference} \
-    --output ${vcf_joint_called_phased} \
-    ${vcf_joint_called_unphased}.gz \
-    ${bam_kid} ${bam_dad} ${bam_mom}
+phase_chrom() {
+    local chrom=$1
+    local chrom_vcf="${per_chrom_dir}/${chrom}.phased.vcf.gz"
+    whatshap phase \
+        --ped ${trio_ped} \
+        --sample ${kid_id} \
+        --sample ${dad_id} \
+        --sample ${mom_id} \
+        --reference ${reference} \
+        --chromosome ${chrom} \
+        --output ${chrom_vcf} \
+        ${vcf_joint_called_unphased}.gz \
+        ${bam_kid} ${bam_dad} ${bam_mom}
+}
+export -f phase_chrom
+export trio_ped kid_id dad_id mom_id reference vcf_joint_called_unphased bam_kid bam_dad bam_mom per_chrom_dir
 
-log_info "Indexing: '${vcf_joint_called_phased}'" 
+printf '%s\n' "${chromosomes[@]}" | xargs -P ${MAX_THREADS} -I {} bash -c 'phase_chrom "$@"' _ {}
+
+log_info "All per-chromosome phasing complete. Merging..."
+
+# Index per-chromosome VCFs, then merge with --naive (no decompression since chromosomes are non-overlapping)
+chrom_vcfs=()
+for chrom in "${chromosomes[@]}"; do
+    chrom_vcf="${per_chrom_dir}/${chrom}.phased.vcf.gz"
+    tabix -f ${chrom_vcf}
+    chrom_vcfs+=("${chrom_vcf}")
+done
+
+bcftools concat --naive "${chrom_vcfs[@]}" -Oz -o ${vcf_joint_called_phased}
+
+log_info "Indexing: '${vcf_joint_called_phased}'"
 tabix ${vcf_joint_called_phased}
 
 log_info "Phased VCF: '${vcf_joint_called_phased}'"
