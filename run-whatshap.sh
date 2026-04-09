@@ -116,17 +116,22 @@ log_info "Phasing ${#chromosomes[@]} chromosomes in parallel (${MAX_THREADS} at 
 # https://whatshap.readthedocs.io/en/latest/guide.html#phasing-pedigrees
 phase_chrom() {
     local chrom=$1
+    local chrom_input_vcf="${per_chrom_dir}/${chrom}.unphased.vcf.gz"
     local chrom_vcf="${per_chrom_dir}/${chrom}.phased.vcf.gz"
     local chrom_log="${per_chrom_dir}/${chrom}.phased.log"
+
+    # Pre-split: extract this chromosome from the unphased VCF
+    bcftools view -r ${chrom} ${vcf_joint_called_unphased}.gz -Oz -o ${chrom_input_vcf}
+    tabix ${chrom_input_vcf}
+
     whatshap phase \
         --ped ${trio_ped} \
         --sample ${kid_id} \
         --sample ${dad_id} \
         --sample ${mom_id} \
         --reference ${reference} \
-        --chromosome ${chrom} \
         --output ${chrom_vcf} \
-        ${vcf_joint_called_unphased}.gz \
+        ${chrom_input_vcf} \
         ${bam_kid} ${bam_dad} ${bam_mom} \
         > ${chrom_log} 2>&1
 }
