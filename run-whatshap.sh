@@ -92,11 +92,11 @@ log_info "Unphasing: '${vcf_joint_called}'"
 
 # Step 1: unphase the input VCF to avoid mixed phasing
 vcf_joint_called_unphased="${output_dir}/CEPH-1463.joint.GRCh38.deepvariant.glnexus.unphased.vcf"
-whatshap unphase ${vcf_joint_called} \
-    > ${vcf_joint_called_unphased} 
+# whatshap unphase ${vcf_joint_called} \
+#     > ${vcf_joint_called_unphased} 
 
-bgzip -f ${vcf_joint_called_unphased}
-tabix ${vcf_joint_called_unphased}.gz
+# bgzip -f ${vcf_joint_called_unphased}
+# tabix ${vcf_joint_called_unphased}.gz
 
 # Step 2: pedigree-aware phasing (parallelized by chromosome)
 vcf_joint_called_phased="${output_dir}/CEPH-1463.joint.GRCh38.deepvariant.glnexus.phased.vcf.gz"
@@ -108,10 +108,10 @@ if [ ${#dev_chromosomes[@]} -gt 0 ] 2>/dev/null; then
 else
     chromosomes=(chr{1..22} chrX chrY chrM)
 fi
-MAX_THREADS=4
+MAX_THREADS=13
 
 log_info "pedMEC Phasing: ${kid_id} ${dad_id} ${mom_id}"
-log_info "Phasing ${#chromosomes[@]} chromosomes in parallel (${MAX_THREADS} at a time)"
+log_info "Phasing ${#chromosomes[@]} chromosomes in parallel (${MAX_THREADS} at a time) in: '${per_chrom_dir}'"
 
 # https://whatshap.readthedocs.io/en/latest/guide.html#phasing-pedigrees
 phase_chrom() {
