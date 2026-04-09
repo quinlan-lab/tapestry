@@ -167,18 +167,27 @@ done
 
 log_info "Created haplotype blocks from: '${vcf_joint_called_phased}'"
 
-# Step 3: haplotag the bams
-for id in ${kid_id} ${dad_id} ${mom_id}; do
-	echo ""
-	log_info "Stripping HP/PS tags from BAM for: ${id}"
-	input_bam=$(get_bam ${id})
-	stripped_bam="${output_dir}/${id}.GRCh38.stripped.bam"
-	samtools view -b -x HP -x PS ${input_bam} -o ${stripped_bam}
-	samtools index ${stripped_bam}
+# Step 3: haplotag the bams (parallelized by sample)
+log_info "Haplotagging 3 samples in parallel"
 
-	log_info "Haplotagging: ${id}"
-	output_bam="${output_dir}/${id}.GRCh38.haplotagged.bam"
-	python -c "
+haplotag_sample() {
+    local id=$1
+
+    local input_bam
+    if [ "$id" == "${kid_id}" ]; then
+        input_bam="${bam_kid}"
+    elif [ "$id" == "${dad_id}" ]; then
+        input_bam="${bam_dad}"
+    elif [ "$id" == "${mom_id}" ]; then
+        input_bam="${bam_mom}"
+    fi
+
+    local stripped_bam="${output_dir}/${id}.GRCh38.stripped.bam"
+    samtools view -b -x HP -x PS ${input_bam} -o ${stripped_bam}
+    samtools index ${stripped_bam}
+
+    local output_bam="${output_dir}/${id}.GRCh38.haplotagged.bam"
+    python -c "
 import hashlib, functools
 hashlib.md5 = functools.partial(hashlib.md5, usedforsecurity=False)
 from whatshap.__main__ import main
@@ -191,7 +200,11 @@ main(argv=[
     '${vcf_joint_called_phased}',
     '${stripped_bam}',
 ])"
-	samtools index ${output_bam}
-	log_info "Haplotagged BAM: '${output_bam}'"
-	echo ""
-done 
+    samtools index ${output_bam}
+}
+export -f haplotag_sample
+export kid_id dad_id mom_id bam_kid bam_dad bam_mom reference output_dir vcf_joint_called_phased
+
+printf '%s\n' ${kid_id} ${dad_id} ${mom_id} | xargs -P 3 -I {} bash -c 'haplotag_sample "$@" > "${output_dir}/$1.haplotag.log" 2>&1' _ {}
+
+log_info "All samples haplotagged"
