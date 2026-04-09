@@ -209,3 +209,5 @@ export kid_id dad_id mom_id bam_kid bam_dad bam_mom reference output_dir vcf_joi
 printf '%s\n' ${kid_id} ${dad_id} ${mom_id} | xargs -P 3 -I {} bash -c 'haplotag_sample "$@" > "${output_dir}/$1.haplotag.log" 2>&1' _ {}
 
 log_info "All samples haplotagged"
+
+log_info "Done: run-whatshap.sh"
