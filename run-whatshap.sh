@@ -24,7 +24,7 @@ done
 source src/util/logging.sh 
 
 # --- Default Configurations (Production) ---
-trio_ped="XXX" # TODO: fill this in
+trio_ped="/scratch/ucgd/lustre-labs/quinlan/u6018199/tapestry/trio_dev_data/input/trio.ped"
 reference="/scratch/ucgd/lustre-labs/quinlan/data-shared/constraint-tools/reference/grch38/hg38.analysisSet.fa.gz" 
 output_dir="/scratch/ucgd/lustre-labs/quinlan/data-shared/pedmec-phasing"
 
@@ -98,7 +98,7 @@ tabix ${vcf_joint_called_unphased}.gz
 # Step 2: pedigree-aware phasing
 vcf_joint_called_phased="${output_dir}/CEPH-1463.joint.GRCh38.deepvariant.glnexus.phased.vcf.gz"
 
-log_info "Phasing: ${kid_id} ${dad_id} ${mom_id}" 
+log_info "pedMEC Phasing: ${kid_id} ${dad_id} ${mom_id}" 
 
 # https://whatshap.readthedocs.io/en/latest/guide.html#phasing-pedigrees
 whatshap phase \
