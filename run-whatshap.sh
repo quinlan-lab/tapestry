@@ -152,10 +152,8 @@ done
 
 bcftools concat --naive "${chrom_vcfs[@]}" -Oz -o ${vcf_joint_called_phased}
 
-log_info "Indexing: '${vcf_joint_called_phased}'"
+log_info "Indexing genome-wide phased VCF: '${vcf_joint_called_phased}'"
 tabix ${vcf_joint_called_phased}
-
-log_info "Phased VCF: '${vcf_joint_called_phased}'"
 
 log_info "Creating phasing statistics ..." 
 
