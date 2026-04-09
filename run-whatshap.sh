@@ -155,14 +155,15 @@ log_info "Phased VCF: '${vcf_joint_called_phased}'"
 log_info "Creating phasing statistics ..." 
 
 for id in ${kid_id} ${dad_id} ${mom_id}; do
-	echo ""
+	stats_log="${output_dir}/${id}.stats.log"
 	blocks_gtf="${output_dir}/CEPH-1463.joint.GRCh38.deepvariant.glnexus.phased.${id}.blocks.gtf"
 	blocks_tsv="${output_dir}/CEPH-1463.joint.GRCh38.deepvariant.glnexus.phased.${id}.blocks.tsv"
 	whatshap stats \
 		--gtf ${blocks_gtf} \
 		--block-list ${blocks_tsv} \
 		--sample ${id} \
-		${vcf_joint_called_phased}
+		${vcf_joint_called_phased} \
+		> ${stats_log} 2>&1
 done
 
 log_info "Created haplotype blocks from: '${vcf_joint_called_phased}'"
