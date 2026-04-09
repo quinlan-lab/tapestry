@@ -391,8 +391,13 @@ def write_combined_bigwig(bed_path, pb_cpg_tool_mode, uid, output_dir, logger=No
         logger.info(f"Wrote combined {pb_cpg_tool_mode}-based methylation bigwig, ASSUMING {REFERENCE_GENOME}, to: '{file_path}'")
 
 
-def _allele_exprs_for_uid(uid):
-    """Return a list of polars expressions that extract allele_1 and allele_2 for one UID."""
+def _allele_exprs_for_member(uid, role):
+    """Return a list of polars expressions that extract allele_1 and allele_2 for one family member.
+
+    Args:
+        uid: Sample UID used to reference the intermediate gt_raw column (from the VCF).
+        role: Role label ('kid', 'dad', or 'mom') used for the output column names.
+    """
     gt_raw_col = f"gt_raw_{uid}"
     return [
         # Parse GT string: take first field before ':', normalize separator, split into list, extract alleles
@@ -402,25 +407,28 @@ def _allele_exprs_for_uid(uid):
             .str.replace("/", "|")
             .str.split("|")
             .list.get(0)
-            .alias(f"allele_1_{uid}"),
+            .alias(f"allele_1_{role}"),
         pl.col(gt_raw_col)
             .str.split(":")
             .list.get(0)
             .str.replace("/", "|")
             .str.split("|")
             .list.get(1)
-            .alias(f"allele_2_{uid}"),
+            .alias(f"allele_2_{role}"),
     ]
 
 
 def get_joint_called_variants(kid_uid, dad_uid, mom_uid, vcf_path):
     """Parse joint-called VCF once and extract SNV alleles for kid, dad, and mom.
 
+    UIDs are used to select columns from the VCF; output columns use role-based
+    names (kid, dad, mom) for consistency with the rest of the pipeline.
+
     Returns a dataframe with columns:
         chrom, start, end,
-        allele_1_{kid_uid}, allele_2_{kid_uid},
-        allele_1_{dad_uid}, allele_2_{dad_uid},
-        allele_1_{mom_uid}, allele_2_{mom_uid}
+        allele_1_kid, allele_2_kid,
+        allele_1_dad, allele_2_dad,
+        allele_1_mom, allele_2_mom
     """
     return (
         pl.scan_csv(
@@ -457,17 +465,17 @@ def get_joint_called_variants(kid_uid, dad_uid, mom_uid, vcf_path):
             (pl.col("pos") - 1).alias("start"),
             pl.col("pos").alias("end"),
         ])
-        # Extract alleles for each family member
+        # Extract alleles for each family member (UID for VCF access, role for output names)
         .with_columns(
-            _allele_exprs_for_uid(kid_uid)
-            + _allele_exprs_for_uid(dad_uid)
-            + _allele_exprs_for_uid(mom_uid)
+            _allele_exprs_for_member(kid_uid, 'kid')
+            + _allele_exprs_for_member(dad_uid, 'dad')
+            + _allele_exprs_for_member(mom_uid, 'mom')
         )
         .select([
             "chrom", "start", "end",
-            f"allele_1_{kid_uid}", f"allele_2_{kid_uid}",
-            f"allele_1_{dad_uid}", f"allele_2_{dad_uid}",
-            f"allele_1_{mom_uid}", f"allele_2_{mom_uid}",
+            "allele_1_kid", "allele_2_kid",
+            "allele_1_dad", "allele_2_dad",
+            "allele_1_mom", "allele_2_mom",
         ])
         .collect()
     )
@@ -546,26 +554,28 @@ def label_with_variants(df_meth_parent_phased_all_cpgs, df_joint_called_variants
     return df
 
 
-def label_cpgs_as_allele_specific(df, kid_uid, dad_uid, mom_uid):
+def label_cpgs_as_allele_specific(df):
     """Label each unique CpG record with per-member allele-specific flags.
 
-    For each family member, adds columns:
-        snv_genotypes_{uid}: comma-separated genotype string ("het", "hom", or ".")
-        cpg_is_allele_specific_{uid}: True if any overlapping SNV is het for that member
+    For each family member (kid, dad, mom), adds columns:
+        snv_genotypes_{role}: comma-separated genotype string ("het", "hom", or ".")
+        cpg_is_allele_specific_{role}: True if any overlapping SNV is het for that member
     Also adds cpg_overlaps_at_least_one_snv (shared across members).
     """
+    roles = ['kid', 'dad', 'mom']
+
     # Columns that define a unique CpG record (everything except per-variant fields)
     variant_cols = {'start_variant', 'end_variant', 'num_SNVs_overlapping_CG'}
-    for uid in [kid_uid, dad_uid, mom_uid]:
-        variant_cols.add(f'allele_1_{uid}')
-        variant_cols.add(f'allele_2_{uid}')
+    for role in roles:
+        variant_cols.add(f'allele_1_{role}')
+        variant_cols.add(f'allele_2_{role}')
     CG_cols = [col for col in df.columns if col not in variant_cols]
 
     # Compute per-member genotype at each overlapping SNV
     genotype_exprs = []
-    for uid in [kid_uid, dad_uid, mom_uid]:
-        a1 = f'allele_1_{uid}'
-        a2 = f'allele_2_{uid}'
+    for role in roles:
+        a1 = f'allele_1_{role}'
+        a2 = f'allele_2_{role}'
         genotype_exprs.append(
             pl
             .when(
@@ -581,17 +591,17 @@ def label_cpgs_as_allele_specific(df, kid_uid, dad_uid, mom_uid):
             .when(pl.col(a1) == pl.col(a2))
             .then(pl.lit("hom"))
             .otherwise(pl.lit("het"))
-            .alias(f"genotype_{uid}")
+            .alias(f"genotype_{role}")
         )
 
     df = df.with_columns(genotype_exprs)
 
     # Aggregate: group by CpG record, join genotypes, flag allele-specific
     agg_exprs = []
-    for uid in [kid_uid, dad_uid, mom_uid]:
+    for role in roles:
         agg_exprs.extend([
-            pl.col(f"genotype_{uid}").str.join(",").alias(f"snv_genotypes_{uid}"),
-            (pl.col(f"genotype_{uid}") == "het").any().alias(f"cpg_is_allele_specific_{uid}"),
+            pl.col(f"genotype_{role}").str.join(",").alias(f"snv_genotypes_{role}"),
+            (pl.col(f"genotype_{role}") == "het").any().alias(f"cpg_is_allele_specific_{role}"),
         ])
 
     df = (
@@ -600,7 +610,7 @@ def label_cpgs_as_allele_specific(df, kid_uid, dad_uid, mom_uid):
         .agg(agg_exprs)
         .with_columns(
             pl
-            .when(pl.col(f'snv_genotypes_{kid_uid}') == '.')
+            .when(pl.col('snv_genotypes_kid') == '.')
             .then(False)
             .otherwise(True)
             .alias("cpg_overlaps_at_least_one_snv")
@@ -610,8 +620,8 @@ def label_cpgs_as_allele_specific(df, kid_uid, dad_uid, mom_uid):
 
     # Reorder: move the new columns to the end
     new_cols = ['cpg_overlaps_at_least_one_snv']
-    for uid in [kid_uid, dad_uid, mom_uid]:
-        new_cols.extend([f'snv_genotypes_{uid}', f'cpg_is_allele_specific_{uid}'])
+    for role in roles:
+        new_cols.extend([f'snv_genotypes_{role}', f'cpg_is_allele_specific_{role}'])
     base_cols = [col for col in df.columns if col not in new_cols]
     return df.select(base_cols + new_cols)
 
@@ -727,7 +737,7 @@ def main():
     gc.collect() # type:ignore
     logger.info(f"Removed df_joint_called_variants, which is no longer needed")
 
-    df = label_cpgs_as_allele_specific(df, args.kid_id, args.dad_id, args.mom_id)
+    df = label_cpgs_as_allele_specific(df)
     logger.info(f"Flagged CpG sites that are allele-specific by assessing overlap with het SNVs, for each family member")
     report_size(df, 'CpG Methylation', logger)
 

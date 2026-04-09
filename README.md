@@ -1,6 +1,6 @@
 # tapestry
 
-A pipeline to phase DNA methylation from HiFi reads in a human pedigree (including as a special case a trio) to the haplotypes of the pedigree's founders. 
+A pipeline to phase DNA methylation from HiFi reads in a human pedigree (including, as a special case, a trio) to the haplotypes of the pedigree's founders. 
 
 ## Dependencies
 
@@ -51,7 +51,7 @@ cp ~/bin/bedGraphToBigWig .venv/bin/
 3. Phase count- and model-based methylation data to founder haplotypes using the `phase_meth_to_founder_haps.sh` script, which uses the data produced in steps 1 and 2.
 4. Use `expand_to_all_cpgs.sh` script to generalize tapestry's output to include all CpG sites in the reference and sample genome, and unphased count- and model-based methylation levels, where available. This step also uses heterozygous SNVs to flag CpG sites that are "allele-specific", i.e., exist in only one of the haplotypes in the sample in question. Uses output of steps 2 and 3.
 
-### Step 3 of workflow: Phasing count- and model-based DNA methylation to founder haplotypes 
+### Step 3 of pedigree workflow: Phasing count- and model-based DNA methylation to founder haplotypes 
 
 The `phase_meth_to_founder_haps.sh` script calls a CL tool called `src/phase_meth_to_founder_haps.py`: 
 
@@ -114,13 +114,13 @@ The tool also creates files that collectively enable visualization of phased DNA
 
 <img src="images/tapestry.pedigree.png" alt="XXX" width="900"/>
 
-## Step 4 of workflow: Expanding the dataset to include all CpG sites in the reference and the sample genome, and to include unphased DNA methylation, and to flag CpGs as "allele-specific" 
+### Step 4 of pedigree workflow: Expanding the dataset to include all CpG sites in the reference and the sample genome, and to include unphased DNA methylation, and to flag CpGs as "allele-specific" 
 
 We would like to be aware of the existence of all CpG sites in the reference genome, irrespective of whether phased or unphased methylation levels are reported for those sites. Additionally, DNA methylation levels are computed at all CpG sites in the sample's haplotypes, even if those CpG sites are not in the reference genome (an example of a variant "creating" a CpG site in the sample). Conversely, CpG sites can be destroyed by mutation, and therefore a methylation level is not reported at that site on the corresponding haplotype. We call such CpG sites "allele-specific". Finally, this step of the workflow reports various QC statistics, e.g., the percentage of CpG sites (in reference and sample genomes, and on phasable chromosomes) at which count-based methylation is phased to at least one parental haplotype. See `https://github.com/quinlan-lab/tapestry/blob/main/src/expand_to_all_cpgs.200081.ipynb` for examples of all these things. 
 
-### Bed file format
+### Output format of pedigree workflow
 
-The bed file output by step 4 includes a header containing run metadata and column headings. The header format provides key/value pairs as "##{key}={value}", and a final column header line in the form: "#col1 col2 col3...". An example header is shown below:
+The bed file output by step 4 includes a header containing run metadata and column headings. The `##source=` line records the script path followed by `with args` and a dictionary of the command-line arguments passed to `src/expand_to_all_cpgs.py`. The final header line lists the column names in the form "#col1 col2 col3...". An example header is shown below:
 
 ```
 ##source='/scratch/ucgd/lustre-labs/quinlan/u6018199/tapestry/src/expand_to_all_cpgs.py with args {'bed_all_cpgs_in_reference': '/scratch/ucgd/lustre-labs/quinlan/data-shared/dna-methylation/CEPH1463.GRCh38.hifi.founder-phased.all-cpgs.2/all_cpg_sites_in_reference.bed', 'bed_meth_count_unphased': '/scratch/ucgd/lustre-labs/quinlan/data-shared/dna-methylation/CEPH1463.GRCh38.hifi.count.read-backed-phased/200084.GRCh38.haplotagged.combined.bed.gz', 'bed_meth_model_unphased': '/scratch/ucgd/lustre-labs/quinlan/data-shared/dna-methylation/CEPH1463.GRCh38.hifi.model.read-backed-phased/200084.GRCh38.haplotagged.combined.bed.gz', 'bed_meth_founder_phased': '/scratch/ucgd/lustre-labs/quinlan/data-shared/dna-methylation/CEPH1463.GRCh38.hifi.founder-phased/200084.dna-methylation.founder-phased.bed', 'bed_het_site_mismatches': '/scratch/ucgd/lustre-labs/quinlan/data-shared/dna-methylation/CEPH1463.GRCh38.hifi.founder-phased/200084.bit-vector-sites-mismatches.bed', 'bed_meth_founder_phased_all_cpgs': '/scratch/ucgd/lustre-labs/quinlan/data-shared/dna-methylation/CEPH1463.GRCh38.hifi.founder-phased.all-cpgs.2/200084.dna-methylation.founder-phased.all_cpgs.bed', 'uid': '200084', 'vcf_iht_phased': '/scratch/ucgd/lustre-labs/quinlan/data-shared/haplotype-maps/CEPH1463.GRCh38/CEPH1463.GRCh38.pass.sorted.vcf.gz'}'
@@ -156,36 +156,35 @@ cpg_is_allele_specific | does the CpG dinucleotide appear in the reads correspon
 
 ## Trio-wise workflow
 
-1. Phase variants:
-   - Phase variants using pedMEC-based trio phasing with the `run-whatshap.sh` script.
+1. Phase variants using pedMEC-based trio phasing with the `run-whatshap.sh` script.
 2. Use `aligned_bam_to_cpg_scores.sh` to generate count- and model-based methylation levels from the haplotagged BAM files produced in step 1, for each trio member (kid, dad, and mom).
-3. Phase count- and model-based methylation data to parental haplotypes (A/B in dad, C/D in mom, pat/mat in kid) using the `phase_meth_to_parent_haps.sh` script, which uses the data produced in steps 1 and 2.
-4. Use `expand_to_all_cpgs.trio.sh` to generalize tapestry's output to include all CpG sites in the reference and sample genomes, unphased count- and model-based methylation levels (for all three trio members, where available), and combined (unphased) bigwig files for IGV visualization. This step also uses heterozygous SNVs to flag CpG sites that are "allele-specific" for each family member individually. Uses output of steps 2 and 3. See `https://github.com/quinlan-lab/tapestry/blob/main/src/expand_to_all_cpgs.trio.ipynb` for examples.
+3. Phase count- and model-based methylation data in kid to parental haplotypes (A/B in dad, C/D in mom) using the `phase_meth_to_parent_haps.sh` script, which uses the data produced in steps 1 and 2.
+4. Use `expand_to_all_cpgs.trio.sh` to generalize tapestry's output to include all CpG sites in the reference and sample genomes, unphased count- and model-based methylation levels (for all three trio members, where available), and unphased bigwig files for IGV visualization. This step also uses heterozygous SNVs to flag CpG sites that are "allele-specific" for each family member individually. Uses output of steps 2 and 3. See `https://github.com/quinlan-lab/tapestry/blob/main/src/expand_to_all_cpgs.trio.ipynb` for examples.
 
-## Step 3 of trio workflow: Phasing count- and model-based DNA methylation to parental haplotypes
+### Step 3 of trio workflow: Phasing count- and model-based DNA methylation in kid to parental haplotypes 
 
-The `phase_meth_to_parent_haps.sh` script calls `src/phase_meth_to_parent_haps.py`, which phases methylation levels for all three trio members to parental haplotypes and creates files for IGV visualization, e.g.,
+The `phase_meth_to_parent_haps.sh` script calls `src/phase_meth_to_parent_haps.py`, which phases methylation levels in the kid to the corresponding haplotypes in the parents (A/B in dad, C/D in mom), and creates files for IGV visualization, e.g.,
 
 <img src="images/tapestry.trio.alignments.png" alt="Trio alignments in IGV" width="900"/>
 
 <img src="images/tapestry.trio.methylation.png" alt="Trio methylation in IGV" width="900"/>
 
-## Step 4 of trio workflow: Expanding the dataset to include all CpG sites, unphased methylation, and per-member allele-specific CpG labeling
+### Step 4 of trio workflow: Expanding the dataset to include all CpG sites, unphased methylation, and per-member allele-specific CpG labeling
 
 This step mirrors step 4 of the pedigree-wise workflow but is adapted for a trio. The key differences are:
 
 - **Unphased methylation for all three members**: count- and model-based unphased methylation levels are included for kid, dad, and mom (rather than just a single sample).
 - **Per-member allele-specific labeling**: CpG sites are flagged as allele-specific independently for each family member (kid, dad, and mom), since a variant may be heterozygous in one member but homozygous in another.
 - **Separate paternal and maternal mismatch proximity**: proximity to mismatch sites is computed separately for the paternal and maternal sides.
-- **Combined bigwig files**: unphased methylation bigwig files are written for each trio member for IGV visualization.
+- **Bigwig files**: unphased methylation bigwig files are written for each trio member for IGV visualization.
 
 Informative example of allele-specific methylation resulting from a SNP in the trio:
 
 <img src="images/tapestry.trio.allele-specific-methylation.png" alt="Trio allele-specific methylation in IGV" width="900"/>
 
-### Bed file format
+### Output format of trio workflow 
 
-The bed file output by step 4 includes a header containing run metadata and column headings. The header format provides key/value pairs as "##{key}={value}", and a final column header line in the form: "#col1 col2 col3...". In the column definitions below, `{kid_id}`, `{dad_id}`, and `{mom_id}` are replaced by the actual sample IDs (e.g., NA12878, NA12891, NA12892).
+The bed file output by step 4 includes a header containing run metadata and column headings. The `##source=` line records the script path followed by `with args` and a dictionary of the command-line arguments passed to `src/expand_to_all_cpgs_trio.py`. The final header line lists the column names in the form "#col1 col2 col3...".
 
 Column | Definition
 :--- | :---
@@ -232,14 +231,13 @@ num_het_SNVs_in_mom | number of heterozygous sites in mom within the maternal ha
 cpg_is_within_50bp_of_mismatch_site_pat | is the CpG site within 50bp of a paternal heterozygous site at which the read-based and pedMEC-based bit vectors are mismatched
 cpg_is_within_50bp_of_mismatch_site_mat | is the CpG site within 50bp of a maternal heterozygous site at which the read-based and pedMEC-based bit vectors are mismatched
 cpg_overlaps_at_least_one_snv | does the CpG dinucleotide overlap an SNV?
-snv_genotypes_{kid_id} | are the SNVs (if any) that overlap the CpG dinucleotide `hom` or `het` in the kid?
-cpg_is_allele_specific_{kid_id} | does the CpG dinucleotide appear in the reads of only one haplotype in the kid?
-snv_genotypes_{dad_id} | are the SNVs (if any) that overlap the CpG dinucleotide `hom` or `het` in dad?
-cpg_is_allele_specific_{dad_id} | does the CpG dinucleotide appear in the reads of only one haplotype in dad?
-snv_genotypes_{mom_id} | are the SNVs (if any) that overlap the CpG dinucleotide `hom` or `het` in mom?
-cpg_is_allele_specific_{mom_id} | does the CpG dinucleotide appear in the reads of only one haplotype in mom?
+snv_genotypes_kid | are the SNVs (if any) that overlap the CpG dinucleotide `hom` or `het` in the kid?
+cpg_is_allele_specific_kid | does the CpG dinucleotide appear in the reads of only one haplotype in the kid?
+snv_genotypes_dad | are the SNVs (if any) that overlap the CpG dinucleotide `hom` or `het` in dad?
+cpg_is_allele_specific_dad | does the CpG dinucleotide appear in the reads of only one haplotype in dad?
+snv_genotypes_mom | are the SNVs (if any) that overlap the CpG dinucleotide `hom` or `het` in mom?
+cpg_is_allele_specific_mom | does the CpG dinucleotide appear in the reads of only one haplotype in mom?
 
 ## TODO
 
-- [ ] Convert manual workflow into a Snakemake workflow (see `Snakefile`), creating a subdirectory called, e.g., `CEPH1463.GRCh38` in `read-backed-phasing` (output of `run-hiphase.sh`)
-- [ ] Add cmdline invocation of the workflow to the header of the data files it outputs (https://g.co/gemini/share/594a669386ba)
+- [ ] Convert manual workflow into a Snakemake workflow (see `Snakefile` for early version of this)
