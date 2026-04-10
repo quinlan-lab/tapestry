@@ -138,36 +138,36 @@ phase_chrom() {
 export -f phase_chrom
 export trio_ped kid_id dad_id mom_id reference vcf_joint_called_unphased bam_kid bam_dad bam_mom per_chrom_dir
 
-printf '%s\n' "${chromosomes[@]}" | xargs -P ${MAX_THREADS} -I {} bash -c 'phase_chrom "$@"' _ {}
+# printf '%s\n' "${chromosomes[@]}" | xargs -P ${MAX_THREADS} -I {} bash -c 'phase_chrom "$@"' _ {}
 
 log_info "All per-chromosome phasing complete. Merging..."
 
 # Index per-chromosome VCFs, then merge with --naive (no decompression since chromosomes are non-overlapping)
-chrom_vcfs=()
-for chrom in "${chromosomes[@]}"; do
-    chrom_vcf="${per_chrom_dir}/${chrom}.phased.vcf.gz"
-    tabix -f ${chrom_vcf}
-    chrom_vcfs+=("${chrom_vcf}")
-done
+# chrom_vcfs=()
+# for chrom in "${chromosomes[@]}"; do
+#     chrom_vcf="${per_chrom_dir}/${chrom}.phased.vcf.gz"
+#     tabix -f ${chrom_vcf}
+#     chrom_vcfs+=("${chrom_vcf}")
+# done
 
-bcftools concat --naive "${chrom_vcfs[@]}" -Oz -o ${vcf_joint_called_phased}
+# bcftools concat --naive "${chrom_vcfs[@]}" -Oz -o ${vcf_joint_called_phased}
 
 log_info "Indexing genome-wide phased VCF: '${vcf_joint_called_phased}'"
-tabix ${vcf_joint_called_phased}
+# tabix ${vcf_joint_called_phased}
 
 log_info "Creating phasing statistics ..." 
 
-for id in ${kid_id} ${dad_id} ${mom_id}; do
-	stats_log="${output_dir}/${id}.stats.log"
-	blocks_gtf="${output_dir}/CEPH-1463.joint.GRCh38.deepvariant.glnexus.phased.${id}.blocks.gtf"
-	blocks_tsv="${output_dir}/CEPH-1463.joint.GRCh38.deepvariant.glnexus.phased.${id}.blocks.tsv"
-	whatshap stats \
-		--gtf ${blocks_gtf} \
-		--block-list ${blocks_tsv} \
-		--sample ${id} \
-		${vcf_joint_called_phased} \
-		> ${stats_log} 2>&1
-done
+# for id in ${kid_id} ${dad_id} ${mom_id}; do
+# 	stats_log="${output_dir}/${id}.stats.log"
+# 	blocks_gtf="${output_dir}/CEPH-1463.joint.GRCh38.deepvariant.glnexus.phased.${id}.blocks.gtf"
+# 	blocks_tsv="${output_dir}/CEPH-1463.joint.GRCh38.deepvariant.glnexus.phased.${id}.blocks.tsv"
+# 	whatshap stats \
+# 		--gtf ${blocks_gtf} \
+# 		--block-list ${blocks_tsv} \
+# 		--sample ${id} \
+# 		${vcf_joint_called_phased} \
+# 		> ${stats_log} 2>&1
+# done
 
 log_info "Created haplotype blocks from: '${vcf_joint_called_phased}'"
 
@@ -187,8 +187,8 @@ haplotag_sample() {
     fi
 
     local stripped_bam="${output_dir}/${id}.GRCh38.stripped.bam"
-    samtools view -b -x HP -x PS ${input_bam} -o ${stripped_bam}
-    samtools index ${stripped_bam}
+    # samtools view -b -x HP -x PS ${input_bam} -o ${stripped_bam}
+    # samtools index ${stripped_bam}
 
     local output_bam="${output_dir}/${id}.GRCh38.haplotagged.bam"
     python -c "
@@ -209,7 +209,8 @@ main(argv=[
 export -f haplotag_sample
 export kid_id dad_id mom_id bam_kid bam_dad bam_mom reference output_dir vcf_joint_called_phased
 
-printf '%s\n' ${kid_id} ${dad_id} ${mom_id} | xargs -P 3 -I {} bash -c 'haplotag_sample "$@" > "${output_dir}/$1.haplotag.log" 2>&1' _ {}
+# printf '%s\n' ${kid_id} ${dad_id} ${mom_id} | xargs -P 3 -I {} bash -c 'haplotag_sample "$@" > "${output_dir}/$1.haplotag.log" 2>&1' _ {}
+printf '%s\n' ${kid_id} | xargs -P 3 -I {} bash -c 'haplotag_sample "$@" > "${output_dir}/$1.haplotag.log" 2>&1' _ {}
 
 log_info "All samples haplotagged"
 
