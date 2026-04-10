@@ -191,7 +191,7 @@ haplotag_sample() {
 
     local stripped_bam="${output_dir}/${id}.GRCh38.stripped.bam"
     log_info "Stripping HP/PS tags from BAM for ${id}"
-    # samtools view -b -x HP -x PS ${input_bam} -o ${stripped_bam}
+    # samtools view -b -x HP -x PS -@ ${HAPLOTAG_THREADS} ${input_bam} -o ${stripped_bam}
     # samtools index ${stripped_bam}
     log_info "Done stripping HP/PS tags from BAM for ${id}"
 
