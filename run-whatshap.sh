@@ -162,12 +162,14 @@ log_info "Creating phasing statistics ..."
 # 	stats_log="${output_dir}/${id}.stats.log"
 # 	blocks_gtf="${output_dir}/CEPH-1463.joint.GRCh38.deepvariant.glnexus.phased.${id}.blocks.gtf"
 # 	blocks_tsv="${output_dir}/CEPH-1463.joint.GRCh38.deepvariant.glnexus.phased.${id}.blocks.tsv"
+# 	log_info "Running whatshap stats for ${id}"
 # 	whatshap stats \
 # 		--gtf ${blocks_gtf} \
 # 		--block-list ${blocks_tsv} \
 # 		--sample ${id} \
 # 		${vcf_joint_called_phased} \
 # 		> ${stats_log} 2>&1
+# 	log_info "Done whatshap stats for ${id}"
 # done
 
 log_info "Created haplotype blocks from: '${vcf_joint_called_phased}'"
