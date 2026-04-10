@@ -108,10 +108,11 @@ if [ ${#dev_chromosomes[@]} -gt 0 ] 2>/dev/null; then
 else
     chromosomes=(chr{1..22} chrX chrY chrM)
 fi
-MAX_THREADS=13
+PHASE_THREADS=13
+HAPLOTAG_THREADS=24
 
 log_info "pedMEC Phasing: ${kid_id} ${dad_id} ${mom_id}"
-log_info "Phasing ${#chromosomes[@]} chromosomes in parallel (${MAX_THREADS} at a time) in: '${per_chrom_dir}'"
+log_info "Phasing ${#chromosomes[@]} chromosomes in parallel (${PHASE_THREADS} at a time) in: '${per_chrom_dir}'"
 
 # https://whatshap.readthedocs.io/en/latest/guide.html#phasing-pedigrees
 phase_chrom() {
@@ -138,7 +139,7 @@ phase_chrom() {
 export -f phase_chrom
 export trio_ped kid_id dad_id mom_id reference vcf_joint_called_unphased bam_kid bam_dad bam_mom per_chrom_dir
 
-# printf '%s\n' "${chromosomes[@]}" | xargs -P ${MAX_THREADS} -I {} bash -c 'phase_chrom "$@"' _ {}
+# printf '%s\n' "${chromosomes[@]}" | xargs -P ${PHASE_THREADS} -I {} bash -c 'phase_chrom "$@"' _ {}
 
 log_info "All per-chromosome phasing complete. Merging..."
 
@@ -172,7 +173,7 @@ log_info "Creating phasing statistics ..."
 log_info "Created haplotype blocks from: '${vcf_joint_called_phased}'"
 
 # Step 3: haplotag the bams (parallelized by sample)
-log_info "Haplotagging 3 samples in parallel"
+log_info "Haplotagging 3 samples in parallel (${HAPLOTAG_THREADS} threads each)"
 
 haplotag_sample() {
     local id=$1
@@ -187,10 +188,13 @@ haplotag_sample() {
     fi
 
     local stripped_bam="${output_dir}/${id}.GRCh38.stripped.bam"
+    log_info "Stripping HP/PS tags from BAM for ${id}"
     # samtools view -b -x HP -x PS ${input_bam} -o ${stripped_bam}
     # samtools index ${stripped_bam}
+    log_info "Done stripping HP/PS tags from BAM for ${id}"
 
     local output_bam="${output_dir}/${id}.GRCh38.haplotagged.bam"
+    local haplotag_stats_log="${output_dir}/${id}.haplotag.stats.log"
     python -c "
 import hashlib, functools
 hashlib.md5 = functools.partial(hashlib.md5, usedforsecurity=False)
@@ -200,14 +204,14 @@ main(argv=[
     '--reference', '${reference}',
     '--sample', '${id}',
     '--output', '${output_bam}',
-    '--output-threads', '4',
+    '--output-threads', '${HAPLOTAG_THREADS}',
     '${vcf_joint_called_phased}',
     '${stripped_bam}',
-])"
+])" > ${haplotag_stats_log} 2>&1
     samtools index ${output_bam}
 }
-export -f haplotag_sample
-export kid_id dad_id mom_id bam_kid bam_dad bam_mom reference output_dir vcf_joint_called_phased
+export -f haplotag_sample log_info log
+export kid_id dad_id mom_id bam_kid bam_dad bam_mom reference output_dir vcf_joint_called_phased HAPLOTAG_THREADS
 
 # printf '%s\n' ${kid_id} ${dad_id} ${mom_id} | xargs -P 3 -I {} bash -c 'haplotag_sample "$@" > "${output_dir}/$1.haplotag.log" 2>&1' _ {}
 printf '%s\n' ${kid_id} | xargs -P 3 -I {} bash -c 'haplotag_sample "$@" > "${output_dir}/$1.haplotag.log" 2>&1' _ {}
