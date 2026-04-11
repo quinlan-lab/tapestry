@@ -197,6 +197,7 @@ haplotag_sample() {
 
     local output_bam="${output_dir}/${id}.GRCh38.haplotagged.bam"
     local haplotag_stats_log="${output_dir}/${id}.haplotag.stats.log"
+    log_info "Running whatshap haplotag for ${id}"
     python -c "
 import hashlib, functools
 hashlib.md5 = functools.partial(hashlib.md5, usedforsecurity=False)
@@ -211,6 +212,7 @@ main(argv=[
     '${stripped_bam}',
 ])" > ${haplotag_stats_log} 2>&1
     samtools index ${output_bam}
+    log_info "Done whatshap haplotag for ${id}"
 }
 export -f haplotag_sample log_info log
 export kid_id dad_id mom_id bam_kid bam_dad bam_mom reference output_dir vcf_joint_called_phased HAPLOTAG_THREADS
