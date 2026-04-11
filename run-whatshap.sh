@@ -92,11 +92,11 @@ log_info "Unphasing: '${vcf_joint_called}'"
 
 # Step 1: unphase the input VCF to avoid mixed phasing
 vcf_joint_called_unphased="${output_dir}/CEPH-1463.joint.GRCh38.deepvariant.glnexus.unphased.vcf"
-# whatshap unphase ${vcf_joint_called} \
-#     > ${vcf_joint_called_unphased} 
+whatshap unphase ${vcf_joint_called} \
+    > ${vcf_joint_called_unphased} 
 
-# bgzip -f ${vcf_joint_called_unphased}
-# tabix ${vcf_joint_called_unphased}.gz
+bgzip -f ${vcf_joint_called_unphased}
+tabix ${vcf_joint_called_unphased}.gz
 
 # Step 2: pedigree-aware phasing (parallelized by chromosome)
 vcf_joint_called_phased="${output_dir}/CEPH-1463.joint.GRCh38.deepvariant.glnexus.phased.vcf.gz"
@@ -139,38 +139,38 @@ phase_chrom() {
 export -f phase_chrom
 export trio_ped kid_id dad_id mom_id reference vcf_joint_called_unphased bam_kid bam_dad bam_mom per_chrom_dir
 
-# printf '%s\n' "${chromosomes[@]}" | xargs -P ${PHASE_THREADS} -I {} bash -c 'phase_chrom "$@"' _ {}
+printf '%s\n' "${chromosomes[@]}" | xargs -P ${PHASE_THREADS} -I {} bash -c 'phase_chrom "$@"' _ {}
 
 log_info "All per-chromosome phasing complete. Merging..."
 
 # Index per-chromosome VCFs, then merge with --naive (no decompression since chromosomes are non-overlapping)
-# chrom_vcfs=()
-# for chrom in "${chromosomes[@]}"; do
-#     chrom_vcf="${per_chrom_dir}/${chrom}.phased.vcf.gz"
-#     tabix -f ${chrom_vcf}
-#     chrom_vcfs+=("${chrom_vcf}")
-# done
+chrom_vcfs=()
+for chrom in "${chromosomes[@]}"; do
+    chrom_vcf="${per_chrom_dir}/${chrom}.phased.vcf.gz"
+    tabix -f ${chrom_vcf}
+    chrom_vcfs+=("${chrom_vcf}")
+done
 
-# bcftools concat --naive "${chrom_vcfs[@]}" -Oz -o ${vcf_joint_called_phased}
+bcftools concat --naive "${chrom_vcfs[@]}" -Oz -o ${vcf_joint_called_phased}
 
 log_info "Indexing genome-wide phased VCF: '${vcf_joint_called_phased}'"
-# tabix ${vcf_joint_called_phased}
+tabix ${vcf_joint_called_phased}
 
 log_info "Creating phasing statistics ..." 
 
-# for id in ${kid_id} ${dad_id} ${mom_id}; do
-# 	stats_log="${output_dir}/${id}.stats.log"
-# 	blocks_gtf="${output_dir}/CEPH-1463.joint.GRCh38.deepvariant.glnexus.phased.${id}.blocks.gtf"
-# 	blocks_tsv="${output_dir}/CEPH-1463.joint.GRCh38.deepvariant.glnexus.phased.${id}.blocks.tsv"
-# 	log_info "Running whatshap stats for ${id}"
-# 	whatshap stats \
-# 		--gtf ${blocks_gtf} \
-# 		--block-list ${blocks_tsv} \
-# 		--sample ${id} \
-# 		${vcf_joint_called_phased} \
-# 		> ${stats_log} 2>&1
-# 	log_info "Done whatshap stats for ${id}"
-# done
+for id in ${kid_id} ${dad_id} ${mom_id}; do
+	stats_log="${output_dir}/${id}.stats.log"
+	blocks_gtf="${output_dir}/CEPH-1463.joint.GRCh38.deepvariant.glnexus.phased.${id}.blocks.gtf"
+	blocks_tsv="${output_dir}/CEPH-1463.joint.GRCh38.deepvariant.glnexus.phased.${id}.blocks.tsv"
+	log_info "Running whatshap stats for ${id}"
+	whatshap stats \
+		--gtf ${blocks_gtf} \
+		--block-list ${blocks_tsv} \
+		--sample ${id} \
+		${vcf_joint_called_phased} \
+		> ${stats_log} 2>&1
+	log_info "Done whatshap stats for ${id}"
+done
 
 log_info "Created haplotype blocks from: '${vcf_joint_called_phased}'"
 
@@ -191,8 +191,8 @@ haplotag_sample() {
 
     local stripped_bam="${output_dir}/${id}.GRCh38.stripped.bam"
     log_info "Stripping HP/PS tags from BAM for ${id}"
-    # samtools view -b -x HP -x PS -@ ${HAPLOTAG_THREADS} ${input_bam} -o ${stripped_bam}
-    # samtools index ${stripped_bam}
+    samtools view -b -x HP -x PS -@ ${HAPLOTAG_THREADS} ${input_bam} -o ${stripped_bam}
+    samtools index ${stripped_bam}
     log_info "Done stripping HP/PS tags from BAM for ${id}"
 
     local output_bam="${output_dir}/${id}.GRCh38.haplotagged.bam"
@@ -215,8 +215,7 @@ main(argv=[
 export -f haplotag_sample log_info log
 export kid_id dad_id mom_id bam_kid bam_dad bam_mom reference output_dir vcf_joint_called_phased HAPLOTAG_THREADS
 
-# printf '%s\n' ${kid_id} ${dad_id} ${mom_id} | xargs -P 3 -I {} bash -c 'haplotag_sample "$@" > "${output_dir}/$1.haplotag.log" 2>&1' _ {}
-printf '%s\n' ${kid_id} | xargs -P 3 -I {} bash -c 'haplotag_sample "$@" > "${output_dir}/$1.haplotag.log" 2>&1' _ {}
+printf '%s\n' ${kid_id} ${dad_id} ${mom_id} | xargs -P 3 -I {} bash -c 'haplotag_sample "$@" > "${output_dir}/$1.haplotag.log" 2>&1' _ {}
 
 log_info "All samples haplotagged"
 
