@@ -609,31 +609,51 @@ The three figures play distinct roles:
    phased into the parents' haplotype labels).
 
 The visual style for the read pileups in Figs 1 and 2 borrows
-deliberately from
-`/Users/petermchale/phasing_simulations/simulate_reads_single_sample.py`
-— monospace glyphs at fixed columns, ragged read starts/ends rendered
-as `-` for "no information at this site". The lollipop-style trio in
-Fig 3 borrows from the multi-generation methylation-tracking diagram
-the user attached when redesigning this page (open / filled circles on
-sticks above each haplotype line).
+deliberately from the terminal output of
+`/Users/petermchale/phasing_simulations/simulate_reads_single_sample.py`:
+each read is one monospace row, prefixed by a section label
+(`Read:` for the unphased pile, `Hap1:` / `Hap2:` for the phased
+pile), with one ASCII glyph per site at fixed integer columns.
+Out-of-window sites carry a faint `-` so the ragged read extents read
+cleanly. Per-CpG methylation state on each read is rendered as a
+small filled rectangle — **red = unmethylated, blue = methylated** —
+borrowed from the BAM-track CpG colouring in
+`images/tapestry.trio.allele-specific-methylation.png`.
+
+The methylation profiles above the pileup in Figs 1 and 2 are
+**bigwig-style bar tracks**, modelled on the bigwig methylation
+tracks in `images/tapestry.trio.methylation.png`: one bar per CpG,
+height in [0, 1], rendered on a single horizontal track per profile.
+Fig 1 has one (gray) pooled track; Fig 2 has two stacked tracks (pat
+in teal, mat in orange) on a shared y-axis.
+
+The lollipop-style trio in Fig 3 borrows from the multi-generation
+methylation-tracking diagram the user attached when redesigning this
+page (open / filled circles on sticks above each haplotype line). Its
+visual style is intentionally distinct from Figs 1 and 2 — Fig 3 is
+about pedigree-level same-physical-homolog comparison, not about
+read-level evidence — and is *not* updated to share the ASCII-art /
+red-blue-box / bigwig-bar style of Figs 1 and 2.
 
 ### 11.1 Figure 1 — "Before" (single individual, unphased)
 
 `wiki/motivation/fig1_before_unphased.png`. Two stacked subplots
 sharing the genomic x-axis:
 
-- **Top subplot — pooled methylation profile, 0–1 axis.** A single
-  series of vertical stems with markers at the top, one stem per CpG.
-  Both stems sit at exactly 0.5 in the toy — the least-informative
-  possible value.
-- **Bottom subplot — read pileup.** ~10 ragged reads, each a row of
-  monospace glyphs at fixed x = site-index columns. Sites inside the
-  read's window carry the read's allele bit (`0`/`1`) at SNV columns
-  and methylation glyph (`●`/`○`) at CpG columns; sites outside the
-  window are rendered as a faint `-` so the ragged extents read
-  cleanly. Every glyph is drawn in a single uniform grey — the
-  haplotype partition is not yet known. Reads are interleaved so the
-  unphased picture does not visually pre-suggest the partition.
+- **Top subplot — pooled methylation profile (bigwig-style track).**
+  Gray bars at each CpG; height = pooled fraction of reads
+  methylated. Both bars sit at exactly 0.5 in the toy — the
+  least-informative possible value. The y-axis spans 0..1 with ticks
+  at `0` and `1` (no `0.5` tick — the height speaks for itself).
+- **Bottom subplot — ASCII-art read pileup.** ~10 ragged reads. Each
+  row begins with the prefix `Read:` (in dark grey, since the
+  haplotype source is unknown) followed by one glyph per site:
+    - `0` or `1` at SNV columns, in dark grey.
+    - A small filled rectangle at CpG columns: **red** if the read is
+      unmethylated at that CpG, **blue** if methylated.
+    - A faint `-` at sites outside the read's window.
+  Reads are interleaved so the unphased picture does not visually
+  pre-suggest the haplotype partition.
 
 Locus layout, left-to-right: `SNV1`, `CpG1`, `SNV2`, `CpG2`, `SNV3`.
 Three SNVs (instead of two) so the partition in Fig 2 is visibly
@@ -644,24 +664,29 @@ methylation phenomenon (the epimutation in Fig 3).
 
 ### 11.2 Figure 2 — "After" (same individual, phased)
 
-`wiki/motivation/fig2_after_phased.png`. Same two-subplot layout as
-Fig 1, but:
+`wiki/motivation/fig2_after_phased.png`. Three stacked subplots
+sharing the genomic x-axis:
 
-- **Top subplot — two methylation profiles**, one per haplotype, on
-  the same 0–1 axis. Paternal stems in dark blue and maternal in dark
-  red, slightly x-offset so they don't overlap. In the toy: paternal
-  CpG1 = 0 / CpG2 = 1; maternal CpG1 = 1 / CpG2 = 0. Each Fig 1 stem
-  splits into two stems on opposite extremes, in *opposite directions*
-  across the two CpGs.
-- **Bottom subplot — partitioned read pileup.** Same reads as Fig 1,
-  now coloured by haplotype (paternal = dark blue, maternal = dark
-  red) and grouped vertically (pat above mat) with a faint divider.
-  Side labels "paternal reads" / "maternal reads" on the left.
+- **Top — paternal bigwig track** (teal bars). In the toy, the
+  paternal track lights up at CpG2 (level = 1) and is empty at CpG1.
+- **Middle — maternal bigwig track** (orange bars). Symmetric:
+  lights up at CpG1, empty at CpG2.
+- **Bottom — partitioned read pileup.** Same ten reads as Fig 1,
+  now grouped paternal-above-maternal with a faint dotted divider.
+  Each row's prefix is `Hap1:` (paternal, teal) or `Hap2:` (maternal,
+  orange); SNV bits and the prefix are coloured by haplotype, while
+  the per-CpG red/blue methylation boxes are unchanged from Fig 1
+  (the per-read methylation state does not depend on the haplotype
+  partition — only the *aggregation* into bigwig tracks does).
 
-The colours in Fig 2 deliberately match the colours of the kid's two
-haplotypes in Fig 3 (paternal = dark blue = dad hap A; maternal = dark
-red = mom hap C), so a reader moving from Fig 2 to Fig 3 can trace the
-kid's two homologs by colour into the trio context.
+Note on colour: Figs 1 and 2 use a *separate* haplotype palette
+(teal pat / orange mat) from Fig 3 (which uses dark blue / dark red)
+so the per-CpG meth-box red/blue convention stays unambiguous in the
+single-individual figures. Fig 3 keeps its blue/red palette because
+its visual encoding (no red/blue meth boxes; methylation as lollipops
+on each haplotype line) does not collide. A future redesign of Fig 3
+to share the ASCII-art / red-blue-box style would unify the palette;
+for now the two styles are kept disjoint.
 
 ### 11.3 Figure 3 — Trio (epimutations and compound-het use cases)
 
@@ -756,15 +781,16 @@ SNV3.
 - All three figures are emitted by `page_motivation()` in
   `wiki/generate_wiki.py`, selectable via
   `python wiki/generate_wiki.py --page motivation`.
-- The read pileup in Figs 1 and 2 is rendered as monospace
-  `pyplot.text` glyphs at integer site-index x-coordinates with a
-  faint coloured backbone line for each read's window (so out-of-
-  window cells, drawn as `-`, are visually distinguishable from
-  in-window cells without overloading the glyph alphabet).
-- The methylation-profile subplots above the read pileups use a
-  shared 0–1 y-axis with identical ticks (`0`, `0.5`, `1`).
-  `_draw_methylation_profile()` in `generate_wiki.py` is the helper
-  that enforces the axis style.
+- Figs 1 and 2 use shared helpers `_draw_read_pileup` (which dispatches
+  per-row to `_draw_read_row`) and `_draw_methylation_profile_bars`.
+  `_draw_read_row` renders SNV columns as monospace `pyplot.text` and
+  CpG columns as `Rectangle` patches whose face colour encodes the
+  meth state; out-of-window cells are rendered as a faint `-` glyph.
+  `_draw_methylation_profile_bars` produces the bigwig-style track
+  with `pyplot.bar`, a fixed `ylim=(0, 1.05)`, and `yticks=[0, 1]`.
+- Fig 2 stacks two single-track bigwig axes (one per haplotype) above
+  the read pileup. They share `sharex` with the pileup so column
+  alignment is automatic.
 - The trio in Fig 3 is rendered on a single axes with manual
   positioning of the three "person cells" (pedigree symbol +
   haplotype display). Lollipops are `pyplot.scatter` markers above a
@@ -773,10 +799,15 @@ SNV3.
   bar even with the lollipop sticks crossing it.
 - Because the simulation is hard-coded, no unit tests are required;
   correctness is checked by eye on the rendered PNG.
-- The colour palette for Figs 2 and 3 is intentionally consistent
-  (paternal = dark blue, maternal = dark red, with kid's haplotype
-  lines in Fig 3 reusing those exact colours), so a reader's eye can
-  trace a single haplotype across figures.
+- Two disjoint haplotype palettes are intentionally maintained:
+  `COLOR_FIG12_PAT` / `COLOR_FIG12_MAT` (teal / orange) for the
+  single-individual figures, where the meth-box red/blue would
+  otherwise collide with a blue/red haplotype palette; and
+  `COLOR_DAD_A` / `COLOR_DAD_B` / `COLOR_MOM_C` / `COLOR_MOM_D`
+  (blue and red shades) for the trio, where there are no meth boxes
+  to collide with. A reader bridging Fig 2 to Fig 3 has to remap
+  colours mentally — that is acknowledged tradeoff for keeping the
+  meth-state convention unambiguous in Figs 1 and 2.
 
 ## 12. Searchable-output figure (trio-wise BED mock-up)
 

@@ -85,15 +85,40 @@ MOM_D = (0, 0, 0, 0, 0)
 KID_PAT = (0, 0, 0, 1, 0)  # = DAD_A except CpG2 is now methylated (epimutation)
 KID_MAT = (1, 1, 1, 0, 1)  # = MOM_C
 
-# --- Colour palette (4-colour scheme, kid haplotypes match parental ones) -
-COLOR_DAD_A = "#1f4e79"   # dark blue   — transmitted to kid as pat
-COLOR_DAD_B = "#9dc3e6"   # light blue  — not transmitted
-COLOR_MOM_C = "#c00000"   # dark red    — transmitted to kid as mat
-COLOR_MOM_D = "#f4b183"   # light orange — not transmitted
+# --- Colour palette -------------------------------------------------------
+#
+# Two semantic colour axes share the page:
+#
+#   - HAPLOTYPE family. Fig 3 uses a 4-colour scheme based on dark/light
+#     blue (dad) and dark red / light orange (mom); the kid's two haplotype
+#     lines in Fig 3 reuse the dark shades of the parental homologs they
+#     descend from. These constants stay unchanged so the trio diagram
+#     keeps the layout the user signed off on.
+#   - METHYLATION-STATE family. Per-read CpG boxes in the pileup of Figs
+#     1 and 2 are blue (methylated) / red (unmethylated), borrowed from
+#     `images/tapestry.trio.allele-specific-methylation.png`.
+#
+# Figs 1 and 2 use a *separate* haplotype palette (teal pat / orange mat)
+# so the per-read SNV-bit colours don't collide with the per-CpG meth-box
+# blue/red. Fig 3 is unaffected.
+
+# Trio (Fig 3) — 4 founder colours, kid haps reuse the parental dark shades.
+COLOR_DAD_A = "#1f4e79"   # dark blue       — transmitted to kid as pat
+COLOR_DAD_B = "#9dc3e6"   # light blue      — not transmitted
+COLOR_MOM_C = "#c00000"   # dark red        — transmitted to kid as mat
+COLOR_MOM_D = "#f4b183"   # light orange    — not transmitted
 COLOR_KID_PAT = COLOR_DAD_A
 COLOR_KID_MAT = COLOR_MOM_C
-COLOR_NEUTRAL = "#666666"  # uniform grey for unphased reads in Fig 1
-COLOR_ERROR = "#d62728"    # bold red, reserved for sequencing-error bits
+
+# Single individual (Figs 1 & 2) — disjoint from blue/red so the meth-state
+# colour of CpG boxes is unambiguous.
+COLOR_FIG12_PAT = "#0f766e"   # dark teal
+COLOR_FIG12_MAT = "#c2410c"   # dark orange
+
+COLOR_NEUTRAL = "#555555"  # uniform dark grey for unphased reads in Fig 1
+COLOR_METH = "#1d4ed8"     # blue  — CpG is methylated
+COLOR_UNMETH = "#dc2626"   # red   — CpG is unmethylated
+COLOR_OUT = "#bbbbbb"      # light grey for `-` (out-of-window) glyphs
 
 
 # --- Glyph helpers --------------------------------------------------------
@@ -138,17 +163,17 @@ KID_READS = [
 ]
 
 
-def _read_glyphs(source: str, window: tuple[int, int]) -> list[str | None]:
-    """Render a read as a list of length N_SITES of glyphs (or None for
-    sites outside the read's window)."""
+def _read_data(source: str, window: tuple[int, int]) -> list[tuple[int | None, bool]]:
+    """For one read: a list of length N_SITES of (per-site value, in_window?)
+    tuples. value is the underlying SNV bit or CpG meth state (0 or 1) when
+    the site is inside the read's window, or None when it isn't."""
     hap = KID_PAT if source == "pat" else KID_MAT
-    glyphs = list(_hap_glyphs(hap))
-    out: list[str | None] = []
+    out: list[tuple[int | None, bool]] = []
     for i in range(N_SITES):
         if window[0] <= i <= window[1]:
-            out.append(glyphs[i])
+            out.append((hap[i], True))
         else:
-            out.append(None)
+            out.append((None, False))
     return out
 
 
@@ -184,161 +209,211 @@ def _phased_methylation() -> dict[str, dict[int, float]]:
 
 
 # --- Drawing primitives ---------------------------------------------------
+#
+# Read-pileup style mimics the terminal output of
+# /Users/petermchale/phasing_simulations/simulate_reads_single_sample.py:
+# every read is one monospace row prefixed with `Read:` (Fig 1, before
+# phasing) or `Hap1:` / `Hap2:` (Fig 2, after phasing) followed by a
+# sequence of one-character columns. SNV columns carry an ASCII bit (0/1
+# in the haplotype colour, or grey when unphased); CpG columns carry a
+# small filled red/blue rectangle (red = unmethylated, blue = methylated)
+# borrowed from `images/tapestry.trio.allele-specific-methylation.png`;
+# out-of-window columns carry a faint `-` glyph.
 
 GLYPH_FONTSIZE = 13
 SITE_LABEL_FONTSIZE = 10
-COL_PITCH = 1.0  # x-pitch between adjacent sites in axes-data coordinates
+PREFIX_FONTSIZE = 12
+
+PREFIX_X = -1.6           # x-position where row prefixes ("Hap1:" etc.) anchor
+SITE_LABEL_X_PAD = 0.0    # site labels (SNV1 etc.) sit directly above each column
+
+CPG_BOX_W = 0.62          # width of the colored CpG box (in column units)
+CPG_BOX_H = 0.62          # height of the colored CpG box (in row units)
 
 
-def _draw_site_ruler(ax: plt.Axes, y: float = -0.6) -> None:
-    """Site labels (SNV1, CpG1, ...) along the x-axis."""
+def _draw_site_ruler(ax: plt.Axes, y: float) -> None:
+    """Site labels (SNV1, CpG1, …) along the x-axis."""
     for i, name in enumerate(SITE_NAMES):
-        kind = SITE_KIND[i]
-        weight = "bold" if kind == "cpg" else "normal"
+        weight = "bold" if SITE_KIND[i] == "cpg" else "normal"
         ax.text(i, y, name, ha="center", va="top",
                 fontsize=SITE_LABEL_FONTSIZE, family="monospace",
                 fontweight=weight)
 
 
+def _draw_read_row(
+    ax: plt.Axes,
+    row_y: float,
+    source: str,
+    window: tuple[int, int],
+    hap_color: str,
+    prefix: str,
+    prefix_color: str,
+) -> None:
+    """One read row: prefix label + per-site glyphs."""
+    # Row prefix (e.g. "Read:" or "Hap1:")
+    ax.text(
+        PREFIX_X, row_y, prefix,
+        ha="left", va="center", fontsize=PREFIX_FONTSIZE,
+        family="monospace", fontweight="bold", color=prefix_color,
+    )
+    for i, (val, in_window) in enumerate(_read_data(source, window)):
+        if not in_window:
+            ax.text(i, row_y, "-", ha="center", va="center",
+                    fontsize=GLYPH_FONTSIZE, family="monospace",
+                    color=COLOR_OUT)
+            continue
+        if SITE_KIND[i] == "snv":
+            ax.text(i, row_y, _snv_glyph(val),
+                    ha="center", va="center",
+                    fontsize=GLYPH_FONTSIZE, family="monospace",
+                    fontweight="bold", color=hap_color)
+        else:  # CpG — small filled rectangle, red (unmeth) or blue (meth)
+            box_color = COLOR_METH if val else COLOR_UNMETH
+            ax.add_patch(
+                Rectangle(
+                    (i - CPG_BOX_W / 2, row_y - CPG_BOX_H / 2),
+                    CPG_BOX_W, CPG_BOX_H,
+                    facecolor=box_color, edgecolor="black", linewidth=0.4,
+                    zorder=2,
+                )
+            )
+
+
 def _draw_read_pileup(
     ax: plt.Axes,
     ordered_reads: list[tuple[str, tuple[int, int]]],
-    color_for_source: dict[str, str],
-    show_haplotype_labels: bool = False,
+    hap_colors: dict[str, str],
+    prefix_for_source: dict[str, str],
+    prefix_color_for_source: dict[str, str] | None = None,
+    section_title: str | None = None,
+    show_haplotype_divider: bool = False,
 ) -> None:
-    """
-    Draw a vertical stack of reads. Each read is a row of monospace glyphs
-    at fixed x = site-index columns. Cells outside the read's window are
-    drawn as faint '-' to convey "no information".
-    """
+    """Stack of reads in ASCII-art style. Each row goes through
+    `_draw_read_row` so the column geometry stays in lockstep with the
+    methylation-profile axes that share x via `sharex=`."""
+    if prefix_color_for_source is None:
+        prefix_color_for_source = hap_colors
+
     n = len(ordered_reads)
     for row, (source, window) in enumerate(ordered_reads):
-        glyphs = _read_glyphs(source, window)
-        color = color_for_source[source]
-        # Faint horizontal backbone for the read extent (axes-data coords).
-        ax.plot(
-            [window[0] - 0.4, window[1] + 0.4],
-            [row, row],
-            color=color, linewidth=2.2, alpha=0.30, solid_capstyle="butt",
-            zorder=1,
+        _draw_read_row(
+            ax, row_y=row, source=source, window=window,
+            hap_color=hap_colors[source], prefix=prefix_for_source[source],
+            prefix_color=prefix_color_for_source[source],
         )
-        for i, g in enumerate(glyphs):
-            if g is None:
-                ax.text(i, row, "-", ha="center", va="center",
-                        fontsize=GLYPH_FONTSIZE, family="monospace",
-                        color="#bbbbbb", zorder=2)
-            else:
-                ax.text(i, row, g, ha="center", va="center",
-                        fontsize=GLYPH_FONTSIZE, family="monospace",
-                        fontweight="bold", color=color, zorder=2)
 
-    ax.set_xlim(-0.7, N_SITES - 0.3)
-    ax.set_ylim(n - 0.5, -1.2)  # invert: row 0 at top
+    if show_haplotype_divider:
+        n_pat = sum(1 for s, _ in ordered_reads if s == "pat")
+        ax.axhline(n_pat - 0.5, color="black", linewidth=0.6,
+                   linestyle=(0, (3, 3)), alpha=0.4)
+
+    if section_title is not None:
+        ax.text(
+            PREFIX_X, -1.4, section_title,
+            ha="left", va="bottom",
+            fontsize=11, family="monospace", fontweight="bold",
+            color="black",
+        )
+
+    ax.set_xlim(PREFIX_X - 0.3, N_SITES - 0.3)
+    ax.set_ylim(n - 0.5, -1.7)  # invert: row 0 at top
     ax.set_axis_off()
 
-    if show_haplotype_labels:
-        # Group reads by source preserving order; draw a side label per group.
-        cur_src = None
-        group_start = 0
-        for i in range(n + 1):
-            src = ordered_reads[i][0] if i < n else None
-            if src != cur_src:
-                if cur_src is not None:
-                    mid = (group_start + i - 1) / 2.0
-                    label = "paternal\nreads" if cur_src == "pat" else "maternal\nreads"
-                    ax.text(
-                        -0.95, mid, label,
-                        ha="right", va="center", fontsize=9,
-                        color=color_for_source[cur_src], fontweight="bold",
-                    )
-                cur_src = src
-                group_start = i
-        ax.set_xlim(-2.4, N_SITES - 0.3)
 
-
-def _draw_methylation_profile(
+def _draw_methylation_profile_bars(
     ax: plt.Axes,
     series: list[tuple[str, dict[int, float], str]],
-    title: str | None = None,
+    track_label: str | None = None,
 ) -> None:
-    """
-    Plot per-CpG methylation levels above the read pileup, on a 0..1 axis.
-    `series` is a list of (label, {cpg_index: level}, color) tuples.
-    Each series is rendered as vertical stems at the CpG positions, with a
-    marker at the top.
+    """Bigwig-style bars: one bar per CpG position, height = methylation
+    fraction (0..1). Each `series` is one track. When multiple series share
+    one axes (e.g. pat + mat side-by-side), bars are offset horizontally.
+
+    This helper draws *one* axes; for two tracks stacked vertically (as in
+    Fig 2) the caller passes a single-series at a time on a per-track axes.
     """
     n_series = len(series)
-    # Stagger horizontally so multiple series don't overlap at the same x.
+    # Bar width: when multiple series share one axes, slim them and
+    # stagger so each CpG hosts an obvious pair.
+    bar_w = 0.42 if n_series == 1 else 0.34
     if n_series == 1:
         offsets = [0.0]
     else:
-        spread = 0.16
-        offsets = [-spread / 2 + spread * i / max(n_series - 1, 1)
-                   for i in range(n_series)]
+        spread = 0.42
+        offsets = [
+            -spread / 2 + spread * i / max(n_series - 1, 1)
+            for i in range(n_series)
+        ]
 
     for (label, levels, color), dx in zip(series, offsets):
         for cpg_i, level in levels.items():
-            ax.plot([cpg_i + dx, cpg_i + dx], [0, level],
-                    color=color, linewidth=2.0, solid_capstyle="round")
-            ax.plot(cpg_i + dx, level, marker="o", markersize=8,
-                    markerfacecolor=color, markeredgecolor="black",
-                    markeredgewidth=0.5)
+            ax.bar(
+                cpg_i + dx, level, width=bar_w,
+                color=color, edgecolor="black", linewidth=0.4,
+                align="center",
+            )
 
-    ax.set_xlim(-0.7, N_SITES - 0.3)
-    ax.set_ylim(-0.05, 1.10)
-    ax.set_yticks([0, 0.5, 1])
-    ax.set_yticklabels(["0", "0.5", "1"], fontsize=8)
-    ax.set_ylabel("methylation\n(fraction)", fontsize=9)
+    ax.set_xlim(PREFIX_X - 0.3, N_SITES - 0.3)
+    ax.set_ylim(0, 1.05)
+    ax.set_yticks([0, 1])
+    ax.set_yticklabels(["0", "1"], fontsize=8)
     ax.set_xticks([])
     for spine in ("top", "right"):
         ax.spines[spine].set_visible(False)
 
-    # Series legend (only when more than one series).
-    if n_series > 1:
-        legend_x = N_SITES - 0.3
-        for k, (label, _, color) in enumerate(series):
-            ax.text(
-                legend_x, 1.0 - 0.25 * k, label,
-                ha="right", va="top", fontsize=9,
-                color=color, fontweight="bold",
-            )
-
-    if title is not None:
-        ax.set_title(title, fontsize=11, pad=8, loc="left")
+    if track_label is not None:
+        # Track label sits in the prefix column, mimicking the IGV side-label.
+        ax.text(
+            PREFIX_X, 0.5, track_label,
+            ha="left", va="center",
+            fontsize=10, family="monospace", fontweight="bold",
+            color=series[0][2] if n_series == 1 else "black",
+        )
 
 
 # --- Figure 1 — single individual, before phasing -----------------------
 
 def _render_fig1_before(out_path: Path) -> None:
     """
-    A single individual (the kid) with reads in the unphased pile order
-    and one pooled methylation profile (0..1) above the reads. Both CpGs
-    come out at exactly 0.5 — the least-informative possible value.
+    A single individual (the kid). Layout, top to bottom:
+
+      - One bigwig-style methylation track (gray bars) showing the *pooled*
+        methylation level at each CpG. Both CpGs come out at exactly 0.5
+        — the least-informative possible value.
+      - The read pileup in ASCII-art style: each read is one monospace
+        row prefixed `Read:`, with `0`/`1` glyphs at SNV columns, red
+        (unmethylated) / blue (methylated) boxes at CpG columns, and
+        faint `-` glyphs at out-of-window columns. All glyphs are dark
+        grey because the haplotype partition is not yet known.
     """
-    fig = plt.figure(figsize=(7.8, 6.0))
+    fig = plt.figure(figsize=(8.4, 6.4))
     gs = GridSpec(
         nrows=2, ncols=1,
         height_ratios=(1.0, 4.0),
-        hspace=0.12,
-        left=0.13, right=0.97, top=0.91, bottom=0.10,
+        hspace=0.20,
+        left=0.04, right=0.98, top=0.91, bottom=0.06,
     )
 
     ax_meth = fig.add_subplot(gs[0])
     ax_reads = fig.add_subplot(gs[1], sharex=ax_meth)
 
     pooled = _pooled_methylation()
-    _draw_methylation_profile(
+    _draw_methylation_profile_bars(
         ax_meth,
         series=[("pooled", pooled, COLOR_NEUTRAL)],
-        title="pooled methylation level (across all reads, before phasing)",
+        track_label="pooled  ",
     )
 
-    # Reads in arrival order: not grouped by haplotype.
-    interleaved_order = list(KID_READS)
-    color_for_source = {"pat": COLOR_NEUTRAL, "mat": COLOR_NEUTRAL}
-    _draw_read_pileup(ax_reads, interleaved_order, color_for_source,
-                      show_haplotype_labels=False)
-    _draw_site_ruler(ax_reads, y=-0.95)
+    interleaved = list(KID_READS)  # arrival order — not grouped by hap
+    _draw_read_pileup(
+        ax_reads,
+        ordered_reads=interleaved,
+        hap_colors={"pat": COLOR_NEUTRAL, "mat": COLOR_NEUTRAL},
+        prefix_for_source={"pat": "Read:", "mat": "Read:"},
+        prefix_color_for_source={"pat": COLOR_NEUTRAL, "mat": COLOR_NEUTRAL},
+        section_title="reads (before phasing — source unknown)",
+    )
+    _draw_site_ruler(ax_reads, y=-0.55)
 
     fig.suptitle(
         "Figure 1 — \"Before\": unphased reads, one pooled methylation "
@@ -356,45 +431,49 @@ def _render_fig1_before(out_path: Path) -> None:
 
 def _render_fig2_after(out_path: Path) -> None:
     """
-    Same individual, same reads, now coloured by haplotype (pat above mat,
-    distinct colours), with two methylation profiles (one per haplotype) on
-    a shared 0..1 axis above the reads.
+    Same individual, same reads, now partitioned by haplotype. Two
+    bigwig-style methylation tracks (one per haplotype, teal and orange)
+    sit above the read pileup on a shared 0..1 y-axis. Reads are grouped
+    paternal-above-maternal, prefixed `Hap1:` / `Hap2:` in the haplotype
+    colour, with the same per-CpG red/blue meth boxes as in Fig 1.
     """
-    fig = plt.figure(figsize=(8.6, 6.4))
+    fig = plt.figure(figsize=(9.0, 7.2))
     gs = GridSpec(
-        nrows=2, ncols=1,
-        height_ratios=(1.0, 4.0),
-        hspace=0.12,
-        left=0.16, right=0.97, top=0.91, bottom=0.10,
+        nrows=3, ncols=1,
+        height_ratios=(0.85, 0.85, 4.0),
+        hspace=0.15,
+        left=0.04, right=0.98, top=0.93, bottom=0.06,
     )
 
-    ax_meth = fig.add_subplot(gs[0])
-    ax_reads = fig.add_subplot(gs[1], sharex=ax_meth)
+    ax_pat = fig.add_subplot(gs[0])
+    ax_mat = fig.add_subplot(gs[1], sharex=ax_pat)
+    ax_reads = fig.add_subplot(gs[2], sharex=ax_pat)
 
     phased = _phased_methylation()
-    _draw_methylation_profile(
-        ax_meth,
-        series=[
-            ("pat", phased["pat"], COLOR_KID_PAT),
-            ("mat", phased["mat"], COLOR_KID_MAT),
-        ],
-        title="phased methylation level, one profile per haplotype",
+    _draw_methylation_profile_bars(
+        ax_pat,
+        series=[("pat", phased["pat"], COLOR_FIG12_PAT)],
+        track_label="pat meth  ",
+    )
+    _draw_methylation_profile_bars(
+        ax_mat,
+        series=[("mat", phased["mat"], COLOR_FIG12_MAT)],
+        track_label="mat meth  ",
     )
 
-    # Reads grouped: paternal on top, maternal below.
     grouped = (
         [r for r in KID_READS if r[0] == "pat"]
         + [r for r in KID_READS if r[0] == "mat"]
     )
-    color_for_source = {"pat": COLOR_KID_PAT, "mat": COLOR_KID_MAT}
-    _draw_read_pileup(ax_reads, grouped, color_for_source,
-                      show_haplotype_labels=True)
-    _draw_site_ruler(ax_reads, y=-0.95)
-
-    # Faint divider between the two haplotype groups.
-    n_pat = sum(1 for r in KID_READS if r[0] == "pat")
-    ax_reads.axhline(n_pat - 0.5, color="black", linewidth=0.6,
-                     linestyle=(0, (3, 3)), alpha=0.4)
+    _draw_read_pileup(
+        ax_reads,
+        ordered_reads=grouped,
+        hap_colors={"pat": COLOR_FIG12_PAT, "mat": COLOR_FIG12_MAT},
+        prefix_for_source={"pat": "Hap1:", "mat": "Hap2:"},
+        section_title="reads (after phasing — partitioned by haplotype)",
+        show_haplotype_divider=True,
+    )
+    _draw_site_ruler(ax_reads, y=-0.55)
 
     fig.suptitle(
         "Figure 2 — \"After\": phased reads, one methylation profile "
@@ -716,17 +795,26 @@ tapestry's [pedigree-wise](../pedigree_wise_workflow/index.md) and
 ![Figure 1 — before](fig1_before_unphased.png)
 
 A small synthetic locus with three SNVs and two CpGs in left-to-right
-order: `SNV1`, `CpG1`, `SNV2`, `CpG2`, `SNV3`. Ten long reads span
-parts of the locus; each read is annotated at the sites it covers
-with a `0` or `1` at each SNV (REF/ALT bit, matching the convention
-used throughout the wiki and in the vendored
-[`inheritance_mapping/`](../pedigree_wise_workflow/inheritance_mapping/README.md)
-section) and a filled (`●`) or open (`○`) circle at each CpG. Sites
-outside a read's covered window appear as `-` to convey "no
-information at this position".
+order: `SNV1`, `CpG1`, `SNV2`, `CpG2`, `SNV3`. Ten ragged reads cover
+overlapping windows of the locus. The pile-up is rendered in
+ASCII-art style (after
+[`/Users/petermchale/phasing_simulations/simulate_reads_single_sample.py`](https://github.com/quinlan-lab/tapestry)):
+each read is one monospace row prefixed `Read:` (haplotype source not
+yet known), and at each site the read carries:
 
-Above the pile-up, the pooled methylation profile reports the fraction
-of reads methylated at each CpG, on a 0–1 scale. Both CpGs come out at
+- a `0` or `1` glyph at SNV columns (REF/ALT bit, matching the
+  convention used throughout the wiki and in the vendored
+  [`inheritance_mapping/`](../pedigree_wise_workflow/inheritance_mapping/README.md)
+  section),
+- a small filled **red box** (unmethylated) or **blue box**
+  (methylated) at CpG columns — colours borrowed from the IGV BAM
+  tracks in `images/tapestry.trio.allele-specific-methylation.png`,
+- a faint `-` at sites outside the read's window.
+
+Above the pile-up, a single bigwig-style methylation track (gray
+bars, height = 0–1 fraction methylated; modelled on the bigwig
+tracks in `images/tapestry.trio.methylation.png`) reports the
+*pooled* methylation level at each CpG: both bars come out at
 exactly 0.5 — the least-informative possible value. A 0.5 per-CpG
 number is consistent with many biological truths (both haplotypes at
 50 %; one fully methylated and the other unmethylated; asymmetric
@@ -737,16 +825,20 @@ pile-up cannot distinguish them.
 
 ![Figure 2 — after](fig2_after_phased.png)
 
-The same ten reads, now partitioned by haplotype. The SNV bits
-themselves carry the partition — every paternal read agrees on `(0, 0,
-0)` at the three SNVs, every maternal read agrees on `(1, 1, 1)` — so
-the partition is robust to a single sequencing error anywhere. With
-the partition in hand, the pooled profile splits into two
-per-haplotype profiles, drawn on the same 0–1 axis: paternal CpG1 = 0,
-maternal CpG1 = 1, paternal CpG2 = 1, maternal CpG2 = 0. Each Figure 1
-bar was hiding a maximally-far-apart pair of per-haplotype values, and
-the two CpGs point in *opposite* directions — an unphased aggregate
-erases both.
+The same ten reads, now partitioned by haplotype: pile-up rows are
+prefixed `Hap1:` (paternal, teal) or `Hap2:` (maternal, orange) and
+the row glyphs and CpG boxes are inherited unchanged from Figure 1.
+The SNV bits themselves carry the partition — every paternal read
+agrees on `(0, 0, 0)` at the three SNVs, every maternal read agrees
+on `(1, 1, 1)` — so the partition is robust to a single sequencing
+error anywhere. With the partition in hand, the pooled profile splits
+into two per-haplotype bigwig-style tracks, one stacked above the
+other on the same 0–1 axis: the paternal track lights up at CpG2
+(level = 1, methylated on dad's homolog only) and the maternal track
+at CpG1 (level = 1, methylated on mom's homolog only). Each Figure 1
+bar was hiding a maximally-far-apart pair of per-haplotype values,
+and the two CpGs point in *opposite* directions — an unphased
+aggregate erases both.
 
 What Figure 2 shows is what tapestry computes, mechanically, for every
 CpG once the haplotype partition is in hand. The two payoffs of having

@@ -33,17 +33,26 @@ tapestry's [pedigree-wise](../pedigree_wise_workflow/index.md) and
 ![Figure 1 — before](fig1_before_unphased.png)
 
 A small synthetic locus with three SNVs and two CpGs in left-to-right
-order: `SNV1`, `CpG1`, `SNV2`, `CpG2`, `SNV3`. Ten long reads span
-parts of the locus; each read is annotated at the sites it covers
-with a `0` or `1` at each SNV (REF/ALT bit, matching the convention
-used throughout the wiki and in the vendored
-[`inheritance_mapping/`](../pedigree_wise_workflow/inheritance_mapping/README.md)
-section) and a filled (`●`) or open (`○`) circle at each CpG. Sites
-outside a read's covered window appear as `-` to convey "no
-information at this position".
+order: `SNV1`, `CpG1`, `SNV2`, `CpG2`, `SNV3`. Ten ragged reads cover
+overlapping windows of the locus. The pile-up is rendered in
+ASCII-art style (after
+[`/Users/petermchale/phasing_simulations/simulate_reads_single_sample.py`](https://github.com/quinlan-lab/tapestry)):
+each read is one monospace row prefixed `Read:` (haplotype source not
+yet known), and at each site the read carries:
 
-Above the pile-up, the pooled methylation profile reports the fraction
-of reads methylated at each CpG, on a 0–1 scale. Both CpGs come out at
+- a `0` or `1` glyph at SNV columns (REF/ALT bit, matching the
+  convention used throughout the wiki and in the vendored
+  [`inheritance_mapping/`](../pedigree_wise_workflow/inheritance_mapping/README.md)
+  section),
+- a small filled **red box** (unmethylated) or **blue box**
+  (methylated) at CpG columns — colours borrowed from the IGV BAM
+  tracks in `images/tapestry.trio.allele-specific-methylation.png`,
+- a faint `-` at sites outside the read's window.
+
+Above the pile-up, a single bigwig-style methylation track (gray
+bars, height = 0–1 fraction methylated; modelled on the bigwig
+tracks in `images/tapestry.trio.methylation.png`) reports the
+*pooled* methylation level at each CpG: both bars come out at
 exactly 0.5 — the least-informative possible value. A 0.5 per-CpG
 number is consistent with many biological truths (both haplotypes at
 50 %; one fully methylated and the other unmethylated; asymmetric
@@ -54,16 +63,20 @@ pile-up cannot distinguish them.
 
 ![Figure 2 — after](fig2_after_phased.png)
 
-The same ten reads, now partitioned by haplotype. The SNV bits
-themselves carry the partition — every paternal read agrees on `(0, 0,
-0)` at the three SNVs, every maternal read agrees on `(1, 1, 1)` — so
-the partition is robust to a single sequencing error anywhere. With
-the partition in hand, the pooled profile splits into two
-per-haplotype profiles, drawn on the same 0–1 axis: paternal CpG1 = 0,
-maternal CpG1 = 1, paternal CpG2 = 1, maternal CpG2 = 0. Each Figure 1
-bar was hiding a maximally-far-apart pair of per-haplotype values, and
-the two CpGs point in *opposite* directions — an unphased aggregate
-erases both.
+The same ten reads, now partitioned by haplotype: pile-up rows are
+prefixed `Hap1:` (paternal, teal) or `Hap2:` (maternal, orange) and
+the row glyphs and CpG boxes are inherited unchanged from Figure 1.
+The SNV bits themselves carry the partition — every paternal read
+agrees on `(0, 0, 0)` at the three SNVs, every maternal read agrees
+on `(1, 1, 1)` — so the partition is robust to a single sequencing
+error anywhere. With the partition in hand, the pooled profile splits
+into two per-haplotype bigwig-style tracks, one stacked above the
+other on the same 0–1 axis: the paternal track lights up at CpG2
+(level = 1, methylated on dad's homolog only) and the maternal track
+at CpG1 (level = 1, methylated on mom's homolog only). Each Figure 1
+bar was hiding a maximally-far-apart pair of per-haplotype values,
+and the two CpGs point in *opposite* directions — an unphased
+aggregate erases both.
 
 What Figure 2 shows is what tapestry computes, mechanically, for every
 CpG once the haplotype partition is in hand. The two payoffs of having
