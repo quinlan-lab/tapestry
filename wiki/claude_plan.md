@@ -579,210 +579,204 @@ not a source feed for the paper.)
 
 ## 11. Motivation figure spec
 
-Two cartoon figures, both produced by `generate_wiki.py` into
-`wiki/motivation/`. Both are fully synthetic — no real reads, no real
-sample. The goal is to make a reader, on first contact with the wiki,
-understand *why* haplotype-level methylation is worth computing. The
-page is shared between the pedigree-wise and trio-wise workflows (see
-§5.2) because the motivation does not depend on which phasing strategy
-you use to reach parental-haplotype resolution.
+Three cartoon figures, all produced by `generate_wiki.py` into
+`wiki/motivation/`. All three are fully synthetic — no real reads, no
+real sample. The goal is to make a reader, on first contact with the
+wiki, understand *why* haplotype-level methylation is worth computing.
+The page is shared between the pedigree-wise and trio-wise workflows
+(see §5.2) because the motivation does not depend on which phasing
+strategy you use to reach parental-haplotype resolution.
 
-### 11.1 Figure 1 — "Before": unphased methylation averages over both haplotypes
+The three figures play distinct roles:
 
-A single cartoon panel showing, top to bottom:
+1. **Figure 1 (single individual, before phasing).** Read pileup with
+   one *pooled* methylation profile on top, illustrating that an
+   unphased per-CpG number cannot resolve haplotype-level structure.
+2. **Figure 2 (same individual, after phasing).** Same reads now
+   coloured by haplotype, with *two* methylation profiles on top
+   (one per haplotype). Sells the mechanical claim of tapestry: the
+   read partition splits one pooled profile into two per-haplotype
+   profiles.
+3. **Figure 3 (trio, no reads).** Pedigree-style layout — dad, mom,
+   kid — with each individual's two haplotypes drawn as horizontal
+   coloured lines carrying methylation lollipops above and SNV allele
+   bits below. Four founder colours; the kid's two haplotype lines
+   inherit the colour of the parental homolog they descend from. This
+   is where the *epimutation* and *compound genetic-epigenetic
+   heterozygote* use cases become concrete, because both require a
+   trio (epimutation: kid vs same-physical-homolog parent;
+   compound-het: visible from a single trio member but only when
+   phased into the parents' haplotype labels).
 
-- **Reference-genome ruler** with four marked positions in
-  left-to-right order: `SNV1` (near the left edge), `CpG1`
-  (immediately to its right), `CpG2` (further right, mid-panel), and
-  `SNV2` (near the right edge). The two SNVs bracket the two CpGs so
-  that both SNVs overlap every read in the pileup and both can serve
-  as phasing anchors.
-- **Read pileup.** ~12 horizontal read bars spanning all four marked
-  positions, drawn in a single uniform colour (no haplotype
-  distinction). On each read, four glyphs — one per marked column:
-    - At each CpG column, a small filled circle `●` if the read is
-      methylated at that site, or an open circle `○` if unmethylated.
-    - At each SNV column, a `0` or `1` denoting which allele the read
-      carries under the VCF convention (`0` = REF allele, `1` = ALT
-      allele). This matches the symbology used throughout the rest of
-      the wiki — in particular the vendored `inheritance_mapping/`
-      pages, which work in REF/ALT bits throughout — so a reader never
-      has to context-switch between nucleotide letters and 0/1 bits
-      when moving between the motivation page and the method pages.
-      The toy is set up so the two SNVs agree on haplotype assignment
-      — every read's pair of bits at (SNV1, SNV2) is either `(0, 0)`
-      or `(1, 1)` — which both (a) contains the information needed to
-      phase, and (b) demonstrates that two informative SNVs give a
-      more robust phasing anchor than one (a single sequencing error
-      at either SNV would not flip the assignment). The unphased
-      analysis is not yet using this information.
-- **Aggregate methylation bar plot.** To the right of (or immediately
-  below) the pileup, a bar plot with a shared 0–100 % y-axis showing
-  two bars — one labeled "CpG1 (unphased)", one labeled "CpG2
-  (unphased)". Bar height = fraction of reads methylated at that CpG,
-  pooled across all reads. The toy is constructed so both bars come
-  out at *exactly* 50 % — the least-informative possible value — even
-  though the underlying per-haplotype methylation is drastically
-  different at each site. **The y-axis of this bar plot is shared,
-  with identical limits (0 %–100 %) and tick positions, with the bar
-  plot in Figure 2 Panel B**, so the "before" and "after" bars sit on
-  directly comparable scales when a reader views them side by side.
-- **Caption.** Observed methylation level = fraction of reads that are
-  methylated, pooled across all reads overlapping the CpG. Because
-  long-read methylation tools don't know which read came from which
-  parent (let alone which of that parent's two haplotypes), a single
-  number per CpG has to summarise a mixture of as many as four
-  distinct haplotypic states. A 50 % value is consistent with many
-  biological truths — both haplotypes at 50 %; one fully methylated
-  and one unmethylated; asymmetric methylation between maternal and
-  paternal homologs — and the unphased pileup cannot distinguish
-  them. In this toy both CpGs report "50 % unphased" but, as Figure 2
-  will show, they are actually as asymmetric as possible once phased,
-  and they are asymmetric in *opposite directions*.
+The visual style for the read pileups in Figs 1 and 2 borrows
+deliberately from
+`/Users/petermchale/phasing_simulations/simulate_reads_single_sample.py`
+— monospace glyphs at fixed columns, ragged read starts/ends rendered
+as `-` for "no information at this site". The lollipop-style trio in
+Fig 3 borrows from the multi-generation methylation-tracking diagram
+the user attached when redesigning this page (open / filled circles on
+sticks above each haplotype line).
 
-File: `wiki/motivation/fig1_before_unphased.png`.
+### 11.1 Figure 1 — "Before" (single individual, unphased)
 
-### 11.2 Figure 2 — "After": partition by haplotype, reveal two biological payoffs
+`wiki/motivation/fig1_before_unphased.png`. Two stacked subplots
+sharing the genomic x-axis:
 
-Same underlying reads as Figure 1, but redrawn to show the effect of
-phasing. Three stacked sub-panels:
+- **Top subplot — pooled methylation profile, 0–1 axis.** A single
+  series of vertical stems with markers at the top, one stem per CpG.
+  Both stems sit at exactly 0.5 in the toy — the least-informative
+  possible value.
+- **Bottom subplot — read pileup.** ~10 ragged reads, each a row of
+  monospace glyphs at fixed x = site-index columns. Sites inside the
+  read's window carry the read's allele bit (`0`/`1`) at SNV columns
+  and methylation glyph (`●`/`○`) at CpG columns; sites outside the
+  window are rendered as a faint `-` so the ragged extents read
+  cleanly. Every glyph is drawn in a single uniform grey — the
+  haplotype partition is not yet known. Reads are interleaved so the
+  unphased picture does not visually pre-suggest the partition.
 
-- **Panel A — reads relabeled and partitioned by haplotype.** The same
-  12 reads, now coloured by haplotype (e.g. blue = paternal, red =
-  maternal) with the two SNVs jointly anchoring the assignment. Reads
-  are vertically re-grouped: paternal reads (those reading `0` at
-  both SNVs) in the upper half, maternal reads (those reading `1` at
-  both SNVs) in the lower half, separated by a faint horizontal
-  divider. The reads still carry the same `●`/`○` methylation glyphs
-  at the two CpG columns and the same `0`/`1` SNV bits as in Figure 1
-  — nothing has been re-sequenced; the only new information is which
-  reads belong together, and both SNVs agreeing on that assignment
-  advertises that phasing is robust.
-- **Panel B — four methylation bars, two CpGs × two haplotypes.** On
-  **the same 0–100 % y-axis as Figure 1** (identical limits and ticks),
-  four bars in two grouped pairs, left to right: `CpG1 pat` next to
-  `CpG1 mat`, then a gap, then `CpG2 pat` next to `CpG2 mat`. In the
-  toy the heights come out to `CpG1 pat = 0 %`, `CpG1 mat = 100 %`,
-  `CpG2 pat = 100 %`, `CpG2 mat = 0 %`. Two things become legible
-  only on this picture: (a) each CpG's unphased 50 % bar from Figure
-  1 was a flat average over two haplotype-level values that are
-  maximally far apart (0 % vs 100 %); and (b) the two CpGs point in
-  *opposite* directions (CpG1 methylated on the maternal haplotype
-  only, CpG2 methylated on the paternal haplotype only), which an
-  unphased aggregate would erase. Because the two bar plots share a
-  y-axis, dropping them next to each other in the final figure makes
-  the collapse-of-a-single-tall-bar-into-a-pair-of-extreme-bars story
-  immediate.
-- **Panel C — zoomed-out methylation profile across a short genomic
-  window** (say 20–40 CpGs). Two stacked profile tracks, one per
-  haplotype, **paternal on top and maternal below** (matching the
-  pat-above-mat ordering already used in Panel A's read grouping and
-  in Panel B's bar pairs, so the three sub-panels read consistently).
-  The profiles are ~95 % concordant — same CpGs methylated on both
-  haplotypes — with two deliberately chosen divergence sites
-  highlighted. The two CpGs from Panels A–B both appear in this wider
-  window (as two of the ~30 CpG columns) and each is annotated with
-  one of the two biological phenomena:
-    - **CpG1 annotated "compound genetic-epigenetic heterozygote."**
-      CpG1 sits immediately next to SNV1. The haplotype carrying one
-      SNV1 allele is methylated at CpG1; the haplotype carrying the
-      other SNV1 allele is unmethylated. The individual is therefore
-      simultaneously heterozygous at SNV1 *and* at the CpG1
-      methylation state — a class of variant invisible to either
-      unphased genotype calls or unphased methylation calls, but
-      directly readable from the paired phased tracks.
-    - **CpG2 annotated "epimutation."** CpG2 is methylated on the
-      child's paternal haplotype but was *unmethylated* on the same
-      physical homolog in dad. Show a small inset comparing the
-      child's paternal track at CpG2 to dad's corresponding track.
-      Caption: a methylation change on a specific haplotype across a
-      single meiosis — only visible because phasing lets us compare
-      the same physical homolog in parent and child.
-- **Overall caption.** Tapestry's output converts a single averaged
-  methylation number per CpG into two haplotype-specific profiles,
-  enabling (i) detection of epimutations by comparing the same
-  haplotype across meioses (CpG2), and (ii) identification of
-  compound genetic-epigenetic heterozygotes by co-interpreting the
-  SNV and methylation tracks on each haplotype (CpG1). The extended
-  toy — two CpGs and two SNVs — is what lets both payoffs appear in a
-  single figure: two SNVs give robust phasing, two CpGs give one
-  worked example of each phenomenon.
+Locus layout, left-to-right: `SNV1`, `CpG1`, `SNV2`, `CpG2`, `SNV3`.
+Three SNVs (instead of two) so the partition in Fig 2 is visibly
+robust against a single sequencing error at any one of them. CpG1
+sits immediately next to SNV1 to set up the compound-het framing
+in Fig 3; CpG2 is mid-locus with no adjacent SNV so it is a pure
+methylation phenomenon (the epimutation in Fig 3).
 
-File: `wiki/motivation/fig2_after_phased.png`.
+### 11.2 Figure 2 — "After" (same individual, phased)
 
-### 11.3 Toy simulation details
+`wiki/motivation/fig2_after_phased.png`. Same two-subplot layout as
+Fig 1, but:
 
-Fully deterministic; no RNG. Concretely:
+- **Top subplot — two methylation profiles**, one per haplotype, on
+  the same 0–1 axis. Paternal stems in dark blue and maternal in dark
+  red, slightly x-offset so they don't overlap. In the toy: paternal
+  CpG1 = 0 / CpG2 = 1; maternal CpG1 = 1 / CpG2 = 0. Each Fig 1 stem
+  splits into two stems on opposite extremes, in *opposite directions*
+  across the two CpGs.
+- **Bottom subplot — partitioned read pileup.** Same reads as Fig 1,
+  now coloured by haplotype (paternal = dark blue, maternal = dark
+  red) and grouped vertically (pat above mat) with a faint divider.
+  Side labels "paternal reads" / "maternal reads" on the left.
 
-- 12 reads total, split evenly: 6 paternal and 6 maternal. All 12
-  reads span the entire locus (all four marks SNV1, CpG1, CpG2, SNV2).
-- Ruler layout, left-to-right: `SNV1`, `CpG1`, `CpG2`, `SNV2`. CpG1
-  sits immediately next to SNV1 (so the compound-het framing is
-  visually obvious); CpG2 sits in the middle of the locus with no
-  adjacent SNV (so it is a pure methylation phenomenon, not tied to a
-  local genotype).
-- On paternal reads: SNV1 = `0`, SNV2 = `0`, CpG1 = `○` (0/6
-  methylated), CpG2 = `●` (6/6 methylated).
-- On maternal reads: SNV1 = `1`, SNV2 = `1`, CpG1 = `●` (6/6
-  methylated), CpG2 = `○` (0/6 methylated).
-- The pat-reads-all-`0`-and-mat-reads-all-`1` choice is arbitrary (it
-  could equally well be the other way around — in real data we don't
-  know which haplotype is the REF-carrier at either SNV until phasing
-  is done). The toy picks one assignment and holds it fixed to keep
-  the figure simple; the story works the same way under a swap.
-- Unphased methylation levels (Figure 1 bars): CpG1 = 6/12 = 50 %;
-  CpG2 = 6/12 = 50 %. Both maximally uninformative.
-- Phased methylation levels (Figure 2 Panel B bars):
-  `CpG1 pat = 0/6 = 0 %`, `CpG1 mat = 6/6 = 100 %`,
-  `CpG2 pat = 6/6 = 100 %`, `CpG2 mat = 0/6 = 0 %`. Both maximally
-  informative, and in opposite directions.
-- The 20–40 CpG zoomed profile in Panel C is hard-coded as two
-  binary vectors (paternal track vs maternal track) that differ at
-  exactly two positions — CpG1 (annotated "compound het") and CpG2
-  (annotated "epimutation"). All other positions agree between the
-  two haplotypes, so the two divergences are visually obvious without
-  needing real-data statistics.
-- For the parental inset in Panel C, hard-code dad's paternal track
-  to match the child's paternal track at every position *except*
-  CpG2, where dad is unmethylated and the child is methylated. That
-  single-position difference is what makes CpG2 qualify as an
-  epimutation (a methylation change on a specific physical homolog
-  across one meiosis). No other CpGs differ between dad and child in
-  the inset.
+The colours in Fig 2 deliberately match the colours of the kid's two
+haplotypes in Fig 3 (paternal = dark blue = dad hap A; maternal = dark
+red = mom hap C), so a reader moving from Fig 2 to Fig 3 can trace the
+kid's two homologs by colour into the trio context.
 
-### 11.4 Where the figures live in the reader's path
+### 11.3 Figure 3 — Trio (epimutations and compound-het use cases)
+
+`wiki/motivation/fig3_trio_methylation.png`. A small pedigree drawn on
+a single matplotlib axes:
+
+- **Pedigree symbols.** Square for dad (top-left), circle for mom
+  (top-right), square for kid (centred below), connected by a couple
+  line + descent line in standard pedigree convention.
+- **Per-individual haplotype displays.** Each individual has two thick
+  horizontal coloured lines (the two haplotypes) stacked vertically
+  below their pedigree symbol. Each line carries:
+    - **Methylation lollipops above the line** at CpG positions.
+      Filled circle = methylated; open circle = unmethylated.
+    - **SNV allele bits below the line** at SNV positions, rendered
+      in the haplotype's colour.
+- **Four-colour founder palette.** Dad hap A (transmitted to kid) =
+  dark blue; dad hap B (not transmitted) = light blue; mom hap C
+  (transmitted to kid) = dark red; mom hap D (not transmitted) =
+  light orange. The kid's pat haplotype line uses the same dark blue
+  as dad hap A; the kid's mat haplotype line uses the same dark red as
+  mom hap C. The colour-match is the visual cue that says "this is the
+  *same physical homolog*, traced from parent to child."
+- **Epimutation annotation at CpG2.** Two dashed boxes — one around
+  dad hap A's CpG2 lollipop, one around the kid's pat CpG2 lollipop —
+  plus a text label in the open space below mom's haplotype display
+  with an arrow pointing to the kid's box. Kid pat at CpG2 is
+  methylated; dad hap A at CpG2 is unmethylated; same physical
+  homolog (matched colours) → de novo gain of methylation in meiosis.
+- **Compound-het annotation at CpG1.** A single dashed box covering
+  both kid haplotype lines around the SNV1 + CpG1 region (encompasses
+  the two SNV1 allele bits and the two CpG1 lollipops on the kid's
+  two haplotype lines). Text label in the open space to the left of
+  the kid: methylation state at CpG1 co-segregates with SNV1 genotype
+  across the two kid haplotypes → compound genetic-epigenetic
+  heterozygote.
+
+### 11.4 Toy simulation details
+
+Fully deterministic; no RNG. Site index 0..4 = SNV1, CpG1, SNV2, CpG2,
+SNV3.
+
+- **Founder haplotypes** (per-site values; for SNVs `0` = REF, `1` =
+  ALT; for CpGs `0` = unmethylated, `1` = methylated):
+    - `dad_A = (0, 0, 0, 0, 0)` — transmitted to kid
+    - `dad_B = (1, 1, 1, 0, 1)`
+    - `mom_C = (1, 1, 1, 0, 1)` — transmitted to kid
+    - `mom_D = (0, 0, 0, 0, 0)`
+- **Kid haplotypes:**
+    - `kid_pat = (0, 0, 0, 1, 0)` — equals `dad_A` except CpG2 is now
+      methylated (the epimutation: de novo gain of methylation in the
+      meiosis from dad to kid)
+    - `kid_mat = (1, 1, 1, 0, 1)` — equals `mom_C`
+- **Read simulation (Figs 1 & 2, kid only).** 10 ragged reads, 5 from
+  pat and 5 from mat, with windows chosen so both CpGs have at least
+  3 reads from each haplotype after partitioning:
+  ```
+  pat: (0,2), (1,4), (0,3), (0,4), (2,4)
+  mat: (0,3), (0,4), (2,4), (1,4), (0,2)
+  ```
+  Pooled methylation: CpG1 = 0.5, CpG2 = 0.5 (Fig 1's two stems).
+  Phased: pat CpG1 = 0, pat CpG2 = 1, mat CpG1 = 1, mat CpG2 = 0
+  (Fig 2's four stems).
+- **Compound-het visibility.** Kid is heterozygous at every SNV
+  (pat = `0`, mat = `1`); the methylation state at the
+  immediately-adjacent CpG1 co-segregates with the SNV1 genotype
+  (pat = `○`, mat = `●`). This is the dashed-box annotation in
+  Fig 3.
+- **Epimutation visibility.** Dad's hap A and the kid's pat homolog
+  are the same physical homolog (transmitted unchanged in the
+  meiosis), so they share a colour in Fig 3. They differ at CpG2: dad
+  A is `○`, kid pat is `●`. This is the dashed-box + arrow annotation
+  in Fig 3.
+
+### 11.5 Where the figures live in the reader's path
 
 - `wiki/index.md` embeds `fig1_before_unphased.png` as a hero image at
   the top of the page, with a one-line caption and a link to
   `motivation/motivation.md` for the full story.
-- `motivation/motivation.md` contains both figures in order (before,
-  then after), surrounded by the narrative above. Its last paragraph
-  links forward to both workflow overviews: *"To turn the 'before'
-  picture into the 'after' picture, tapestry supports two phasing
-  strategies — one for full pedigrees and one for trios. See
-  [pedigree-wise workflow](../pedigree_wise_workflow/index.md) or
-  [trio-wise workflow](../trio_wise_workflow/README.md)."*
+- `motivation/motivation.md` contains all three figures in order
+  (Fig 1 → Fig 2 → Fig 3) surrounded by the narrative above. Its
+  closing paragraph links forward to both workflow overviews and to
+  the trio-wise output_format searchable example (§12) for "once you
+  have these per-haplotype profiles in hand, here is how you query
+  for the two phenomena".
 - Each workflow's `overview.md` has a back-reference in its opening
   paragraph: *"For motivation, see [why phase DNA
   methylation?](../../motivation/motivation.md)."*
 
-### 11.5 Implementation notes
+### 11.6 Implementation notes
 
-- The figure panels are drawn in matplotlib using the same monospace /
-  text-panel style the rest of the wiki inherits from upstream, so the
-  aesthetic is consistent across the site. Read bars + CpG glyphs are
-  rendered as matplotlib patches + `pyplot.text`; no external image
-  editor is needed.
-- The methylation-level bar plots in Fig 1 and Fig 2 Panel B are drawn
-  with `matplotlib.pyplot.bar()` on an explicit `ylim=(0, 100)` and
-  identical `yticks`, so the two figures render on a directly
-  comparable y-axis. A shared helper (e.g.
-  `draw_methylation_bars(ax, labels, fractions)`) keeps the two calls
-  byte-identical in everything except data.
-- Because the simulation is trivial and hard-coded, no unit tests are
-  required; correctness is checked by eye on the rendered PNG.
-- Written as `page_motivation()` inside `generate_wiki.py`, selectable
-  via `python wiki/generate_wiki.py --page motivation`.
+- All three figures are emitted by `page_motivation()` in
+  `wiki/generate_wiki.py`, selectable via
+  `python wiki/generate_wiki.py --page motivation`.
+- The read pileup in Figs 1 and 2 is rendered as monospace
+  `pyplot.text` glyphs at integer site-index x-coordinates with a
+  faint coloured backbone line for each read's window (so out-of-
+  window cells, drawn as `-`, are visually distinguishable from
+  in-window cells without overloading the glyph alphabet).
+- The methylation-profile subplots above the read pileups use a
+  shared 0–1 y-axis with identical ticks (`0`, `0.5`, `1`).
+  `_draw_methylation_profile()` in `generate_wiki.py` is the helper
+  that enforces the axis style.
+- The trio in Fig 3 is rendered on a single axes with manual
+  positioning of the three "person cells" (pedigree symbol +
+  haplotype display). Lollipops are `pyplot.scatter` markers above a
+  short stem line; the haplotype backbone is a single `plot()` call
+  per haplotype with `linewidth=6.5` so the line reads as a clean
+  bar even with the lollipop sticks crossing it.
+- Because the simulation is hard-coded, no unit tests are required;
+  correctness is checked by eye on the rendered PNG.
+- The colour palette for Figs 2 and 3 is intentionally consistent
+  (paternal = dark blue, maternal = dark red, with kid's haplotype
+  lines in Fig 3 reusing those exact colours), so a reader's eye can
+  trace a single haplotype across figures.
 
 ## 12. Searchable-output figure (trio-wise BED mock-up)
 
