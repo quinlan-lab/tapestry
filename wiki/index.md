@@ -1,5 +1,13 @@
 # tapestry — wiki
 
+[![Why phase methylation?](motivation/fig1_before_unphased.png)](motivation/motivation.md)
+
+*Both bars at 50 %: an unphased per-CpG methylation level cannot tell
+two haplotypes apart. See the [motivation page](motivation/motivation.md)
+for what the same locus looks like once phasing is done — and for the
+two biological phenomena (epimutations, compound genetic-epigenetic
+heterozygotes) that phasing exposes.*
+
 A reference for tapestry, a pipeline that phases DNA methylation from
 PacBio HiFi reads onto the haplotypes of a human pedigree's founders
 (or, in the trio-wise special case, onto the haplotypes of each
