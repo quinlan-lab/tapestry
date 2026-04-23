@@ -36,9 +36,12 @@ context.
 ## 2. Design principles (inherited from the upstream wiki)
 
 The upstream `Platinum-Pedigree-Inheritance/wiki` follows Andrej Karpathy's
-"LLM-wiki" pattern: a thin, hand-curated catalog page (`index.md`) links out
-to self-contained topic pages, each bundled with its own assets. The tapestry
-wiki will use the same pattern, with these concrete rules:
+"LLM-wiki" pattern (see his
+[tweet](https://x.com/karpathy/status/2040572272944324650) and accompanying
+[gist](https://gist.github.com/karpathy/442a6bf555914893e9891c11519de94f)):
+a thin, hand-curated catalog page (`index.md`) links out to self-contained
+topic pages, each bundled with its own assets. The tapestry wiki will use
+the same pattern, with these concrete rules:
 
 - **One directory per page.** Each page has its own folder containing
   `<page>.md` + `fig*.png`. No shared image pool; co-locating assets keeps
