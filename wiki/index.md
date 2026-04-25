@@ -1,6 +1,6 @@
 # tapestry — wiki
 
-[![Why phase methylation?](motivation/fig1_before_unphased.png)](motivation/motivation.md)
+[![Why phase methylation?](motivation/single_indiv_before_phasing.png)](motivation/motivation.md)
 
 *Both bars at 50 %: an unphased per-CpG methylation level cannot tell
 two haplotypes apart. See the [motivation page](motivation/motivation.md)
@@ -39,7 +39,7 @@ of output (haplotype-resolved per-CpG methylation):
   every methylation measurement with one of the pedigree's founder
   haplotypes. This is the workflow built out first; it is the focus of
   the current wiki.
-- **[Trio-wise workflow](trio_wise_workflow/README.md)** — pedMEC /
+- **[Trio-wise workflow](trio_wise_workflow/index.md)** — pedMEC /
   whatshap phasing across a parent–parent–child trio, labelling each
   measurement with one of the parents' haplotypes. Most of this section
   is currently stubbed; the

@@ -3,133 +3,114 @@
 This page is part of the [tapestry wiki](../index.md). It motivates
 the rest of the wiki by answering one question: *why is it worth
 phasing per-CpG methylation onto each haplotype, instead of leaving it
-as a single number per CpG?* Three cartoon figures build the answer
-on a small synthetic locus: the first two take a single individual
-through a before/after of phasing to show what the read partition does
-to the methylation profile, and the third places that individual into a
-trio so the two flagship use cases — *epimutations* and *compound
-genetic-epigenetic heterozygotes* — fall out directly.
+as a single number per CpG?* Two pairs of cartoon figures build the
+answer on a small synthetic locus: the first pair takes a single
+individual through a before/after of phasing to show what the read
+partition does to the methylation profile; the second pair places that
+individual into a trio so the two flagship use cases — *de novo
+epimutations* and *compound genetic-epigenetic heterozygotes* — fall
+out directly, together with the polars query a user runs against
+tapestry's BED output to surface each one.
 
 The motivation does not depend on which phasing strategy gets you to
 parental-haplotype resolution, so this page is shared between
 tapestry's [pedigree-wise](../pedigree_wise_workflow/index.md) and
-[trio-wise](../trio_wise_workflow/README.md) workflows.
+[trio-wise](../trio_wise_workflow/index.md) workflows.
 
 ## Definitions
 
-- **Epimutation** — a change in the methylation state of a specific
-  physical homolog across a single meiosis. Detectable only when a
-  parent and child can be compared on the *same* haplotype, which in
-  turn requires phased methylation.
-- **Compound genetic-epigenetic heterozygote** — an individual who is
-  simultaneously heterozygous at a SNV *and* heterozygous in
-  methylation state at a nearby CpG, with the methylation state
-  tracking the SNV genotype across the two haplotypes. Invisible to
-  either an unphased genotype call or an unphased methylation call,
-  but trivial to read off the paired phased tracks.
+- **De novo epimutation** — a change in the methylation state of a
+  specific physical homolog across a single meiosis. Detectable only
+  when a parent and child can be compared on the *same* haplotype,
+  which in turn requires phased methylation.
+- **Compound genetic-epigenetic heterozygote** — an individual who
+  inherits two different parental haplotypes such that one carries a
+  genetic variant and the other carries an aberrant methylation state
+  in *trans*. Invisible to either an unphased genotype call or an
+  unphased methylation call, but detectable directly from per-haplotype
+  tracks plus a trio.
 
-## Figure 1 — before phasing (single individual)
+## Single individual: before vs. after phasing
 
-![Figure 1 — before](fig1_before_unphased.png)
+![Before phasing](single_indiv_before_phasing.png)
 
-A small synthetic locus with three SNVs and two CpGs in left-to-right
-order: `SNV1`, `CpG1`, `SNV2`, `CpG2`, `SNV3`. Ten ragged reads cover
-overlapping windows of the locus. The pile-up is rendered in
-ASCII-art style (after
-[`/Users/petermchale/phasing_simulations/simulate_reads_single_sample.py`](https://github.com/quinlan-lab/tapestry)):
-each read is one monospace row prefixed `Read:` (haplotype source not
-yet known), and at each site the read carries:
+A small synthetic locus with mixed SNVs and CpGs. Ten ragged reads
+cover overlapping windows; each read is one monospace row carrying a
+`0`/`1` glyph at SNV columns and a small **red** (unmethylated) /
+**blue** (methylated) box at CpG columns. Above the pile-up, a single
+gray bigwig-style methylation track reports the *pooled* per-CpG
+methylation level. With reads unpartitioned, the two haplotypes'
+methylation states get averaged into one number per CpG — so per-CpG
+heterozygous methylation is hidden inside an intermediate value.
 
-- a `0` or `1` glyph at SNV columns (REF/ALT bit, matching the
-  convention used throughout the wiki and in the vendored
-  [`inheritance_mapping/`](../pedigree_wise_workflow/inheritance_mapping/README.md)
-  section),
-- a small filled **red box** (unmethylated) or **blue box**
-  (methylated) at CpG columns — colours borrowed from the IGV BAM
-  tracks in `images/tapestry.trio.allele-specific-methylation.png`,
-- a faint `-` at sites outside the read's window.
-
-Above the pile-up, a single bigwig-style methylation track (gray
-bars, height = 0–1 fraction methylated; modelled on the bigwig
-tracks in `images/tapestry.trio.methylation.png`) reports the
-*pooled* methylation level at each CpG: both bars come out at
-exactly 0.5 — the least-informative possible value. A 0.5 per-CpG
-number is consistent with many biological truths (both haplotypes at
-50 %; one fully methylated and the other unmethylated; asymmetric
-methylation between maternal and paternal homologs) and the unphased
-pile-up cannot distinguish them.
-
-## Figure 2 — after phasing (same individual)
-
-![Figure 2 — after](fig2_after_phased.png)
+![After phasing](single_indiv_after_phasing.png)
 
 The same ten reads, now partitioned by haplotype: pile-up rows are
-prefixed `Hap1:` (paternal, teal) or `Hap2:` (maternal, orange) and
-the row glyphs and CpG boxes are inherited unchanged from Figure 1.
-The SNV bits themselves carry the partition — every paternal read
-agrees on `(0, 0, 0)` at the three SNVs, every maternal read agrees
-on `(1, 1, 1)` — so the partition is robust to a single sequencing
-error anywhere. With the partition in hand, the pooled profile splits
-into two per-haplotype bigwig-style tracks, one stacked above the
-other on the same 0–1 axis: the paternal track lights up at CpG2
-(level = 1, methylated on dad's homolog only) and the maternal track
-at CpG1 (level = 1, methylated on mom's homolog only). Each Figure 1
-bar was hiding a maximally-far-apart pair of per-haplotype values,
-and the two CpGs point in *opposite* directions — an unphased
-aggregate erases both.
+prefixed `Hap1` (paternal, teal) or `Hap2` (maternal, orange) and the
+SNV bits themselves carry the partition. With the partition in hand,
+the pooled profile splits into two stacked per-haplotype bigwig
+tracks. What Figure 2 shows is what tapestry computes mechanically for
+every CpG once the haplotype partition is in hand. The two payoffs of
+having those per-haplotype profiles only become visible once the
+individual is placed into a pedigree.
 
-What Figure 2 shows is what tapestry computes, mechanically, for every
-CpG once the haplotype partition is in hand. The two payoffs of having
-those per-haplotype profiles only become visible once the individual
-is placed into a pedigree, which is what Figure 3 does.
+## Trio use case 1: de novo epimutation
 
-## Figure 3 — trio: epimutations and compound genetic-epigenetic heterozygotes
+![Trio de novo](trio_denovo.svg)
 
-![Figure 3 — trio](fig3_trio_methylation.png)
+The kid, now in a trio. Each individual carries two haplotypes drawn
+as horizontal coloured bars; each bar is decorated with methylation
+lollipops at CpG positions (filled = methylated, open = unmethylated).
+The kid's paternal homolog has a *de novo loss of methylation* at the
+left CpG cluster: dad's transmitted homolog is methylated there, but
+the kid's same physical homolog is unmethylated. Symmetrically, the
+kid's maternal homolog has a *de novo gain of methylation* at the
+right CpG cluster.
 
-The same kid, now in a trio. Each individual is drawn with their two
-haplotypes as horizontal coloured lines; allele bits sit on the line
-at SNV positions and methylation lollipops sit above the line at CpG
-positions (filled = methylated, open = unmethylated). The four founder
-haplotypes get four distinct colours; the kid's two haplotypes inherit
-the colour of the parental homolog they descend from, so a reader can
-trace a single physical homolog by colour from parent to child.
+![Trio de novo BED + polars](trio_denovo_bed.png)
 
-Two phenomena fall out of this picture, both annotated in the figure:
+Once tapestry produces a per-CpG haplotype-resolved BED, surfacing
+de novo epimutations is a one-pass polars filter: pick the dad
+haplotype that was transmitted to the kid (using the `pat_hap` phasing
+column), then keep CpGs where `kid_pat` methylation diverges, on
+average over a small window, from the dad-transmitted haplotype.
 
-- **Epimutation at CpG2.** Dad's transmitted homolog (hap A) is
-  unmethylated at CpG2, but the kid's paternal homolog — the *same
-  physical homolog* — is methylated at CpG2. This is a de novo gain of
-  methylation in the meiosis from dad to kid, and is what tapestry
-  flags as an epimutation. It is invisible without phasing because the
-  kid's pooled CpG2 level (0.5) doesn't distinguish "kid pat
-  methylated, kid mat unmethylated" from any other 50/50 mixture, and
-  it is invisible without parent-vs-child comparison on the *same*
-  homolog because dad's pooled CpG2 level (0) only tells you that one
-  of dad's homologs is unmethylated at CpG2 there.
-- **Compound genetic-epigenetic heterozygote at CpG1.** The kid is
-  heterozygous at SNV1 (paternal allele 0, maternal allele 1) and the
-  methylation state at the immediately-adjacent CpG1 co-segregates
-  with the SNV1 genotype (paternal = ○, maternal = ●). The dashed
-  rectangle around SNV1 + CpG1 in the kid marks the joint phenomenon.
-  This class of variant is invisible to either an unphased genotype
-  call or an unphased methylation call, but trivial to read off the
-  paired phased tracks.
+## Trio use case 2: compound genetic-epigenetic heterozygote
+
+![Trio compound het](trio_compound_het.svg)
+
+Same trio, different scenario: the kid inherits **dad's hap A** —
+which carries a SNV variant (red star) — *and* **mom's hap C** —
+which carries an aberrantly hyper-methylated promoter region (filled
+lollipops at the leftmost three CpGs). The two hits sit on opposite
+parental haplotypes, so the kid is a compound genetic-epigenetic
+heterozygote *in trans* — silenced on the maternal allele by aberrant
+methylation, broken on the paternal allele by a coding variant. Each
+parent is a silent carrier of one of the two hits.
+
+![Trio compound het BED + polars](trio_compound_het_bed.png)
+
+Discovery from tapestry's BED is again a polars chain over two
+inputs: a per-CpG methylation table and a per-SNV genotype table,
+both with one column per parental haplotype (`dad_A`, `dad_B`,
+`mom_C`, `mom_D`) plus the kid's per-side phased values
+(`kid_pat`, `kid_mat`) and the phasing labels (`pat_hap`, `mat_hap`).
+Step 1 finds methylation-outlier regions where exactly one parental
+hap is the outlier and the kid inherits that hap with ~unchanged
+meth. Step 2 finds genotype-outlier SNVs with the analogous
+inheritance check. Step 3 joins the two and keeps loci where the
+meth-outlier and geno-outlier come from *different* parents — i.e.,
+the two hits are in trans.
 
 ## What's next
 
 The rest of the wiki is concerned with how tapestry actually performs
-the phasing summarised in Figures 2 and 3:
+the phasing summarised above:
 
 - The [pedigree-wise workflow](../pedigree_wise_workflow/index.md)
   combines hiphase's read-backed phasing with `gtg-ped-map` /
   `gtg-concordance`'s inheritance-based phasing across a full
   pedigree, labelling each measurement with a founder haplotype.
-- The [trio-wise workflow](../trio_wise_workflow/README.md) uses
+- The [trio-wise workflow](../trio_wise_workflow/index.md) uses
   whatshap / pedMEC trio phasing to label each measurement with one
   of the parents' haplotypes — an option for the trio-only setting.
-
-For a worked example of how to query tapestry's output for the two
-phenomena above (epimutations, compound genetic-epigenetic
-heterozygotes), see
-[`trio_wise_workflow/output_format_trio/output_format_trio.md`](../trio_wise_workflow/output_format_trio/output_format_trio.md).
