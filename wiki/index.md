@@ -2,13 +2,13 @@
 
 [![Why phase methylation?](motivation/single_indiv_before_phasing.png)](motivation/motivation.md)
 
-*Both bars at 50 %: an unphased per-CpG methylation level cannot tell
+*Bars in discordant region at 50 %: an unphased per-CpG methylation level cannot tell
 two haplotypes apart. See the [motivation page](motivation/motivation.md)
 for what the same locus looks like once phasing is done — and for the
-two biological phenomena (epimutations, compound genetic-epigenetic
+two biological phenomena (de novo epimutations, compound genetic-epigenetic
 heterozygotes) that phasing exposes.*
 
-A reference for tapestry, a pipeline that phases DNA methylation from
+Tapestry is a pipeline that phases DNA methylation from
 PacBio HiFi reads onto the haplotypes of a human pedigree's founders
 (or, in the trio-wise special case, onto the haplotypes of each
 parent). Tapestry combines read-backed phasing of single-sample
@@ -42,16 +42,13 @@ of output (haplotype-resolved per-CpG methylation):
 - **[Trio-wise workflow](trio_wise_workflow/index.md)** — pedMEC /
   whatshap phasing across a parent–parent–child trio, labelling each
   measurement with one of the parents' haplotypes. Most of this section
-  is currently stubbed; the
-  [output-format page](trio_wise_workflow/output_format_trio/output_format_trio.md)
-  is built out early because it hosts the searchable-output worked
-  example used to motivate downstream analyses.
+  is currently stubbed. 
 
 ## Why phase methylation?
 
 Both workflows are motivated by the same observation: an unphased
 per-CpG methylation level averages over both haplotypes and erases the
-two phenomena tapestry exists to surface — *epimutations* (a
+two phenomena tapestry exists to surface — *de novo epimutations* (a
 methylation change on a specific physical homolog across a single
 meiosis) and *compound genetic-epigenetic heterozygotes* (a haplotype
 where a SNV genotype and a methylation state co-segregate). The
@@ -83,7 +80,9 @@ The `pedigree_wise_workflow/inheritance_mapping/` section is vendored
 from the
 [Platinum-Pedigree-Inheritance wiki](https://github.com/petermchale/Platinum-Pedigree-Inheritance/tree/main/wiki),
 which documents the `gtg-ped-map` and `gtg-concordance` Rust binaries
-that tapestry's pedigree-wise workflow invokes. The structure of both
+that tapestry's pedigree-wise workflow invokes. 
+
+The structure of both
 wikis follows Andrej Karpathy's
 [LLM-wiki pattern](https://gist.github.com/karpathy/442a6bf555914893e9891c11519de94f):
 a thin, hand-curated catalog page links out to self-contained topic
