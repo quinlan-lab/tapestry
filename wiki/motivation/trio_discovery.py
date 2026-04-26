@@ -211,7 +211,7 @@ def build(scenario: Scenario) -> str:
 
 def render_trio_denovo_bed():
     """BED snippet + polars query for discovering de novo epimutations."""
-    FIG_W, FIG_H = 12.0, 9.0
+    FIG_W, FIG_H = 12.0, 7.5
     fig = plt.figure(figsize=(FIG_W, FIG_H))
     LEFT_IN, RIGHT_IN = 0.04 * FIG_W, 0.98 * FIG_W
     TOP_IN = FIG_H - 0.06 * FIG_H
@@ -301,23 +301,6 @@ def render_trio_denovo_bed():
         0.0, code_y, code,
         ha="left", va="top", fontsize=CODE_FONTSIZE,
         family="Menlo", color=COLOR_NEUTRAL,
-        transform=ax_code.transAxes,
-    )
-
-    # Place the italic note at the same absolute gap below the code block as
-    # VISIBLE_GAP_IN (the table↔code gap).
-    code_n_lines = code.count('\n')
-    line_h_in = CODE_FONTSIZE / 72.0 * 1.2  # ~matplotlib default linespacing
-    code_h_used_in = code_n_lines * line_h_in
-    note_y = code_y - (code_h_used_in + VISIBLE_GAP_IN) / code_h_in
-    ax_code.text(
-        0.0, note_y,
-        "Note: in the highlighted rows, |kid_pat − dad_A| ≈ 0.9 (the true epimutation signal) "
-        "but |kid_pat − dad_B| ≈ 0.5 — picking the wrong dad\n"
-        "haplotype roughly halves the delta and would barely clear the threshold, "
-        "motivating the need for inheritance-based phasing.",
-        ha="left", va="top", fontsize=10,
-        family="Arial", color=COLOR_NEUTRAL, style="italic",
         transform=ax_code.transAxes,
     )
 
