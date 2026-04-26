@@ -1,6 +1,6 @@
 # Phasing alleles consistently with the haplotype map
 
-This page is part of the [wiki](../../../index.md) and picks up where the
+This page is part of the [wiki](../../../README.md) and picks up where the
 [nuclear-family walkthrough](../nuclear_family/nuclear_family.md) left
 off. `gtg-ped-map` emits only founder letters, and only at informative
 sites; it never reconstructs the 0/1 allele sequence of any haplotype.

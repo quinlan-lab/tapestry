@@ -66,7 +66,7 @@ Concretely, on each sync:
 - `rsync` the three subfolders into
   `pedigree_wise_workflow/inheritance_mapping/`.
 - Apply one local edit: rewrite `[wiki](../index.md)` →
-  `[wiki](../../../index.md)` so "up" lands on the tapestry catalog,
+  `[wiki](../../../README.md)` so "up" lands on the tapestry catalog,
   not the upstream one.
 - Upstream permalinks (Rust source) are left alone.
 
@@ -77,7 +77,7 @@ is the user's fork (`petermchale/Platinum-Pedigree-Inheritance`).
 
 ```
 wiki/
-  index.md
+  README.md                 # top-level catalog (auto-rendered by GitHub on the folder view)
   claude_plan.md            # this file
   generate_wiki.py
   _helpers.py
@@ -117,7 +117,7 @@ paragraph inside their `overview.md`.
 
 ## 5. Page-by-page manifest
 
-### 5.1 `wiki/index.md`
+### 5.1 `wiki/README.md`
 One-paragraph elevator pitch + two workflow links + reproduction
 command. Hero image: `motivation/single_indiv_before_phasing.png`.
 

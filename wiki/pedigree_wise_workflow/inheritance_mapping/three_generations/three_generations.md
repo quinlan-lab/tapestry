@@ -1,6 +1,6 @@
 # Structural haplotype mapping across three generations
 
-This page is part of the [wiki](../../../index.md) and extends the
+This page is part of the [wiki](../../../README.md) and extends the
 [nuclear-family walkthrough](../nuclear_family/nuclear_family.md) by
 marrying **Kid3** — the paternal recombinant from that page — to an
 outside-marriage founder **Spouse** and adding two grandchildren

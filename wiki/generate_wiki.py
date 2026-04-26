@@ -37,7 +37,7 @@ from motivation import single_indiv_phasing, trio_discovery  # noqa: E402
 MOTIVATION_MD = """\
 # Why phase DNA methylation?
 
-This page is part of the [tapestry wiki](../index.md). It motivates
+This page is part of the [tapestry wiki](../README.md). It motivates
 the rest of the wiki by answering one question: *why is it worth
 phasing per-CpG methylation onto each haplotype, instead of leaving it
 as a single number per CpG?* Two pairs of cartoon figures build the

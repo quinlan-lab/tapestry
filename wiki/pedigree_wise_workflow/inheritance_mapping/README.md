@@ -57,7 +57,7 @@ rsync -a --delete \
 #    of each vendored page must point at the tapestry top-level wiki, not
 #    the upstream one.
 for f in wiki/pedigree_wise_workflow/inheritance_mapping/*/*.md; do
-  sed -i '' 's|\[wiki\](\.\./index\.md)|[wiki](../../../index.md)|g' "$f"
+  sed -i '' 's|\[wiki\](\.\./index\.md)|[wiki](../../../README.md)|g' "$f"
 done
 
 # 6. Update the pinned SHA at the top of this README to ${UPSTREAM_SHA}.
@@ -82,4 +82,4 @@ upstream repo, not in tapestry.
 - The only link rewritten on vendoring is the `[wiki](...)` link at
   the top of each page, which originally pointed at the upstream
   `wiki/index.md` (`../index.md`) and now points at the tapestry
-  top-level catalog (`../../../index.md`).
+  top-level catalog (`../../../README.md`).

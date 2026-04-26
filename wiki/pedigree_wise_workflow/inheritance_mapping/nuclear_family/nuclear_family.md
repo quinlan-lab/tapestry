@@ -1,6 +1,6 @@
 # Structural haplotype mapping in a nuclear family
 
-This page is part of the [wiki](../../../index.md) and walks through
+This page is part of the [wiki](../../../README.md) and walks through
 `gtg-ped-map`'s structural labelling algorithm on the simplest possible
 pedigree: a two-generation nuclear family with two founders (dad and
 mom) and three children. It zooms in on the per-site mechanics and
