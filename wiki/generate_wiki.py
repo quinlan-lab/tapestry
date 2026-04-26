@@ -49,11 +49,6 @@ epimutations* and *compound genetic-epigenetic heterozygotes* — fall
 out directly, together with the polars query a user runs against
 tapestry's BED output to surface each one.
 
-The motivation does not depend on which phasing strategy gets you to
-parental-haplotype resolution, so this page is shared between
-tapestry's [pedigree-wise](../pedigree_wise_workflow/index.md) and
-[trio-wise](../trio_wise_workflow/index.md) workflows.
-
 ## Definitions
 
 - **De novo epimutation** — a change in the methylation state of a
