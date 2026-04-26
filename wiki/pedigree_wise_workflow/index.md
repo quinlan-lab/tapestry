@@ -20,14 +20,3 @@ For motivation — *why* phase methylation in the first place — see
 | [All-CpG expansion](all_cpg_expansion/all_cpg_expansion.md) | Step 4 — `expand_to_all_cpgs.py`: reference CpGs vs sample CpGs vs measured CpGs, allele-specific CpGs, and the within-50bp-of-mismatch QC flag. |
 | [Output format](output_format/output_format.md) | BED schema and column dictionary for the pedigree-wise output. |
 
-Step 2 (`aligned_bam_to_cpg_scores.sh`) is a pass-through of the
-upstream pb-CpG-tools binary and is described in one paragraph inside
-the [overview](overview/overview.md) rather than on its own page.
-
-## Build status
-
-This wiki is being built phase-by-phase (see
-[`../claude_plan.md` §9](../claude_plan.md)). At the moment, only the
-scaffolding and the vendored inheritance-mapping section are in place;
-the other pages above are placeholders that will be populated in later
-phases.
