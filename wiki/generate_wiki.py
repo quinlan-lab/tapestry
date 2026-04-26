@@ -77,11 +77,11 @@ heterozygous methylation is hidden inside an intermediate value.
 
 ![After phasing](single_indiv_after_phasing.png)
 
-The same ten reads, now partitioned by haplotype: pile-up rows are
-prefixed `Hap1` (paternal, teal) or `Hap2` (maternal, orange) and the
-SNV bits themselves carry the partition. With the partition in hand,
-the pooled profile splits into two stacked per-haplotype bigwig
-tracks. What Figure 2 shows is what tapestry computes mechanically for
+The same ten reads, now partitioned by haplotype: rows are grouped
+paternal-above-maternal (one `Pat hap` / `Mat hap` label per group on
+the left) and the SNV bits themselves carry the partition. With the
+partition in hand, the pooled profile splits into two stacked
+per-haplotype bigwig tracks. What Figure 2 shows is what tapestry computes mechanically for
 every CpG once the haplotype partition is in hand. The two payoffs of
 having those per-haplotype profiles only become visible once the
 individual is placed into a pedigree.

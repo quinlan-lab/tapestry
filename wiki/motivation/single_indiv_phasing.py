@@ -20,8 +20,9 @@ Style requirements:
   NO column headers.
 - Before phasing: uniform grey, reads in scrambled order, single
   pooled methylation track.
-- After phasing: pat in teal / mat in orange, reads grouped pat
-  above mat, two stacked methylation tracks.
+- After phasing: reads grouped pat above mat (with a single
+  "Pat hap" / "Mat hap" label per group on the left), two stacked
+  methylation tracks.
 """
 
 import random
@@ -139,8 +140,6 @@ for _ in range(max(len(READS_BY_SOURCE["pat"]), len(READS_BY_SOURCE["mat"]))):
 
 # --- Colours ---
 COLOR_NEUTRAL = "#444444"
-COLOR_PAT = "#0f766e"     # teal
-COLOR_MAT = "#c2410c"     # orange
 COLOR_METH = "#dc2626"    # red
 COLOR_UNMETH = "#1d4ed8"  # blue
 COLOR_OUT = "#cccccc"     # light grey for `-`
