@@ -131,15 +131,16 @@ KID_RELS = [0.10, 0.20, 0.30, 0.55, 0.65]
 # ---------- scenarios ----------
 
 SCENARIO_DENOVO = Scenario(
-    mom_top=HapData(METH5, '#8ecae6'),
-    mom_bot=HapData(UNMETH5, '#1f6ea8'),
-    dad_top=HapData(UNMETH5, '#f4b860'),
-    dad_bot=HapData(METH5, '#e8734a'),
-    # kid: de novo flips — loss of methylation on one, gain on the other
+    mom_top=HapData(METH5, '#8ecae6', label='C'),
+    mom_bot=HapData(UNMETH5, '#1f6ea8', label='D'),
+    dad_top=HapData(UNMETH5, '#f4b860', label='A'),
+    dad_bot=HapData(METH5, '#e8734a', label='B'),
+    # kid: de novo flips — loss of methylation on one, gain on the other.
+    # Kid pat = dad A; kid mat = mom C.
     kid_top=HapData([(r, m) for r, m in zip(KID_RELS, [False, False, False, True, True])],
-                    '#f4b860'),
+                    '#f4b860', label='A'),
     kid_bot=HapData([(r, m) for r, m in zip(KID_RELS, [True, True, True, False, False])],
-                    '#8ecae6'),
+                    '#8ecae6', label='C'),
 )
 
 # Compound genetic-epigenetic heterozygote:
