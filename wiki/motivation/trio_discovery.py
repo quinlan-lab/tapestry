@@ -135,8 +135,12 @@ SCENARIO_DENOVO = Scenario(
     mom_bot=HapData(UNMETH5, '#1f6ea8', label='D'),
     dad_top=HapData(UNMETH5, '#f4b860', label='A'),
     dad_bot=HapData(METH5, '#e8734a', label='B'),
-    # kid: de novo flips — loss of methylation on one, gain on the other.
-    # Kid pat = dad A; kid mat = mom C.
+    # Kid pat = dad A; kid mat = mom C. Two de novo events both sit at
+    # the right CpG cluster (positions KID_RELS[3:]). Paternal A inherits
+    # dad's unmethylated state at the left cluster but is methylated at
+    # the right cluster (de novo gain). Maternal C inherits mom's
+    # methylated state at the left cluster but is unmethylated at the
+    # right cluster (de novo loss).
     kid_top=HapData([(r, m) for r, m in zip(KID_RELS, [False, False, False, True, True])],
                     '#f4b860', label='A'),
     kid_bot=HapData([(r, m) for r, m in zip(KID_RELS, [True, True, True, False, False])],

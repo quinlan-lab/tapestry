@@ -93,11 +93,15 @@ individual is placed into a pedigree.
 The kid, now in a trio. Each individual carries two haplotypes drawn
 as horizontal coloured bars; each bar is decorated with methylation
 lollipops at CpG positions (filled = methylated, open = unmethylated).
-The kid's paternal homolog has a *de novo loss of methylation* at the
-left CpG cluster: dad's transmitted homolog is methylated there, but
-the kid's same physical homolog is unmethylated. Symmetrically, the
-kid's maternal homolog has a *de novo gain of methylation* at the
-right CpG cluster.
+At the right CpG cluster, two de novo events sit on opposite
+parental haplotypes. The kid's paternal homolog (`A`, inherited from
+dad) is methylated there, but dad's same physical homolog is
+unmethylated — a de novo *gain* of methylation. Symmetrically, the
+kid's maternal homolog (`C`, inherited from mom) is unmethylated at
+the same cluster, but mom's same physical homolog is methylated — a
+de novo *loss*. The left cluster is concordant on both sides
+(unmethylated on `A` from dad to kid; methylated on `C` from mom to
+kid).
 
 ![Trio de novo BED + polars](trio_denovo_bed.png)
 
