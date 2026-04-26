@@ -41,6 +41,15 @@ bundled with its assets. Concretely:
 - **Reproducible figures.** Hard-coded toy simulations; no RNG seeds,
   no real data. `python wiki/generate_wiki.py [--page X]`.
 - **Monospace matplotlib panels** for ASCII-style walkthroughs.
+- **Hand-written SVG (Python f-strings + stdlib) for pixel-perfect,
+  non-data-driven cartoons.** Where a figure is a fixed schematic
+  (pedigree shapes, haplotype bars, lollipops, callouts) rather than
+  a render of toy data, prefer emitting SVG directly from Python
+  rather than going through matplotlib. Vector output, exact control
+  over geometry, no Agg/dpi dance. See `motivation/trio_discovery.py`
+  for the pattern (`rect`/`circle`/`line`/`star` primitives plus a
+  `build()` that composes a `Scenario` dataclass into one SVG
+  document).
 - **No cross-page implicit state.** Every page is independently
   readable.
 
@@ -93,7 +102,7 @@ wiki/
       nuclear_family/
       three_generations/
       concordance/
-    founder_phased_methylation/  # Step 3 — heart of the workflow (§13)
+    founder_phased_methylation/  # Step 3 — heart of the workflow (§8)
     all_cpg_expansion/         # Step 4
     output_format/             # BED schema + column dictionary
 
@@ -140,7 +149,7 @@ procedure, and the canonical upstream URL.
 
 ### 5.7 `pedigree_wise_workflow/founder_phased_methylation/`
 Step 3 — `phase_meth_to_founder_haps.py`. Conceptual heart of the
-workflow. Hero figure: bit-vector matching cartoon (§13). Sections:
+workflow. Hero figure: bit-vector matching cartoon (§8). Sections:
 two phasing sources → bit-vector matching across block intersection →
 founder-haplotype labeling of haplotagged reads → mechanical
 re-bucketing of methylation into pat/mat. Plus an IGV screenshot reused
@@ -179,26 +188,7 @@ links back to those rather than re-emitting them.
 - Stdlib + matplotlib only. Hard-coded deterministic toys.
 - Captions use the `_helpers.permalink(path, line, sha)` helper.
 
-## 7. Manuscript drafting reference (no build coupling)
-
-The wiki is a reference, not a pipeline for paper assets. Suggested
-routing when drafting figures:
-
-| If drafting… | Consult |
-|---|---|
-| Motivation / graphical-abstract figure | `motivation/` |
-| Study design + pipeline overview | `pedigree_wise_workflow/overview/` |
-| Method figure (bit-vector concordance) | `pedigree_wise_workflow/founder_phased_methylation/` |
-| Phased-methylation IGV example | `pedigree_wise_workflow/founder_phased_methylation/` + `images/tapestry.pedigree.png` |
-| CpG-coverage / allele-specific-CpG | `pedigree_wise_workflow/all_cpg_expansion/` |
-| Inheritance-mapping methods (suppl.) | `pedigree_wise_workflow/inheritance_mapping/` |
-| Querying output for epi / compound hets (suppl.) | `motivation/` (de novo + compound-het BED panels) |
-
-The wiki does not need to be visually consistent with the paper — it
-optimises for pedagogical clarity (monospace ASCII panels,
-line-numbered source permalinks).
-
-## 8. Trio-wise workflow — future extension
+## 7. Trio-wise workflow — future extension
 
 The sibling directory `wiki/trio_wise_workflow/` exists as a stub
 except for `output_format/`, which is built early. Pending:
@@ -214,30 +204,7 @@ differences: (a) phase source is pedMEC/whatshap rather than
 letters (A/B in dad, C/D in mom) — fixed as dad's hap1/hap2 and mom's
 hap1/hap2, **not** transmitted/non-transmitted.
 
-## 9. Phased implementation status
-
-- **Phase 1 — scaffolding + vendored section.** ✅ Done.
-- **Phase 2 — `motivation/` page.** ✅ Done. Six figures plus narrative;
-  generation delegated to `motivation/single_indiv_phasing.py` +
-  `motivation/trio_discovery.py`. Hero image wired into
-  `wiki/index.md`.
-- **Phase 3 — `pedigree_wise_workflow/overview/` + `output_format/`.**
-  Pending.
-- **Phase 4 — `read_backed_phasing/`.** Pending.
-- **Phase 5 — `founder_phased_methylation/`.** Pending. Build the
-  bit-vector cartoon (§10) component-at-a-time per the user's
-  documented preference for incremental review:
-  Panel A (pileups + bit vectors) → Panel B (intersection + match) →
-  Panel C (founder-labeled reads) → Panel D (methylation re-bucketed)
-  → IGV screenshot → narrative.
-- **Phase 6 — `all_cpg_expansion/`.** Pending. Three CpG-universe
-  figures (Venn, allele-specific, mismatch proximity).
-- **Phase 7 — `trio_wise_workflow/output_format/`.** Pending.
-  Lift trio BED column dictionary from `README.md`. The
-  discovery-query example is already in `motivation/`; this page just
-  cross-links to it.
-
-## 10. Bit-vector matching cartoon (Phase 5 hero figure)
+## 8. Bit-vector matching cartoon (founder_phased_methylation hero figure)
 
 Single end-to-end cartoon at
 `pedigree_wise_workflow/founder_phased_methylation/fig1_bit_vector_matching.png`,
@@ -265,7 +232,7 @@ Four stacked panels sharing a horizontal genomic axis:
 Toy data hard-coded; no RNG. `motivation/`'s 0–100 % bar style is
 reused for Panel D so it visually anchors back to the motivation page.
 
-## 11. Open questions
+## 9. Open questions
 
 1. **Upstream for `inheritance_mapping/`.** Currently
    `petermchale/Platinum-Pedigree-Inheritance` (the user's fork);
@@ -274,7 +241,7 @@ reused for Panel D so it visually anchors back to the motivation page.
 2. **Permalink commit pinning.** Pin to `HEAD` at generate-time, or to
    a named release tag? Current behaviour: `HEAD`.
 3. **Re-drawing `images/pedigree.jpg`.** The existing JPG is 3.7 MB
-   and looks photographed. For Phase 3 `overview/` it can start as a
+   and looks photographed. For the `pedigree_wise_workflow/overview/` page it can start as a
    direct embed; the manuscript figure will need a clean vector
    re-draw — base on a published pedigree style or draw from scratch?
 4. **GitHub Pages vs. raw markdown.** Upstream uses raw markdown
