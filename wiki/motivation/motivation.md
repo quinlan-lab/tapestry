@@ -69,10 +69,13 @@ kid).
 ![Trio de novo BED + polars](trio_denovo_bed.png)
 
 Once tapestry produces a per-CpG haplotype-resolved BED, surfacing
-de novo epimutations is a one-pass polars filter: pick the dad
-haplotype that was transmitted to the kid (using the `pat_hap` phasing
-column), then keep CpGs where `kid_pat` methylation diverges, on
-average over a small window, from the dad-transmitted haplotype.
+the de novo gain of methylation on the kid's paternal hap is a
+one-pass polars filter: pick the dad haplotype that was transmitted
+to the kid (using the `pat_hap` phasing column), then keep CpGs where
+`kid_pat - dad_transmitted` is *positive* on average over a small
+window. Mirror the filter sign to surface a de novo *loss*; mirror
+both the column choice (`mat_hap`/`mom_C`/`mom_D`) and the sign to
+surface either de novo direction on the maternal side.
 
 ## Trio use case 2: compound genetic-epigenetic heterozygote
 

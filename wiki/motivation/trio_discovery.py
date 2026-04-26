@@ -240,17 +240,24 @@ def render_trio_denovo_bed():
     ax_code = add_axes_in(LEFT_IN, ax_code_top_in - code_h_in, width_in, code_h_in)
 
     cols = ("chrom", "start", "kid_pat", "pat_hap", "dad_A", "dad_B")
+    # CpG genomic coordinates mirror KID_RELS in the trio_denovo SVG:
+    #   left cluster of 3 CpGs at 1100 / 1200 / 1300 (concordant
+    #     unmethylated on dad_A → kid_pat),
+    #   right cluster of 2 CpGs at 1550 / 1650 (de novo gain — kid_pat
+    #     methylated where dad_A is not).
+    # dad_B is the non-transmitted, fully methylated homolog.
+    # Methylation levels jittered around the SVG values for realism.
     rows = [
-        ("chr1", "1000", "0.92", "A", "0.95", "0.93"),
-        ("chr1", "1100", "0.05", "A", "0.94", "0.55"),
-        ("chr1", "1200", "0.02", "A", "0.96", "0.48"),
-        ("chr1", "1300", "0.04", "A", "0.93", "0.52"),
-        ("chr1", "1400", "0.91", "A", "0.92", "0.94"),
+        ("chr1", "1100", "0.05", "A", "0.04", "0.93"),
+        ("chr1", "1200", "0.04", "A", "0.06", "0.95"),
+        ("chr1", "1300", "0.06", "A", "0.05", "0.92"),
+        ("chr1", "1550", "0.94", "A", "0.05", "0.96"),
+        ("chr1", "1650", "0.96", "A", "0.04", "0.94"),
     ]
     _draw_simple_table(
         ax_meth, cols, rows,
         title="Haplotype-specific methylation levels",
-        highlight_rows={1, 2, 3},
+        highlight_rows={3, 4},
         bottom_rule=False,
     )
 
@@ -262,7 +269,7 @@ def render_trio_denovo_bed():
     code_y = CODE_TITLE_Y - CODE_TITLE_TO_CODE_IN / code_h_in
     ax_code.text(
         0.0, CODE_TITLE_Y,
-        "Discover de novo epimutation locus",
+        "Discover de novo gain of methylation on paternal haplotype",
         ha="left", va="top", fontsize=12, fontweight="bold",
         transform=ax_code.transAxes,
     )
@@ -276,12 +283,13 @@ def render_trio_denovo_bed():
         '        .otherwise(pl.col("dad_B"))\n'
         ')\n'
         '\n'
-        '# Find runs of consecutive CpGs where the kid pat methylation\n'
-        '# diverges, on average, from the dad-transmitted haplotype.\n'
-        'WINDOW = 5\n'
-        'df_denovo_pat = (\n'
+        '# Find runs of consecutive CpGs where the kid_pat is methylated\n'
+        '# but the dad-transmitted haplotype is not — i.e., a de novo\n'
+        '# *gain* of methylation on the kid paternal homolog.\n'
+        'WINDOW = 2\n'
+        'df_denovo_gain_pat = (\n'
         '    df_meth.with_columns(\n'
-        '        delta = (pl.col("kid_pat") - pl.col("dad_transmitted")).abs(),\n'
+        '        delta = pl.col("kid_pat") - pl.col("dad_transmitted"),\n'
         '    )\n'
         '    .with_columns(\n'
         '        mean_delta = pl.col("delta").rolling_mean(WINDOW),\n'
