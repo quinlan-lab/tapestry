@@ -217,10 +217,7 @@ Two independent phasings reach Step 3:
     block is bounded by a crossover event in a transmitting
     ancestor — for example, a crossover on the paternal transmission
     path swaps the founder letter carried in the kid's paternal slot
-    from one block to the next. Tapestry parses this in
-    [`get_iht_blocks`]({permalink('src/phasing_pedigree.py', 153, SHA)})
-    (called from
-    [`phase_meth_to_founder_haps.py:32`]({permalink('src/phase_meth_to_founder_haps.py', 32, SHA)})).
+    from one block to the next.
 
 The two block partitions of the genome do not align. The natural
 unit on which to relate them is the **hap-map block**: the
