@@ -200,14 +200,18 @@ Two independent phasings reach Step 3:
   - The **iht-phased VCF**, which phases each het variant as `p|m`
     where `p` is the allele on the paternal homolog and `m` the
     allele on the maternal homolog. Tapestry parses this in
-    [`get_iht_phasing`]({permalink('src/phasing_pedigree.py', 99, SHA)}).
+    [`get_iht_phasing`]({permalink('src/phasing_pedigree.py', 99, SHA)})
+    (called from
+    [`phase_meth_to_founder_haps.py:29`]({permalink('src/phase_meth_to_founder_haps.py', 29, SHA)})).
   - The **iht-blocks map**, which assigns one of the founder-haplotype
     letters (`A`/`B` for dad's two homologs, `C`/`D` for mom's, etc.)
     to the paternal and maternal slot in each block. Within a block,
     these letters are fixed; they are *not* fixed across blocks (a
     crossover changes which dad letter sits in the paternal slot).
     Tapestry parses this in
-    [`get_iht_blocks`]({permalink('src/phasing_pedigree.py', 153, SHA)}).
+    [`get_iht_blocks`]({permalink('src/phasing_pedigree.py', 153, SHA)})
+    (called from
+    [`phase_meth_to_founder_haps.py:32`]({permalink('src/phase_meth_to_founder_haps.py', 32, SHA)})).
 
 The two block partitions of the genome do not align. The natural
 unit on which to relate them is the **hap-map block**: the
@@ -241,7 +245,9 @@ exactly. The decision is a single threshold:
 This decision is made once per hap-map block; the relevant code is
 the bit-vector comparison in [`get_hap_map`]({permalink('src/hap_map_pedigree.py', 13, SHA)}),
 specifically the `similarity_hap1_pat > 0.5` branch at
-[line 58]({permalink('src/hap_map_pedigree.py', 58, SHA)}).
+[line 58]({permalink('src/hap_map_pedigree.py', 58, SHA)}); the
+function is called from
+[`phase_meth_to_founder_haps.py:208`]({permalink('src/phase_meth_to_founder_haps.py', 208, SHA)}).
 
 ## Mechanical re-bucketing of methylation
 
@@ -251,7 +257,11 @@ HP tag's `hap1` and `hap2` files are re-emitted as `pat` and `mat`
 files (or vice versa) according to the decision above; per-CpG
 methylation levels follow the bucket rather than being recomputed.
 The assembly is performed in
-[`phase_meth_to_founder_haps`]({permalink('src/phase_meth_to_founder_haps.py', 44, SHA)}).
+[`phase_meth_to_founder_haps`]({permalink('src/phase_meth_to_founder_haps.py', 44, SHA)})
+(called once per pb-CpG-tools mode at
+[line 236]({permalink('src/phase_meth_to_founder_haps.py', 236, SHA)})
+and
+[line 238]({permalink('src/phase_meth_to_founder_haps.py', 238, SHA)})).
 
 ## Mismatch sites and Step 4 QC
 
