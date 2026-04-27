@@ -257,11 +257,13 @@ function is called from
 
 ## Relabelling per-CpG methylation
 
-Per-CpG methylation has already been summarised by hiphase's `hap1`
+Per-CpG methylation has already been stratified by hiphase's `hap1`
 and `hap2` partition by the time Step 3 runs: Step 2
 ([`aligned_bam_to_cpg_scores.sh`]({permalink('aligned_bam_to_cpg_scores.sh', 1, SHA)}))
-calls pb-CpG-tools once on each HP-tagged BAM. Step 3 does not
-recompute these summaries — it *relabels* them. Inside
+calls pb-CpG-tools once on each HP-tagged BAM, so each per-CpG
+methylation level is computed only over reads carrying the same HP
+tag. Step 3 does not recompute those per-haplotype levels — it
+*relabels* them. Inside
 [`phase_meth_to_founder_haps`]({permalink('src/phase_meth_to_founder_haps.py', 44, SHA)})
 (called once per pb-CpG-tools mode at
 [line 236]({permalink('src/phase_meth_to_founder_haps.py', 236, SHA)})
