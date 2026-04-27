@@ -203,12 +203,19 @@ Two independent phasings reach Step 3:
     [`get_iht_phasing`]({permalink('src/phasing_pedigree.py', 99, SHA)})
     (called from
     [`phase_meth_to_founder_haps.py:29`]({permalink('src/phase_meth_to_founder_haps.py', 29, SHA)})).
-  - The **iht-blocks map**, which assigns one of the founder-haplotype
-    letters (`A`/`B` for dad's two homologs, `C`/`D` for mom's, etc.)
-    to the paternal and maternal slot in each block. Within a block,
-    these letters are fixed; they are *not* fixed across blocks (a
-    crossover changes which dad letter sits in the paternal slot).
-    Tapestry parses this in
+  - The **iht-blocks map**, which assigns one of the pedigree's
+    *founder-haplotype letters* to the paternal and maternal slot in
+    each block. The founders of the pedigree are the individuals at
+    its root — for the CEPH1463 pedigree, the four great-grandparents
+    — and `gtg-ped-map` labels their eight homologs with letters
+    `A`, `B`, `C`, `D`, `E`, `F`, `G`, `H`. The kid's paternal and
+    maternal homologs in each linkage block are therefore labelled
+    with one of *those* root-founder letters, not with letters tied
+    to dad and mom (unless the parents themselves happen to be
+    founders, as in a strict nuclear-family setting). Within a block
+    the assignment is fixed; across blocks it is not (a crossover
+    in any transmitting ancestor changes which founder letter sits
+    in the relevant slot of the next block). Tapestry parses this in
     [`get_iht_blocks`]({permalink('src/phasing_pedigree.py', 153, SHA)})
     (called from
     [`phase_meth_to_founder_haps.py:32`]({permalink('src/phase_meth_to_founder_haps.py', 32, SHA)})).
