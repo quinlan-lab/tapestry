@@ -181,8 +181,8 @@ This page is part of the
 pipeline — `phase_meth_to_founder_haps.py` and `hap_map_pedigree.py` —
 which is the conceptual centre of tapestry. Step 3 takes the two
 phasings produced upstream and uses them to relabel each per-CpG
-methylation measurement with one of the four founder homologs
-(`dad_hap1`, `dad_hap2`, `mom_hap1`, `mom_hap2`).
+methylation measurement with one of the four founder homologs of
+the pedigree.
 
 ## The two phasings, and where they meet
 
@@ -194,11 +194,20 @@ Two independent phasings reach Step 3:
   Inside a block the two partitions are linked across heterozygous
   sites; across blocks the partition labels are independent.
 - **Inheritance-based phasing** (Step 1B, `gtg-ped-map` +
-  `gtg-concordance`). Within each *linkage block*, each het variant
-  is emitted as a phased genotype `p|m`, where `p` and `m` are the
-  alleles inherited from the paternal and maternal founder homolog
-  respectively, and the founder labels (`dad_hap1` / `dad_hap2` /
-  `mom_hap1` / `mom_hap2`) are fixed across the block.
+  `gtg-concordance`). Within each *linkage block* (also called an
+  inheritance block), inheritance-based phasing reaches Step 3 as
+  two parallel data structures:
+  - The **iht-phased VCF**, which phases each het variant as `p|m`
+    where `p` is the allele on the paternal homolog and `m` the
+    allele on the maternal homolog. Tapestry parses this in
+    [`get_iht_phasing`]({permalink('src/phasing_pedigree.py', 99, SHA)}).
+  - The **iht-blocks map**, which assigns one of the founder-haplotype
+    letters (`A`/`B` for dad's two homologs, `C`/`D` for mom's, etc.)
+    to the paternal and maternal slot in each block. Within a block,
+    these letters are fixed; they are *not* fixed across blocks (a
+    crossover changes which dad letter sits in the paternal slot).
+    Tapestry parses this in
+    [`get_iht_blocks`]({permalink('src/phasing_pedigree.py', 153, SHA)}).
 
 The two block partitions of the genome do not align. The natural
 unit on which to relate them is the **hap-map block**: the
