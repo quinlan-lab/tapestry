@@ -286,12 +286,21 @@ two stages of relabelling happen within each hap-map block:
 
 Most hap-map blocks have a small number of sites where `hap1`
 disagrees with the chosen parental vector — concordance < 1. Those
-sites are recorded alongside the hap-map block and propagated to
-Step 4 ([all-CpG expansion](../all_cpg_expansion/all_cpg_expansion.md)),
-where every CpG within 50 bp of one of them is annotated with the
-`cpg_is_within_50bp_of_mismatch_site` QC flag in tapestry's BED
-output. Downstream consumers can choose whether to keep or filter
-those CpGs.
+sites are recorded as `df_sites_mismatch` alongside the hap-map
+block — see the mismatch-collection branches at
+[lines 63–66]({permalink('src/hap_map_pedigree.py', 63, SHA)})
+(when `hap1` matches `pat`) and
+[lines 72–75]({permalink('src/hap_map_pedigree.py', 72, SHA)})
+(when it matches `mat`), assembled into a single DataFrame at
+[line 109]({permalink('src/hap_map_pedigree.py', 109, SHA)}) — and
+propagated to Step 4
+([all-CpG expansion](../all_cpg_expansion/all_cpg_expansion.md)),
+where
+[`compute_proximity_to_mismatched_heterozygous_sites`]({permalink('src/expand_to_all_cpgs.py', 115, SHA)})
+annotates every CpG within 50 bp of one of them with the
+[`cpg_is_within_50bp_of_mismatch_site`]({permalink('src/expand_to_all_cpgs.py', 378, SHA)})
+QC flag in tapestry's BED output. Downstream consumers can choose
+whether to keep or filter those CpGs.
 """
 
 
