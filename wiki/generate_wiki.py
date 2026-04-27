@@ -194,16 +194,16 @@ Two independent phasings reach Step 3:
   Inside a block the two partitions are linked across heterozygous
   sites; across blocks the partition labels are independent.
 - **Inheritance-based phasing** (Step 1B, `gtg-ped-map` +
-  `gtg-concordance`). Within each *linkage block* (also called an
-  inheritance block), inheritance-based phasing reaches Step 3 as
-  two parallel data structures:
+  `gtg-concordance`). Within each *linkage block*,
+  inheritance-based phasing reaches Step 3 as two parallel data
+  structures:
   - The **iht-phased VCF**, which phases each het variant as `p|m`
     where `p` is the allele on the paternal homolog and `m` the
     allele on the maternal homolog. Tapestry parses this in
     [`get_iht_phasing`]({permalink('src/phasing_pedigree.py', 99, SHA)})
     (called from
     [`phase_meth_to_founder_haps.py:29`]({permalink('src/phase_meth_to_founder_haps.py', 29, SHA)})).
-  - The **iht-blocks map**, which assigns one of the pedigree's
+  - The **iht-blocks table** ([`df_iht_blocks`]({permalink('src/phase_meth_to_founder_haps.py', 32, SHA)})), which assigns one of the pedigree's
     *founder-haplotype letters* to the paternal and maternal slot in
     each block. The founders of the pedigree are the individuals at
     its root — for the CEPH1463 pedigree, the four great-grandparents
@@ -214,11 +214,10 @@ Two independent phasings reach Step 3:
     to dad and mom (unless the parents themselves happen to be
     founders, as in a strict nuclear-family setting). Within a block
     the assignment is fixed; across blocks it is not. Each linkage
-    block is bounded by a crossover event in a transmitting ancestor:
-    a crossover on the paternal transmission path swaps the founder
-    letter carried in the kid's paternal slot from one block to the
-    next, and symmetrically on the maternal side. Tapestry parses
-    this in
+    block is bounded by a crossover event in a transmitting
+    ancestor — for example, a crossover on the paternal transmission
+    path swaps the founder letter carried in the kid's paternal slot
+    from one block to the next. Tapestry parses this in
     [`get_iht_blocks`]({permalink('src/phasing_pedigree.py', 153, SHA)})
     (called from
     [`phase_meth_to_founder_haps.py:32`]({permalink('src/phase_meth_to_founder_haps.py', 32, SHA)})).

@@ -18,16 +18,16 @@ Two independent phasings reach Step 3:
   Inside a block the two partitions are linked across heterozygous
   sites; across blocks the partition labels are independent.
 - **Inheritance-based phasing** (Step 1B, `gtg-ped-map` +
-  `gtg-concordance`). Within each *linkage block* (also called an
-  inheritance block), inheritance-based phasing reaches Step 3 as
-  two parallel data structures:
+  `gtg-concordance`). Within each *linkage block*,
+  inheritance-based phasing reaches Step 3 as two parallel data
+  structures:
   - The **iht-phased VCF**, which phases each het variant as `p|m`
     where `p` is the allele on the paternal homolog and `m` the
     allele on the maternal homolog. Tapestry parses this in
-    [`get_iht_phasing`](https://github.com/quinlan-lab/tapestry/blob/ed5107463acdb5e79d5dc30da52b9ffa537975af/src/phasing_pedigree.py#L99)
+    [`get_iht_phasing`](https://github.com/quinlan-lab/tapestry/blob/c3e8a2e22ecba4dc4f696493eae8e6a8665c59c9/src/phasing_pedigree.py#L99)
     (called from
-    [`phase_meth_to_founder_haps.py:29`](https://github.com/quinlan-lab/tapestry/blob/ed5107463acdb5e79d5dc30da52b9ffa537975af/src/phase_meth_to_founder_haps.py#L29)).
-  - The **iht-blocks map**, which assigns one of the pedigree's
+    [`phase_meth_to_founder_haps.py:29`](https://github.com/quinlan-lab/tapestry/blob/c3e8a2e22ecba4dc4f696493eae8e6a8665c59c9/src/phase_meth_to_founder_haps.py#L29)).
+  - The **iht-blocks table** ([`df_iht_blocks`](https://github.com/quinlan-lab/tapestry/blob/c3e8a2e22ecba4dc4f696493eae8e6a8665c59c9/src/phase_meth_to_founder_haps.py#L32)), which assigns one of the pedigree's
     *founder-haplotype letters* to the paternal and maternal slot in
     each block. The founders of the pedigree are the individuals at
     its root — for the CEPH1463 pedigree, the four great-grandparents
@@ -38,14 +38,13 @@ Two independent phasings reach Step 3:
     to dad and mom (unless the parents themselves happen to be
     founders, as in a strict nuclear-family setting). Within a block
     the assignment is fixed; across blocks it is not. Each linkage
-    block is bounded by a crossover event in a transmitting ancestor:
-    a crossover on the paternal transmission path swaps the founder
-    letter carried in the kid's paternal slot from one block to the
-    next, and symmetrically on the maternal side. Tapestry parses
-    this in
-    [`get_iht_blocks`](https://github.com/quinlan-lab/tapestry/blob/ed5107463acdb5e79d5dc30da52b9ffa537975af/src/phasing_pedigree.py#L153)
+    block is bounded by a crossover event in a transmitting
+    ancestor — for example, a crossover on the paternal transmission
+    path swaps the founder letter carried in the kid's paternal slot
+    from one block to the next. Tapestry parses this in
+    [`get_iht_blocks`](https://github.com/quinlan-lab/tapestry/blob/c3e8a2e22ecba4dc4f696493eae8e6a8665c59c9/src/phasing_pedigree.py#L153)
     (called from
-    [`phase_meth_to_founder_haps.py:32`](https://github.com/quinlan-lab/tapestry/blob/ed5107463acdb5e79d5dc30da52b9ffa537975af/src/phase_meth_to_founder_haps.py#L32)).
+    [`phase_meth_to_founder_haps.py:32`](https://github.com/quinlan-lab/tapestry/blob/c3e8a2e22ecba4dc4f696493eae8e6a8665c59c9/src/phase_meth_to_founder_haps.py#L32)).
 
 The two block partitions of the genome do not align. The natural
 unit on which to relate them is the **hap-map block**: the
@@ -77,11 +76,11 @@ exactly. The decision is a single threshold:
 - Otherwise → the assignment is flipped.
 
 This decision is made once per hap-map block; the relevant code is
-the bit-vector comparison in [`get_hap_map`](https://github.com/quinlan-lab/tapestry/blob/ed5107463acdb5e79d5dc30da52b9ffa537975af/src/hap_map_pedigree.py#L13),
+the bit-vector comparison in [`get_hap_map`](https://github.com/quinlan-lab/tapestry/blob/c3e8a2e22ecba4dc4f696493eae8e6a8665c59c9/src/hap_map_pedigree.py#L13),
 specifically the `similarity_hap1_pat > 0.5` branch at
-[line 58](https://github.com/quinlan-lab/tapestry/blob/ed5107463acdb5e79d5dc30da52b9ffa537975af/src/hap_map_pedigree.py#L58); the
+[line 58](https://github.com/quinlan-lab/tapestry/blob/c3e8a2e22ecba4dc4f696493eae8e6a8665c59c9/src/hap_map_pedigree.py#L58); the
 function is called from
-[`phase_meth_to_founder_haps.py:208`](https://github.com/quinlan-lab/tapestry/blob/ed5107463acdb5e79d5dc30da52b9ffa537975af/src/phase_meth_to_founder_haps.py#L208).
+[`phase_meth_to_founder_haps.py:208`](https://github.com/quinlan-lab/tapestry/blob/c3e8a2e22ecba4dc4f696493eae8e6a8665c59c9/src/phase_meth_to_founder_haps.py#L208).
 
 ## Mechanical re-bucketing of methylation
 
@@ -91,11 +90,11 @@ HP tag's `hap1` and `hap2` files are re-emitted as `pat` and `mat`
 files (or vice versa) according to the decision above; per-CpG
 methylation levels follow the bucket rather than being recomputed.
 The assembly is performed in
-[`phase_meth_to_founder_haps`](https://github.com/quinlan-lab/tapestry/blob/ed5107463acdb5e79d5dc30da52b9ffa537975af/src/phase_meth_to_founder_haps.py#L44)
+[`phase_meth_to_founder_haps`](https://github.com/quinlan-lab/tapestry/blob/c3e8a2e22ecba4dc4f696493eae8e6a8665c59c9/src/phase_meth_to_founder_haps.py#L44)
 (called once per pb-CpG-tools mode at
-[line 236](https://github.com/quinlan-lab/tapestry/blob/ed5107463acdb5e79d5dc30da52b9ffa537975af/src/phase_meth_to_founder_haps.py#L236)
+[line 236](https://github.com/quinlan-lab/tapestry/blob/c3e8a2e22ecba4dc4f696493eae8e6a8665c59c9/src/phase_meth_to_founder_haps.py#L236)
 and
-[line 238](https://github.com/quinlan-lab/tapestry/blob/ed5107463acdb5e79d5dc30da52b9ffa537975af/src/phase_meth_to_founder_haps.py#L238)).
+[line 238](https://github.com/quinlan-lab/tapestry/blob/c3e8a2e22ecba4dc4f696493eae8e6a8665c59c9/src/phase_meth_to_founder_haps.py#L238)).
 
 ## Mismatch sites and Step 4 QC
 
