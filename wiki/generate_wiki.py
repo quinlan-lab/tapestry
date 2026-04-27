@@ -213,9 +213,12 @@ Two independent phasings reach Step 3:
     with one of *those* root-founder letters, not with letters tied
     to dad and mom (unless the parents themselves happen to be
     founders, as in a strict nuclear-family setting). Within a block
-    the assignment is fixed; across blocks it is not (a crossover
-    in any transmitting ancestor changes which founder letter sits
-    in the relevant slot of the next block). Tapestry parses this in
+    the assignment is fixed; across blocks it is not. Each linkage
+    block is bounded by a crossover event in a transmitting ancestor:
+    a crossover on the paternal transmission path swaps the founder
+    letter carried in the kid's paternal slot from one block to the
+    next, and symmetrically on the maternal side. Tapestry parses
+    this in
     [`get_iht_blocks`]({permalink('src/phasing_pedigree.py', 153, SHA)})
     (called from
     [`phase_meth_to_founder_haps.py:32`]({permalink('src/phase_meth_to_founder_haps.py', 32, SHA)})).
