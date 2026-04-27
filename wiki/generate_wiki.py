@@ -255,19 +255,30 @@ specifically the `similarity_hap1_pat > 0.5` branch at
 function is called from
 [`phase_meth_to_founder_haps.py:208`]({permalink('src/phase_meth_to_founder_haps.py', 208, SHA)}).
 
-## Mechanical re-bucketing of methylation
+## Relabelling per-CpG methylation
 
-Once each haplotagged read carries a founder tag, the per-CpG
-methylation summaries split mechanically. Reads bucketed under the
-HP tag's `hap1` and `hap2` files are re-emitted as `pat` and `mat`
-files (or vice versa) according to the decision above; per-CpG
-methylation levels follow the bucket rather than being recomputed.
-The assembly is performed in
+Per-CpG methylation has already been summarised by hiphase's `hap1`
+and `hap2` partition by the time Step 3 runs: Step 2
+([`aligned_bam_to_cpg_scores.sh`]({permalink('aligned_bam_to_cpg_scores.sh', 1, SHA)}))
+calls pb-CpG-tools once on each HP-tagged BAM. Step 3 does not
+recompute these summaries — it *relabels* them. Inside
 [`phase_meth_to_founder_haps`]({permalink('src/phase_meth_to_founder_haps.py', 44, SHA)})
 (called once per pb-CpG-tools mode at
 [line 236]({permalink('src/phase_meth_to_founder_haps.py', 236, SHA)})
 and
-[line 238]({permalink('src/phase_meth_to_founder_haps.py', 238, SHA)})).
+[line 238]({permalink('src/phase_meth_to_founder_haps.py', 238, SHA)})),
+two stages of relabelling happen within each hap-map block:
+
+1. **`hap1`/`hap2` → `pat`/`mat`.** The bit-vector decision recorded
+   in `df_hap_map` is read off and used to copy the pre-computed
+   `methylation_level_hap{1,2}` (and the matching read counts) onto
+   `methylation_level_pat` and `methylation_level_mat` columns
+   ([lines 71–103]({permalink('src/phase_meth_to_founder_haps.py', 71, SHA)})).
+2. **`pat`/`mat` → founder letter.** The founder-haplotype letter
+   on each parental slot, carried by `df_hap_map` from the
+   iht-blocks table, is split off into `founder_haplotype_pat` and
+   `founder_haplotype_mat`
+   ([lines 104–105]({permalink('src/phase_meth_to_founder_haps.py', 104, SHA)})).
 
 ## Mismatch sites and Step 4 QC
 

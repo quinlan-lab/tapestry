@@ -24,10 +24,10 @@ Two independent phasings reach Step 3:
   - The **iht-phased VCF**, which phases each het variant as `p|m`
     where `p` is the allele on the paternal homolog and `m` the
     allele on the maternal homolog. Tapestry parses this in
-    [`get_iht_phasing`](https://github.com/quinlan-lab/tapestry/blob/3e1ebeea32beb5077200f1f42eb6890b640c8a66/src/phasing_pedigree.py#L99)
+    [`get_iht_phasing`](https://github.com/quinlan-lab/tapestry/blob/b7f1919adc35ad691af941e0e6e8cf24b6968856/src/phasing_pedigree.py#L99)
     (called from
-    [`phase_meth_to_founder_haps.py:29`](https://github.com/quinlan-lab/tapestry/blob/3e1ebeea32beb5077200f1f42eb6890b640c8a66/src/phase_meth_to_founder_haps.py#L29)).
-  - The **iht-blocks table** ([`df_iht_blocks`](https://github.com/quinlan-lab/tapestry/blob/3e1ebeea32beb5077200f1f42eb6890b640c8a66/src/phase_meth_to_founder_haps.py#L32)), which assigns one of the pedigree's
+    [`phase_meth_to_founder_haps.py:29`](https://github.com/quinlan-lab/tapestry/blob/b7f1919adc35ad691af941e0e6e8cf24b6968856/src/phase_meth_to_founder_haps.py#L29)).
+  - The **iht-blocks table** ([`df_iht_blocks`](https://github.com/quinlan-lab/tapestry/blob/b7f1919adc35ad691af941e0e6e8cf24b6968856/src/phase_meth_to_founder_haps.py#L32)), which assigns one of the pedigree's
     *founder-haplotype letters* to the paternal and maternal slot in
     each block. The founders of the pedigree are the individuals at
     its root — for the CEPH1463 pedigree, the four great-grandparents
@@ -73,25 +73,36 @@ exactly. The decision is a single threshold:
 - Otherwise → the assignment is flipped.
 
 This decision is made once per hap-map block; the relevant code is
-the bit-vector comparison in [`get_hap_map`](https://github.com/quinlan-lab/tapestry/blob/3e1ebeea32beb5077200f1f42eb6890b640c8a66/src/hap_map_pedigree.py#L13),
+the bit-vector comparison in [`get_hap_map`](https://github.com/quinlan-lab/tapestry/blob/b7f1919adc35ad691af941e0e6e8cf24b6968856/src/hap_map_pedigree.py#L13),
 specifically the `similarity_hap1_pat > 0.5` branch at
-[line 58](https://github.com/quinlan-lab/tapestry/blob/3e1ebeea32beb5077200f1f42eb6890b640c8a66/src/hap_map_pedigree.py#L58); the
+[line 58](https://github.com/quinlan-lab/tapestry/blob/b7f1919adc35ad691af941e0e6e8cf24b6968856/src/hap_map_pedigree.py#L58); the
 function is called from
-[`phase_meth_to_founder_haps.py:208`](https://github.com/quinlan-lab/tapestry/blob/3e1ebeea32beb5077200f1f42eb6890b640c8a66/src/phase_meth_to_founder_haps.py#L208).
+[`phase_meth_to_founder_haps.py:208`](https://github.com/quinlan-lab/tapestry/blob/b7f1919adc35ad691af941e0e6e8cf24b6968856/src/phase_meth_to_founder_haps.py#L208).
 
-## Mechanical re-bucketing of methylation
+## Relabelling per-CpG methylation
 
-Once each haplotagged read carries a founder tag, the per-CpG
-methylation summaries split mechanically. Reads bucketed under the
-HP tag's `hap1` and `hap2` files are re-emitted as `pat` and `mat`
-files (or vice versa) according to the decision above; per-CpG
-methylation levels follow the bucket rather than being recomputed.
-The assembly is performed in
-[`phase_meth_to_founder_haps`](https://github.com/quinlan-lab/tapestry/blob/3e1ebeea32beb5077200f1f42eb6890b640c8a66/src/phase_meth_to_founder_haps.py#L44)
+Per-CpG methylation has already been summarised by hiphase's `hap1`
+and `hap2` partition by the time Step 3 runs: Step 2
+([`aligned_bam_to_cpg_scores.sh`](https://github.com/quinlan-lab/tapestry/blob/b7f1919adc35ad691af941e0e6e8cf24b6968856/aligned_bam_to_cpg_scores.sh#L1))
+calls pb-CpG-tools once on each HP-tagged BAM. Step 3 does not
+recompute these summaries — it *relabels* them. Inside
+[`phase_meth_to_founder_haps`](https://github.com/quinlan-lab/tapestry/blob/b7f1919adc35ad691af941e0e6e8cf24b6968856/src/phase_meth_to_founder_haps.py#L44)
 (called once per pb-CpG-tools mode at
-[line 236](https://github.com/quinlan-lab/tapestry/blob/3e1ebeea32beb5077200f1f42eb6890b640c8a66/src/phase_meth_to_founder_haps.py#L236)
+[line 236](https://github.com/quinlan-lab/tapestry/blob/b7f1919adc35ad691af941e0e6e8cf24b6968856/src/phase_meth_to_founder_haps.py#L236)
 and
-[line 238](https://github.com/quinlan-lab/tapestry/blob/3e1ebeea32beb5077200f1f42eb6890b640c8a66/src/phase_meth_to_founder_haps.py#L238)).
+[line 238](https://github.com/quinlan-lab/tapestry/blob/b7f1919adc35ad691af941e0e6e8cf24b6968856/src/phase_meth_to_founder_haps.py#L238)),
+two stages of relabelling happen within each hap-map block:
+
+1. **`hap1`/`hap2` → `pat`/`mat`.** The bit-vector decision recorded
+   in `df_hap_map` is read off and used to copy the pre-computed
+   `methylation_level_hap(1, 2)` (and the matching read counts) onto
+   `methylation_level_pat` and `methylation_level_mat` columns
+   ([lines 71–103](https://github.com/quinlan-lab/tapestry/blob/b7f1919adc35ad691af941e0e6e8cf24b6968856/src/phase_meth_to_founder_haps.py#L71)).
+2. **`pat`/`mat` → founder letter.** The founder-haplotype letter
+   on each parental slot, carried by `df_hap_map` from the
+   iht-blocks table, is split off into `founder_haplotype_pat` and
+   `founder_haplotype_mat`
+   ([lines 104–105](https://github.com/quinlan-lab/tapestry/blob/b7f1919adc35ad691af941e0e6e8cf24b6968856/src/phase_meth_to_founder_haps.py#L104)).
 
 ## Mismatch sites and Step 4 QC
 
