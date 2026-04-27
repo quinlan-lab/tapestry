@@ -42,7 +42,7 @@ of output (haplotype-resolved per-CpG methylation):
 - **[Trio-wise workflow](trio_wise_workflow/index.md)** — pedMEC /
   whatshap phasing across a parent–parent–child trio, labelling each
   measurement with one of the parents' haplotypes. Most of this section
-  is currently stubbed. 
+  is currently stubbed.
 
 ## Why phase methylation?
 
@@ -80,7 +80,7 @@ The `pedigree_wise_workflow/inheritance_mapping/` section is vendored
 from the
 [Platinum-Pedigree-Inheritance wiki](https://github.com/petermchale/Platinum-Pedigree-Inheritance/tree/main/wiki),
 which documents the `gtg-ped-map` and `gtg-concordance` Rust binaries
-that tapestry's pedigree-wise workflow invokes. 
+that tapestry's pedigree-wise workflow invokes.
 
 The structure of both
 wikis follows Andrej Karpathy's
