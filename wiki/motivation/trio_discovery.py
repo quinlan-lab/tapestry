@@ -448,6 +448,218 @@ def _draw_simple_table(ax, cols, rows, title, highlight_rows=frozenset(),
         )
 
 
+# Shared data for the compound genetic-epigenetic heterozygote BED panel.
+COMPOUND_METH_TITLE = "Haplotype-specific methylation levels"
+COMPOUND_METH_COLS = ("chrom", "start",
+                      "kid_pat", "pat_hap", "kid_mat", "mat_hap",
+                      "dad_A", "dad_B", "mom_C", "mom_D")
+COMPOUND_METH_ROWS = [
+    ("chr1", "1100", "0.05", "A", "0.94", "C", "0.04", "0.05", "0.93", "0.06"),
+    ("chr1", "1200", "0.04", "A", "0.96", "C", "0.06", "0.04", "0.95", "0.05"),
+    ("chr1", "1300", "0.06", "A", "0.91", "C", "0.05", "0.06", "0.92", "0.04"),
+    ("chr1", "1550", "0.05", "A", "0.04", "C", "0.04", "0.05", "0.05", "0.06"),
+    ("chr1", "1650", "0.05", "A", "0.04", "C", "0.05", "0.04", "0.06", "0.03"),
+]
+COMPOUND_METH_HIGHLIGHT = {0, 1, 2}
+
+COMPOUND_GENO_TITLE = "Phased genotypes"
+COMPOUND_GENO_COLS = ("chrom", "pos",
+                      "dad_A", "dad_B", "mom_C", "mom_D",
+                      "kid_pat", "kid_mat")
+COMPOUND_GENO_ROWS = [
+    ("chr1", "1420", "1", "0", "0", "0", "1", "0"),
+]
+COMPOUND_GENO_HIGHLIGHT = {0}
+
+COMPOUND_CODE_TITLE = "Discover compound genetic-epigenetic heterozygous locus"
+COMPOUND_CODE = (
+    '# --- Step 1 -----------------------------------------------------\n'
+    '# Find runs of consecutive CpGs where the same parental hap is the\n'
+    '# meth outlier, was transmitted to the kid, and the kid hap on that\n'
+    '# side has ~the same meth level.\n'
+    'TOL = 0.10\n'
+    'df_meth_hits = (df_meth\n'
+    '    # sites where exactly one parental hap is the meth outlier\n'
+    '    .with_columns(\n'
+    '        n_hi         = ((pl.col("dad_A") > 0.5)\n'
+    '                      + (pl.col("dad_B") > 0.5)\n'
+    '                      + (pl.col("mom_C") > 0.5)\n'
+    '                      + (pl.col("mom_D") > 0.5)),\n'
+    '        outlier_hap  = pl.when(pl.col("dad_A") > 0.5).then(pl.lit("A"))\n'
+    '                         .when(pl.col("dad_B") > 0.5).then(pl.lit("B"))\n'
+    '                         .when(pl.col("mom_C") > 0.5).then(pl.lit("C"))\n'
+    '                         .otherwise(pl.lit("D")),\n'
+    '        outlier_meth = pl.max_horizontal("dad_A", "dad_B", "mom_C", "mom_D"),\n'
+    '    )\n'
+    '    .filter(pl.col("n_hi") == 1)\n'
+    '    # group consecutive CpGs sharing the same outlier hap\n'
+    '    .with_columns(\n'
+    '        run_id = (pl.col("outlier_hap")\n'
+    '                  != pl.col("outlier_hap").shift(1)).cum_sum()\n'
+    '    )\n'
+    '    # collapse each run; outlier_meth = mean over its CpGs\n'
+    '    .group_by("run_id", maintain_order=True)\n'
+    '    .agg(\n'
+    '        chrom        = pl.col("chrom").first(),\n'
+    '        start        = pl.col("start").min(),\n'
+    '        end          = pl.col("start").max(),\n'
+    '        n            = pl.len(),\n'
+    '        outlier_hap  = pl.col("outlier_hap").first(),\n'
+    '        outlier_meth = pl.col("outlier_meth").mean(),\n'
+    '        pat_hap      = pl.col("pat_hap").first(),\n'
+    '        mat_hap      = pl.col("mat_hap").first(),\n'
+    '        kid_pat      = pl.col("kid_pat").mean(),\n'
+    '        kid_mat      = pl.col("kid_mat").mean(),\n'
+    '    )\n'
+    '    .filter(pl.col("n") >= 3)\n'
+    '    # kid inherits the outlier hap with ~unchanged meth\n'
+    '    .filter(\n'
+    '        ((pl.col("outlier_hap") == pl.col("pat_hap"))\n'
+    '         & ((pl.col("kid_pat") - pl.col("outlier_meth")).abs() < TOL))\n'
+    '        | ((pl.col("outlier_hap") == pl.col("mat_hap"))\n'
+    '           & ((pl.col("kid_mat") - pl.col("outlier_meth")).abs() < TOL))\n'
+    '    )\n'
+    ')\n'
+    '\n'
+    '# --- Step 2 -----------------------------------------------------\n'
+    '# Exactly one parental hap carries the ALT; kid inherits it on the\n'
+    '# matching side.\n'
+    'df_geno_hits = (df_geno\n'
+    '    # tag each SNV with the ALT count and the (unique) outlier hap\n'
+    '    .with_columns(\n'
+    '        n_alt       = pl.sum_horizontal("dad_A", "dad_B", "mom_C", "mom_D"),\n'
+    '        outlier_hap = pl.when(pl.col("dad_A") == 1).then(pl.lit("A"))\n'
+    '                        .when(pl.col("dad_B") == 1).then(pl.lit("B"))\n'
+    '                        .when(pl.col("mom_C") == 1).then(pl.lit("C"))\n'
+    '                        .otherwise(pl.lit("D")),\n'
+    '    )\n'
+    '    # keep SNVs with a single ALT-carrying parental hap\n'
+    '    .filter(pl.col("n_alt") == 1)\n'
+    '    # kid inherits that ALT on the matching side\n'
+    '    .filter(\n'
+    '        (pl.col("outlier_hap").is_in(["A", "B"]) & (pl.col("kid_pat") == 1))\n'
+    '        | (pl.col("outlier_hap").is_in(["C", "D"]) & (pl.col("kid_mat") == 1))\n'
+    '    )\n'
+    ')\n'
+    '\n'
+    '# --- Step 3 -----------------------------------------------------\n'
+    '# Compound het = meth-outlier and geno-outlier from different\n'
+    '# parents, same locus.\n'
+    'df_compound_het = (df_meth_hits\n'
+    '    .rename({"outlier_hap": "outlier_hap_meth"})\n'
+    '    # pair each meth-outlier region with the nearest geno-outlier\n'
+    '    # SNV on the same chromosome, within 500 bp\n'
+    '    .join_asof(\n'
+    '        df_geno_hits.rename({"outlier_hap": "outlier_hap_geno"}),\n'
+    '        on="start", by="chrom",\n'
+    '        strategy="nearest", tolerance=500,\n'
+    '    )\n'
+    '    # keep loci where the meth and geno outliers are in trans\n'
+    '    # (i.e., come from different parents)\n'
+    '    .filter(\n'
+    '        (pl.col("outlier_hap_meth").is_in(["A", "B"])\n'
+    '         & pl.col("outlier_hap_geno").is_in(["C", "D"]))\n'
+    '        | (pl.col("outlier_hap_meth").is_in(["C", "D"])\n'
+    '           & pl.col("outlier_hap_geno").is_in(["A", "B"]))\n'
+    '    )\n'
+    ')\n'
+)
+
+
+def render_trio_compound_het_tables(out_path: Path | None = None,
+                                     show_title: bool = True,
+                                     fig_width: float = 12.0,
+                                     trim_whitespace: bool = False):
+    """Methylation + phased-genotype tables only (no polars-query subpanel)."""
+    FIG_W, FIG_H = fig_width, 5.0
+    fig = plt.figure(figsize=(FIG_W, FIG_H))
+    LEFT_IN, RIGHT_IN = 0.04 * FIG_W, 0.98 * FIG_W
+    TOP_IN = FIG_H - 0.06 * FIG_H
+    BOTTOM_IN = 0.04 * FIG_H
+
+    TABLE_H_IN = 2.04
+    # _draw_simple_table places the header at axes-y 0.72 and rows below it
+    # at row_dy=0.09. With 5 data rows the last cell-row sits at y≈0.24, so
+    # content extends down to ~y=0.195; the header top sits at ~y=0.78.
+    METH_CONTENT_BOTTOM_FRAC = 0.195
+    GENO_CONTENT_TOP_FRAC = 0.78
+    VISIBLE_GAP_IN = 0.15
+    width_in = RIGHT_IN - LEFT_IN
+
+    def add_axes_in(left_in, bottom_in, w_in, h_in):
+        return fig.add_axes([
+            left_in / FIG_W, bottom_in / FIG_H,
+            w_in / FIG_W,    h_in / FIG_H,
+        ])
+
+    ax_meth_bottom_in = TOP_IN - TABLE_H_IN
+    ax_meth = add_axes_in(LEFT_IN, ax_meth_bottom_in, width_in, TABLE_H_IN)
+    # Overlap geno axis into meth's empty bottom so the *visible* content gap
+    # equals VISIBLE_GAP_IN, not the axis-edge separation.
+    meth_content_bottom_in = ax_meth_bottom_in + METH_CONTENT_BOTTOM_FRAC * TABLE_H_IN
+    geno_content_top_in = meth_content_bottom_in - VISIBLE_GAP_IN
+    ax_geno_bottom_in = geno_content_top_in - GENO_CONTENT_TOP_FRAC * TABLE_H_IN
+    ax_geno = add_axes_in(LEFT_IN, ax_geno_bottom_in, width_in, TABLE_H_IN)
+
+    _draw_simple_table(
+        ax_meth, COMPOUND_METH_COLS, COMPOUND_METH_ROWS,
+        title=COMPOUND_METH_TITLE if show_title else "",
+        highlight_rows=COMPOUND_METH_HIGHLIGHT,
+        bottom_rule=False,
+    )
+    _draw_simple_table(
+        ax_geno, COMPOUND_GENO_COLS, COMPOUND_GENO_ROWS,
+        title=COMPOUND_GENO_TITLE if show_title else "",
+        highlight_rows=COMPOUND_GENO_HIGHLIGHT,
+        bottom_rule=False,
+    )
+
+    out = out_path if out_path is not None else OUT / "trio_compound_het_tables.png"
+    fig.savefig(out, dpi=180)
+    plt.close(fig)
+    if trim_whitespace:
+        _trim_whitespace_png(out)
+    print(f"[scratch] Wrote {out}")
+
+
+def render_trio_compound_het_polars_code(out_path: Path | None = None,
+                                          show_title: bool = True,
+                                          trim_whitespace: bool = False):
+    """Polars discovery code snippet only (no table subpanel)."""
+    # ~95 lines of code at fontsize=10.5 need ~19in of vertical space.
+    n_lines = COMPOUND_CODE.count("\n") + 1
+    code_h_in = n_lines * 0.20
+    fig_h = code_h_in + (0.6 if show_title else 0.3)
+    fig = plt.figure(figsize=(12.0, fig_h))
+    ax = fig.add_axes([0.04, 0.02, 0.94, 0.96])
+    ax.set_xlim(0, 1)
+    ax.set_ylim(0, 1)
+    ax.set_axis_off()
+
+    if show_title:
+        ax.text(
+            0.0, 0.99, COMPOUND_CODE_TITLE,
+            ha="left", va="top", fontsize=12, fontweight="bold",
+            transform=ax.transAxes,
+        )
+        code_y = 0.95
+    else:
+        code_y = 0.99
+    ax.text(
+        0.0, code_y, COMPOUND_CODE,
+        ha="left", va="top", fontsize=10.5,
+        family="Menlo", color=COLOR_NEUTRAL,
+        transform=ax.transAxes,
+    )
+
+    out = out_path if out_path is not None else OUT / "trio_compound_het_polars_code.png"
+    fig.savefig(out, dpi=180)
+    plt.close(fig)
+    if trim_whitespace:
+        _trim_whitespace_png(out)
+    print(f"[scratch] Wrote {out}")
+
+
 def render_trio_compound_het_bed(out_path: Path | None = None):
     """BED snippet (methylation + genotype) + polars query for compound
     genetic-epigenetic heterozygotes."""
@@ -498,36 +710,20 @@ def render_trio_compound_het_bed(out_path: Path | None = None):
     # Outside the region every hap is unmethylated; inside it, exactly one
     # parental hap (mom_C) is hyper-methylated, and the kid inherits that
     # pattern on its maternal side.
-    meth_cols = ("chrom", "start",
-                 "kid_pat", "pat_hap", "kid_mat", "mat_hap",
-                 "dad_A", "dad_B", "mom_C", "mom_D")
-    meth_rows = [
-        ("chr1", "1100", "0.05", "A", "0.94", "C", "0.04", "0.05", "0.93", "0.06"),
-        ("chr1", "1200", "0.04", "A", "0.96", "C", "0.06", "0.04", "0.95", "0.05"),
-        ("chr1", "1300", "0.06", "A", "0.91", "C", "0.05", "0.06", "0.92", "0.04"),
-        ("chr1", "1550", "0.05", "A", "0.04", "C", "0.04", "0.05", "0.05", "0.06"),
-        ("chr1", "1650", "0.05", "A", "0.04", "C", "0.05", "0.04", "0.06", "0.03"),
-    ]
     _draw_simple_table(
-        ax_meth, meth_cols, meth_rows,
-        title="Haplotype-specific methylation levels",
-        highlight_rows={0, 1, 2},
+        ax_meth, COMPOUND_METH_COLS, COMPOUND_METH_ROWS,
+        title=COMPOUND_METH_TITLE,
+        highlight_rows=COMPOUND_METH_HIGHLIGHT,
         bottom_rule=False,
     )
 
     # Genotype at a SNV inside the same locus: exactly one parental hap
     # (dad_A) carries the ALT allele, and the kid inherits it on the
     # paternal side — in trans with the meth outlier.
-    geno_cols = ("chrom", "pos",
-                 "dad_A", "dad_B", "mom_C", "mom_D",
-                 "kid_pat", "kid_mat")
-    geno_rows = [
-        ("chr1", "1420", "1", "0", "0", "0", "1", "0"),
-    ]
     _draw_simple_table(
-        ax_geno, geno_cols, geno_rows,
-        title="Phased genotypes",
-        highlight_rows={0},
+        ax_geno, COMPOUND_GENO_COLS, COMPOUND_GENO_ROWS,
+        title=COMPOUND_GENO_TITLE,
+        highlight_rows=COMPOUND_GENO_HIGHLIGHT,
         bottom_rule=False,
     )
 
@@ -540,104 +736,12 @@ def render_trio_compound_het_bed(out_path: Path | None = None):
     code_y = CODE_TITLE_Y - CODE_TITLE_TO_CODE_IN / code_h_in
     ax_code.text(
         0.0, CODE_TITLE_Y,
-        "Discover compound genetic-epigenetic heterozygous locus",
+        COMPOUND_CODE_TITLE,
         ha="left", va="top", fontsize=12, fontweight="bold",
         transform=ax_code.transAxes,
     )
-    code = (
-        '# --- Step 1 -----------------------------------------------------\n'
-        '# Find runs of consecutive CpGs where the same parental hap is the\n'
-        '# meth outlier, was transmitted to the kid, and the kid hap on that\n'
-        '# side has ~the same meth level.\n'
-        'TOL = 0.10\n'
-        'df_meth_hits = (df_meth\n'
-        '    # sites where exactly one parental hap is the meth outlier\n'
-        '    .with_columns(\n'
-        '        n_hi         = ((pl.col("dad_A") > 0.5)\n'
-        '                      + (pl.col("dad_B") > 0.5)\n'
-        '                      + (pl.col("mom_C") > 0.5)\n'
-        '                      + (pl.col("mom_D") > 0.5)),\n'
-        '        outlier_hap  = pl.when(pl.col("dad_A") > 0.5).then(pl.lit("A"))\n'
-        '                         .when(pl.col("dad_B") > 0.5).then(pl.lit("B"))\n'
-        '                         .when(pl.col("mom_C") > 0.5).then(pl.lit("C"))\n'
-        '                         .otherwise(pl.lit("D")),\n'
-        '        outlier_meth = pl.max_horizontal("dad_A", "dad_B", "mom_C", "mom_D"),\n'
-        '    )\n'
-        '    .filter(pl.col("n_hi") == 1)\n'
-        '    # group consecutive CpGs sharing the same outlier hap\n'
-        '    .with_columns(\n'
-        '        run_id = (pl.col("outlier_hap")\n'
-        '                  != pl.col("outlier_hap").shift(1)).cum_sum()\n'
-        '    )\n'
-        '    # collapse each run; outlier_meth = mean over its CpGs\n'
-        '    .group_by("run_id", maintain_order=True)\n'
-        '    .agg(\n'
-        '        chrom        = pl.col("chrom").first(),\n'
-        '        start        = pl.col("start").min(),\n'
-        '        end          = pl.col("start").max(),\n'
-        '        n            = pl.len(),\n'
-        '        outlier_hap  = pl.col("outlier_hap").first(),\n'
-        '        outlier_meth = pl.col("outlier_meth").mean(),\n'
-        '        pat_hap      = pl.col("pat_hap").first(),\n'
-        '        mat_hap      = pl.col("mat_hap").first(),\n'
-        '        kid_pat      = pl.col("kid_pat").mean(),\n'
-        '        kid_mat      = pl.col("kid_mat").mean(),\n'
-        '    )\n'
-        '    .filter(pl.col("n") >= 3)\n'
-        '    # kid inherits the outlier hap with ~unchanged meth\n'
-        '    .filter(\n'
-        '        ((pl.col("outlier_hap") == pl.col("pat_hap"))\n'
-        '         & ((pl.col("kid_pat") - pl.col("outlier_meth")).abs() < TOL))\n'
-        '        | ((pl.col("outlier_hap") == pl.col("mat_hap"))\n'
-        '           & ((pl.col("kid_mat") - pl.col("outlier_meth")).abs() < TOL))\n'
-        '    )\n'
-        ')\n'
-        '\n'
-        '# --- Step 2 -----------------------------------------------------\n'
-        '# Exactly one parental hap carries the ALT; kid inherits it on the\n'
-        '# matching side.\n'
-        'df_geno_hits = (df_geno\n'
-        '    # tag each SNV with the ALT count and the (unique) outlier hap\n'
-        '    .with_columns(\n'
-        '        n_alt       = pl.sum_horizontal("dad_A", "dad_B", "mom_C", "mom_D"),\n'
-        '        outlier_hap = pl.when(pl.col("dad_A") == 1).then(pl.lit("A"))\n'
-        '                        .when(pl.col("dad_B") == 1).then(pl.lit("B"))\n'
-        '                        .when(pl.col("mom_C") == 1).then(pl.lit("C"))\n'
-        '                        .otherwise(pl.lit("D")),\n'
-        '    )\n'
-        '    # keep SNVs with a single ALT-carrying parental hap\n'
-        '    .filter(pl.col("n_alt") == 1)\n'
-        '    # kid inherits that ALT on the matching side\n'
-        '    .filter(\n'
-        '        (pl.col("outlier_hap").is_in(["A", "B"]) & (pl.col("kid_pat") == 1))\n'
-        '        | (pl.col("outlier_hap").is_in(["C", "D"]) & (pl.col("kid_mat") == 1))\n'
-        '    )\n'
-        ')\n'
-        '\n'
-        '# --- Step 3 -----------------------------------------------------\n'
-        '# Compound het = meth-outlier and geno-outlier from different\n'
-        '# parents, same locus.\n'
-        'df_compound_het = (df_meth_hits\n'
-        '    .rename({"outlier_hap": "outlier_hap_meth"})\n'
-        '    # pair each meth-outlier region with the nearest geno-outlier\n'
-        '    # SNV on the same chromosome, within 500 bp\n'
-        '    .join_asof(\n'
-        '        df_geno_hits.rename({"outlier_hap": "outlier_hap_geno"}),\n'
-        '        on="start", by="chrom",\n'
-        '        strategy="nearest", tolerance=500,\n'
-        '    )\n'
-        '    # keep loci where the meth and geno outliers are in trans\n'
-        '    # (i.e., come from different parents)\n'
-        '    .filter(\n'
-        '        (pl.col("outlier_hap_meth").is_in(["A", "B"])\n'
-        '         & pl.col("outlier_hap_geno").is_in(["C", "D"]))\n'
-        '        | (pl.col("outlier_hap_meth").is_in(["C", "D"])\n'
-        '           & pl.col("outlier_hap_geno").is_in(["A", "B"]))\n'
-        '    )\n'
-        ')\n'
-    )
     ax_code.text(
-        0.0, code_y, code,
+        0.0, code_y, COMPOUND_CODE,
         ha="left", va="top", fontsize=10.5,
         family="Menlo", color=COLOR_NEUTRAL,
         transform=ax_code.transAxes,

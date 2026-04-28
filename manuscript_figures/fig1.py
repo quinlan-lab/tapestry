@@ -102,6 +102,24 @@ def panel_F() -> None:
     )
 
 
+# Panel G — haplotype-specific methylation + phased-genotype tables (compound scenario).
+def panel_G() -> None:
+    trio_discovery.render_trio_compound_het_tables(
+        out_path=OUT / "panel_G_trio_compound_het_tables.png",
+        show_title=False,
+        trim_whitespace=True,
+    )
+
+
+# Panel H — polars discovery snippet (compound scenario).
+def panel_H() -> None:
+    trio_discovery.render_trio_compound_het_polars_code(
+        out_path=OUT / "panel_H_trio_compound_het_polars_code.png",
+        show_title=False,
+        trim_whitespace=True,
+    )
+
+
 PANELS = {
     "A": panel_A,
     "B": panel_B,
@@ -109,6 +127,8 @@ PANELS = {
     "D": panel_D,
     "E": panel_E,
     "F": panel_F,
+    "G": panel_G,
+    "H": panel_H,
 }
 
 
