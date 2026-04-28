@@ -221,12 +221,12 @@ methylation_level_mom_D_model | model-based methylation level on mom's haplotype
 start_hap_map_block_pat | start of the paternal hap-map block
 end_hap_map_block_pat | end of the paternal hap-map block
 paternal_haplotype | which of dad's haplotypes (A or B) corresponds to the kid's paternal haplotype in this block
-paternal_concordance | bit-vector concordance between the kid's paternal allele sequence and dad's assigned haplotype (A or B) over the het SNVs in the paternal hap-map block. Both vectors come from the same `whatshap phase --ped` run, so this is a within-pedMEC consistency score, not a cross-method comparison. The assigned haplotype is defined as whichever of dad's two haplotypes gives the higher concordance, so the value lies in `[0.5, 1.0]` by construction
+paternal_concordance | bit-vector concordance between the kid's paternal allele sequence and dad's assigned haplotype (A or B) over the het SNVs in the paternal hap-map block. Both vectors come from the same `whatshap phase --ped` run. The assigned haplotype is defined as whichever of dad's two haplotypes gives the higher concordance, so the value lies in `[0.5, 1.0]` by construction
 num_het_SNVs_in_dad | number of heterozygous sites in dad within the paternal hap-map block
 start_hap_map_block_mat | start of the maternal hap-map block
 end_hap_map_block_mat | end of the maternal hap-map block
 maternal_haplotype | which of mom's haplotypes (C or D) corresponds to the kid's maternal haplotype in this block
-maternal_concordance | bit-vector concordance between the kid's maternal allele sequence and mom's assigned haplotype (C or D) over the het SNVs in the maternal hap-map block. Both vectors come from the same `whatshap phase --ped` run, so this is a within-pedMEC consistency score, not a cross-method comparison. The assigned haplotype is defined as whichever of mom's two haplotypes gives the higher concordance, so the value lies in `[0.5, 1.0]` by construction
+maternal_concordance | bit-vector concordance between the kid's maternal allele sequence and mom's assigned haplotype (C or D) over the het SNVs in the maternal hap-map block. Both vectors come from the same `whatshap phase --ped` run. The assigned haplotype is defined as whichever of mom's two haplotypes gives the higher concordance, so the value lies in `[0.5, 1.0]` by construction
 num_het_SNVs_in_mom | number of heterozygous sites in mom within the maternal hap-map block
 cpg_is_within_50bp_of_mismatch_site_pat | is the CpG site within 50bp of a het SNV in dad at which the kid's paternal allele disagrees with dad's assigned haplotype (a within-pedMEC bit-vector mismatch on the paternal side)
 cpg_is_within_50bp_of_mismatch_site_mat | is the CpG site within 50bp of a het SNV in mom at which the kid's maternal allele disagrees with mom's assigned haplotype (a within-pedMEC bit-vector mismatch on the maternal side)
