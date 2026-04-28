@@ -456,7 +456,7 @@ For motivation — *why* phase methylation in the first place — see
 
 | Page | What it covers |
 |---|---|
-| [pedMEC phasing](pedmec_phasing/pedmec_phasing.md) | Step 1 — `run-whatshap.sh`: trio-aware pedMEC phasing of the joint-called VCF, per-sample phase-block stats, and haplotagging of each sample's BAM. *(page TODO; for now see [`run-whatshap.sh`](../../run-whatshap.sh) and the **Trio-wise workflow** section of the top-level [`README.md`](../../README.md).)* |
+| [pedMEC phasing](pedmec_phasing/pedmec_phasing.md) | Step 1 — `run-whatshap.sh`: trio-aware pedMEC phasing of the joint-called VCF, per-sample phase-block stats, and haplotagging of each sample's BAM. |
 | [Parent-phased methylation](parent_phased_methylation/parent_phased_methylation.md) | Step 3 — `phase_meth_to_parent_haps.py` + `hap_map_trio.py`: the conceptual centre of the trio-wise workflow. Within each hap-map block (intersection of the kid's whatshap phase block and one parent's whatshap phase block), a bit-vector concordance decides which of the kid's two haplotypes descends from which parental homolog (`A`/`B` for dad, `C`/`D` for mom), and per-CpG methylation re-buckets mechanically. |
 | [All-CpG expansion (trio)](all_cpg_expansion_trio/all_cpg_expansion_trio.md) | Step 4 — `expand_to_all_cpgs.trio.sh`: trio analogue of the pedigree-wise all-CpG expansion (reference CpGs vs sample CpGs vs measured CpGs, allele-specific CpGs, within-50bp-of-mismatch QC flag). *(page TODO; for now see [`expand_to_all_cpgs.trio.sh`](../../expand_to_all_cpgs.trio.sh).)* |
 
@@ -469,6 +469,75 @@ the trio-wise version only has to explain the two differences:
 `gtg-concordance`, and (b) the kid's haplotypes are labelled by
 parental letters (A/B in dad, C/D in mom) rather than by
 founder-of-the-pedigree letters.
+"""
+
+
+PEDMEC_PHASING_MD = f"""\
+# pedMEC phasing (Step 1)
+
+This page is part of the [trio-wise workflow](../index.md). It covers
+Step 1 of the trio-wise pipeline:
+[`run-whatshap.sh`]({permalink('run-whatshap.sh', 1, SHA)}) — the
+script that takes a joint-called trio VCF and a set of HiFi BAMs and
+produces, for each sample, a pedMEC-phased VCF, a per-sample
+phase-block table, and a haplotagged BAM. The downstream
+[parent-phased-methylation page](../parent_phased_methylation/parent_phased_methylation.md)
+consumes the per-sample phase-block tables and the multi-sample
+phased VCF; the trio version of
+[`aligned_bam_to_cpg_scores.sh`](../../../aligned_bam_to_cpg_scores.sh)
+consumes the haplotagged BAMs.
+
+The script proceeds in four steps.
+
+## 1. Unphase the input VCF
+
+The input joint-called VCF arrives with whatever phasing the upstream
+caller emitted. To avoid mixed phasing,
+[`whatshap unphase`]({permalink('run-whatshap.sh', 95, SHA)}) strips
+all existing phase information. The unphased VCF is then bgzipped and
+tabixed for use as input to the per-chromosome pedMEC step.
+
+## 2. Pedigree-aware (pedMEC) phasing
+
+Per-chromosome,
+[`whatshap phase --ped`]({permalink('run-whatshap.sh', 128, SHA)})
+runs the pedMEC algorithm jointly on the three samples (kid, dad,
+mom) using the trio's PED file and all three HiFi BAMs as evidence.
+pedMEC adds an inheritance-consistency constraint to single-sample
+read-based MEC, which resolves phasing ambiguities that single-sample
+whatshap cannot. By tapestry's convention the kid is ordered as
+`pat|mat`, so the kid's `hap1` is paternal and `hap2` is maternal;
+dad is `A|B` and mom is `C|D`.
+
+The 25 chromosomes (chr1–22, X, Y, M) are phased in parallel
+([`xargs -P PHASE_THREADS`]({permalink('run-whatshap.sh', 142, SHA)}))
+and the per-chromosome phased VCFs are concatenated with
+[`bcftools concat --naive`]({permalink('run-whatshap.sh', 154, SHA)})
+into one genome-wide phased VCF.
+
+## 3. Per-sample block stats
+
+For each of the three samples,
+[`whatshap stats --block-list`]({permalink('run-whatshap.sh', 166, SHA)})
+emits a TSV listing every phase block (chromosome, span, phase-set
+ID, number of variants). This is the file the next step of the
+pipeline reads via
+[`get_phase_blocks`]({permalink('src/phasing_trio.py', 7, SHA)})
+(consumed at
+[`phase_meth_to_parent_haps.py:359`]({permalink('src/phase_meth_to_parent_haps.py', 359, SHA)})).
+
+## 4. Haplotag the BAMs
+
+For each sample, prior `HP`/`PS` tags are stripped from the input
+BAM and
+[`whatshap haplotag`]({permalink('run-whatshap.sh', 200, SHA)})
+re-tags the reads from the pedMEC-phased VCF, producing a
+`*.haplotagged.bam` whose reads carry trio-aware `HP`/`PS` tags.
+This haplotagged BAM is the input to Step 2
+([`aligned_bam_to_cpg_scores.sh`]({permalink('aligned_bam_to_cpg_scores.sh', 1, SHA)})
+in trio mode), which calls pb-CpG-tools once per HP-tagged BAM and
+produces the per-haplotype methylation BEDs that Step 3 relabels
+onto the parental-letter alphabet.
 """
 
 
@@ -620,6 +689,14 @@ def page_trio_wise_index(outdir: Path) -> None:
     print(f"[wiki] Wrote {md_path}")
 
 
+def page_pedmec_phasing(outdir: Path) -> None:
+    page_dir = outdir / "trio_wise_workflow" / "pedmec_phasing"
+    page_dir.mkdir(parents=True, exist_ok=True)
+    md_path = page_dir / "pedmec_phasing.md"
+    md_path.write_text(PEDMEC_PHASING_MD)
+    print(f"[wiki] Wrote {md_path}")
+
+
 def page_parent_phased_methylation(outdir: Path) -> None:
     page_dir = outdir / "trio_wise_workflow" / "parent_phased_methylation"
     page_dir.mkdir(parents=True, exist_ok=True)
@@ -639,6 +716,7 @@ PAGES = {
     "pedigree_wise_index": page_pedigree_wise_index,
     "founder_phased_methylation": page_founder_phased_methylation,
     "trio_wise_index": page_trio_wise_index,
+    "pedmec_phasing": page_pedmec_phasing,
     "parent_phased_methylation": page_parent_phased_methylation,
 }
 

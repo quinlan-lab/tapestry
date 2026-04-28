@@ -14,7 +14,7 @@ For motivation — *why* phase methylation in the first place — see
 
 | Page | What it covers |
 |---|---|
-| [pedMEC phasing](pedmec_phasing/pedmec_phasing.md) | Step 1 — `run-whatshap.sh`: trio-aware pedMEC phasing of the joint-called VCF, per-sample phase-block stats, and haplotagging of each sample's BAM. *(page TODO; for now see [`run-whatshap.sh`](../../run-whatshap.sh) and the **Trio-wise workflow** section of the top-level [`README.md`](../../README.md).)* |
+| [pedMEC phasing](pedmec_phasing/pedmec_phasing.md) | Step 1 — `run-whatshap.sh`: trio-aware pedMEC phasing of the joint-called VCF, per-sample phase-block stats, and haplotagging of each sample's BAM. |
 | [Parent-phased methylation](parent_phased_methylation/parent_phased_methylation.md) | Step 3 — `phase_meth_to_parent_haps.py` + `hap_map_trio.py`: the conceptual centre of the trio-wise workflow. Within each hap-map block (intersection of the kid's whatshap phase block and one parent's whatshap phase block), a bit-vector concordance decides which of the kid's two haplotypes descends from which parental homolog (`A`/`B` for dad, `C`/`D` for mom), and per-CpG methylation re-buckets mechanically. |
 | [All-CpG expansion (trio)](all_cpg_expansion_trio/all_cpg_expansion_trio.md) | Step 4 — `expand_to_all_cpgs.trio.sh`: trio analogue of the pedigree-wise all-CpG expansion (reference CpGs vs sample CpGs vs measured CpGs, allele-specific CpGs, within-50bp-of-mismatch QC flag). *(page TODO; for now see [`expand_to_all_cpgs.trio.sh`](../../expand_to_all_cpgs.trio.sh).)* |
 
