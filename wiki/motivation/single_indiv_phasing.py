@@ -182,7 +182,7 @@ def _read_data(source: str, read_idx: int, start: int, end: int):
 
 
 def _draw_read_row(ax, row_y, source, read_idx, start, end, hap_color,
-                   prefix, prefix_color):
+                   prefix, prefix_color, glyph_fontsize=GLYPH_FONTSIZE):
     ax.text(
         PREFIX_X, row_y, prefix,
         ha="left", va="center", fontsize=PREFIX_FONTSIZE,
@@ -195,7 +195,7 @@ def _draw_read_row(ax, row_y, source, read_idx, start, end, hap_color,
             ax.text(
                 i, row_y, str(val),
                 ha="center", va="center",
-                fontsize=GLYPH_FONTSIZE, family="Arial",
+                fontsize=glyph_fontsize, family="Arial",
                 color=hap_color,
             )
         else:  # CpG: same-cell-size colored rectangle
@@ -212,7 +212,7 @@ def _draw_read_row(ax, row_y, source, read_idx, start, end, hap_color,
 DISCORDANT_TRACK_COLOR = "#000000"   # black
 
 
-def _draw_discordant_track(ax, label="Discordant region"):
+def _draw_discordant_track(ax, label="Discordant region", xlim_left=None):
     """An IGV-style feature track: one horizontal bar spanning the
     [DISCORDANT_LO, DISCORDANT_HI] interval, with a side label."""
     ax.add_patch(Rectangle(
@@ -220,17 +220,21 @@ def _draw_discordant_track(ax, label="Discordant region"):
         (DISCORDANT_HI - DISCORDANT_LO) + 1.0, 0.5,
         facecolor=DISCORDANT_TRACK_COLOR, edgecolor="none",
     ))
-    ax.text(
-        PREFIX_X, 0.5, label,
-        ha="left", va="center", fontsize=PREFIX_FONTSIZE,
-        family="Arial", color=DISCORDANT_TRACK_COLOR,
-    )
-    ax.set_xlim(PREFIX_X - 0.5, N_SITES - 0.5)
+    if label:
+        ax.text(
+            PREFIX_X, 0.5, label,
+            ha="left", va="center", fontsize=PREFIX_FONTSIZE,
+            family="Arial", color=DISCORDANT_TRACK_COLOR,
+        )
+    ax.set_xlim(PREFIX_X - 0.5 if xlim_left is None else xlim_left,
+                N_SITES - 0.5)
     ax.set_ylim(0, 1)
     ax.set_axis_off()
 
 
-def _draw_meth_bars(ax, levels_dict, color, track_label=None):
+def _draw_meth_bars(ax, levels_dict, color, track_label=None,
+                    ytick_fontsize=8, xlim_left=None,
+                    ylabel=None, ylabel_fontsize=10):
     """Bigwig-style methylation track. No x-axis, no column annotations."""
     BAR_ALPHA = 0.55
     for cpg_i, level in levels_dict.items():
@@ -254,18 +258,22 @@ def _draw_meth_bars(ax, levels_dict, color, track_label=None):
             ha="left", va="center", fontsize=PREFIX_FONTSIZE,
             family="Arial", color=color,
         )
-    ax.set_xlim(PREFIX_X - 0.5, N_SITES - 0.5)
+    ax.set_xlim(PREFIX_X - 0.5 if xlim_left is None else xlim_left,
+                N_SITES - 0.5)
     ax.set_ylim(0, 1.05)
     ax.set_xticks([])
     ax.set_yticks([0, 1])
-    ax.set_yticklabels(["0", "1"], fontsize=8)
+    ax.set_yticklabels(["0", "1"], fontsize=ytick_fontsize)
     for spine in ("top", "right", "bottom"):
         ax.spines[spine].set_visible(False)
     # Move the y-axis (with its 0/1 ticks) right next to the bars and
     # bound the spine so it stops at the "1" tick.
     ax.spines["left"].set_position(("data", -0.8))
     ax.spines["left"].set_bounds(0, 1)
-    ax.tick_params(axis="y", length=2, labelsize=8)
+    ax.tick_params(axis="y", length=2, labelsize=ytick_fontsize)
+    if ylabel:
+        ax.set_ylabel(ylabel, fontsize=ylabel_fontsize, color=color,
+                      family="Arial", rotation=90, labelpad=4)
 
 
 def _per_source_indexed_reads():
@@ -309,7 +317,13 @@ def _phased_methylation():
 
 # --- Figures ---
 
-def render_before_phasing():
+def render_before_phasing(out_path: Path | None = None,
+                          glyph_fontsize: int = GLYPH_FONTSIZE,
+                          ytick_fontsize: int = 8,
+                          show_left_labels: bool = True,
+                          show_title: bool = True,
+                          ylabel: str | None = None,
+                          ylabel_fontsize: int = 10):
     fig = plt.figure(figsize=(11.0, 5.7))
     gs = GridSpec(
         nrows=3, ncols=1,
@@ -322,8 +336,20 @@ def render_before_phasing():
     ax_reads = fig.add_subplot(gs[2], sharex=ax_meth)
 
     pooled = _pooled_methylation()
-    _draw_meth_bars(ax_meth, pooled, COLOR_NEUTRAL, track_label="Meth level")
-    _draw_discordant_track(ax_discordant)
+    xlim_left = None if show_left_labels else -1.5
+    _draw_meth_bars(
+        ax_meth, pooled, COLOR_NEUTRAL,
+        track_label="Meth level" if show_left_labels else None,
+        ytick_fontsize=ytick_fontsize,
+        xlim_left=xlim_left,
+        ylabel=ylabel,
+        ylabel_fontsize=ylabel_fontsize,
+    )
+    _draw_discordant_track(
+        ax_discordant,
+        label="Discordant region" if show_left_labels else None,
+        xlim_left=xlim_left,
+    )
 
     src_seen = {"pat": 0, "mat": 0}
     for row, (src, start, end) in enumerate(READS_INTERLEAVED):
@@ -334,22 +360,32 @@ def render_before_phasing():
             start=start, end=end,
             hap_color=COLOR_NEUTRAL, prefix="",
             prefix_color=COLOR_NEUTRAL,
+            glyph_fontsize=glyph_fontsize,
         )
-    ax_reads.set_xlim(PREFIX_X - 0.5, N_SITES - 0.5)
+    ax_reads.set_xlim(PREFIX_X - 0.5 if xlim_left is None else xlim_left,
+                      N_SITES - 0.5)
     ax_reads.set_ylim(N_READS - 0.5, -1.0)
     ax_reads.set_axis_off()
 
-    fig.suptitle(
-        'Before phasing: unphased reads, one pooled methylation profile',
-        fontsize=12, y=0.97,
-    )
-    out = OUT / "single_indiv_before_phasing.png"
+    if show_title:
+        fig.suptitle(
+            'Before phasing: unphased reads, one pooled methylation profile',
+            fontsize=12, y=0.97,
+        )
+    out = out_path if out_path is not None else OUT / "single_indiv_before_phasing.png"
     fig.savefig(out, dpi=180)
     plt.close(fig)
     print(f"[scratch] Wrote {out}")
 
 
-def render_after_phasing():
+def render_after_phasing(out_path: Path | None = None,
+                         glyph_fontsize: int = GLYPH_FONTSIZE,
+                         ytick_fontsize: int = 8,
+                         show_left_labels: bool = True,
+                         show_title: bool = True,
+                         pat_ylabel: str | None = None,
+                         mat_ylabel: str | None = None,
+                         ylabel_fontsize: int = 10):
     fig = plt.figure(figsize=(11.0, 6.7))
     gs = GridSpec(
         nrows=4, ncols=1,
@@ -362,10 +398,25 @@ def render_after_phasing():
     ax_discordant = fig.add_subplot(gs[2], sharex=ax_pat)
     ax_reads = fig.add_subplot(gs[3], sharex=ax_pat)
 
+    xlim_left = None if show_left_labels else -1.5
     phased = _phased_methylation()
-    _draw_meth_bars(ax_pat, phased["pat"], COLOR_NEUTRAL, track_label="Pat meth")
-    _draw_meth_bars(ax_mat, phased["mat"], COLOR_NEUTRAL, track_label="Mat meth")
-    _draw_discordant_track(ax_discordant)
+    _draw_meth_bars(
+        ax_pat, phased["pat"], COLOR_NEUTRAL,
+        track_label="Pat meth" if show_left_labels else None,
+        ytick_fontsize=ytick_fontsize, xlim_left=xlim_left,
+        ylabel=pat_ylabel, ylabel_fontsize=ylabel_fontsize,
+    )
+    _draw_meth_bars(
+        ax_mat, phased["mat"], COLOR_NEUTRAL,
+        track_label="Mat meth" if show_left_labels else None,
+        ytick_fontsize=ytick_fontsize, xlim_left=xlim_left,
+        ylabel=mat_ylabel, ylabel_fontsize=ylabel_fontsize,
+    )
+    _draw_discordant_track(
+        ax_discordant,
+        label="Discordant region" if show_left_labels else None,
+        xlim_left=xlim_left,
+    )
 
     n_pat = len(READS_BY_SOURCE["pat"])
     GROUP_GAP = 1.2  # vertical space between the pat and mat groups
@@ -379,27 +430,31 @@ def render_after_phasing():
             ax_reads, row_y=y, source=src, read_idx=k,
             start=start, end=end,
             hap_color=COLOR_NEUTRAL, prefix="", prefix_color=COLOR_NEUTRAL,
+            glyph_fontsize=glyph_fontsize,
         )
         last_y = y
     n_mat = len(READS_BY_SOURCE["mat"])
     pat_center = (n_pat - 1) / 2.0
     mat_center = n_pat + GROUP_GAP + (n_mat - 1) / 2.0
-    for y, label in ((pat_center, "Pat hap"), (mat_center, "Mat hap")):
-        ax_reads.text(
-            PREFIX_X, y, label,
-            ha="left", va="center", fontsize=PREFIX_FONTSIZE,
-            family="Arial", color=COLOR_NEUTRAL,
-        )
+    if show_left_labels:
+        for y, label in ((pat_center, "Pat hap"), (mat_center, "Mat hap")):
+            ax_reads.text(
+                PREFIX_X, y, label,
+                ha="left", va="center", fontsize=PREFIX_FONTSIZE,
+                family="Arial", color=COLOR_NEUTRAL,
+            )
 
-    ax_reads.set_xlim(PREFIX_X - 0.5, N_SITES - 0.5)
+    ax_reads.set_xlim(PREFIX_X - 0.5 if xlim_left is None else xlim_left,
+                      N_SITES - 0.5)
     ax_reads.set_ylim(last_y + 0.6, -1.0)
     ax_reads.set_axis_off()
 
-    fig.suptitle(
-        'After phasing: phased reads, one methylation profile per haplotype',
-        fontsize=12, y=0.98,
-    )
-    out = OUT / "single_indiv_after_phasing.png"
+    if show_title:
+        fig.suptitle(
+            'After phasing: phased reads, one methylation profile per haplotype',
+            fontsize=12, y=0.98,
+        )
+    out = out_path if out_path is not None else OUT / "single_indiv_after_phasing.png"
     fig.savefig(out, dpi=180)
     plt.close(fig)
     print(f"[scratch] Wrote {out}")

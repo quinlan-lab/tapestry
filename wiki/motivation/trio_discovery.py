@@ -25,7 +25,7 @@ OUT = Path(__file__).resolve().parent
 X0, Y0, VW, VH = 220, 125, 880, 335
 SVG_HEAD = (
     f'<svg xmlns="http://www.w3.org/2000/svg" viewBox="{X0} {Y0} {VW} {VH}" '
-    f'font-family="Helvetica, Arial, sans-serif" font-size="14">'
+    f'font-family="Arial, sans-serif" font-size="14">'
     f'<rect x="{X0}" y="{Y0}" width="{VW}" height="{VH}" fill="white"/>'
 )
 SVG_TAIL = '</svg>'
@@ -62,7 +62,8 @@ def star(cx, cy, r=7, fill='#d62728', stroke='black', sw=1.0):
 
 # ---------- haplotype ----------
 
-def haplotype(x, y, w, color, cpgs, variants=(), label=None, label_at_start=False):
+def haplotype(x, y, w, color, cpgs, variants=(), label=None, label_at_start=False,
+              label_fontsize=16):
     """cpgs: list of (rel_x, methylated_bool). variants: list of rel_x drawn as red stars.
     label: optional single-letter hap id (drawn just outside the bar, adjacent
     to the person's shape). label_at_start puts it at bar_x0 (left end)."""
@@ -75,12 +76,12 @@ def haplotype(x, y, w, color, cpgs, variants=(), label=None, label_at_start=Fals
         if label_at_start:
             out.append(
                 f'<text x="{bar_x0 - 10}" y="{y + 5}" text-anchor="end" '
-                f'font-family="Arial, sans-serif" font-size="16">{label}</text>'
+                f'font-family="Arial, sans-serif" font-size="{label_fontsize}">{label}</text>'
             )
         else:
             out.append(
                 f'<text x="{bar_x1 + 10}" y="{y + 5}" text-anchor="start" '
-                f'font-family="Arial, sans-serif" font-size="16">{label}</text>'
+                f'font-family="Arial, sans-serif" font-size="{label_fontsize}">{label}</text>'
             )
     stem_h = 24
     r = 7
@@ -168,7 +169,7 @@ SCENARIO_COMPOUND = Scenario(
 
 # ---------- layout ----------
 
-def build(scenario: Scenario) -> str:
+def build(scenario: Scenario, label_fontsize: int = 16) -> str:
     parts = [SVG_HEAD]
 
     mom = (560, 190)
@@ -179,16 +180,20 @@ def build(scenario: Scenario) -> str:
     # Mom/kid labels sit on the bar's tail (person side); dad labels sit on the head.
     parts.append(haplotype(240, 184, 340, scenario.mom_top.color,
                            scenario.mom_top.cpgs, scenario.mom_top.variants,
-                           label=scenario.mom_top.label))
+                           label=scenario.mom_top.label,
+                           label_fontsize=label_fontsize))
     parts.append(haplotype(240, 234, 340, scenario.mom_bot.color,
                            scenario.mom_bot.cpgs, scenario.mom_bot.variants,
-                           label=scenario.mom_bot.label))
+                           label=scenario.mom_bot.label,
+                           label_fontsize=label_fontsize))
     parts.append(haplotype(890, 184, 280, scenario.dad_top.color,
                            scenario.dad_top.cpgs, scenario.dad_top.variants,
-                           label=scenario.dad_top.label, label_at_start=True))
+                           label=scenario.dad_top.label, label_at_start=True,
+                           label_fontsize=label_fontsize))
     parts.append(haplotype(890, 234, 280, scenario.dad_bot.color,
                            scenario.dad_bot.cpgs, scenario.dad_bot.variants,
-                           label=scenario.dad_bot.label, label_at_start=True))
+                           label=scenario.dad_bot.label, label_at_start=True,
+                           label_fontsize=label_fontsize))
 
     parts.append(line(mom[0] + 50, mom[1], dad[0] - 50, dad[1]))
     midx = (mom[0] + dad[0]) / 2
@@ -198,10 +203,12 @@ def build(scenario: Scenario) -> str:
 
     parts.append(haplotype(380, 394, 280, scenario.kid_top.color,
                            scenario.kid_top.cpgs, scenario.kid_top.variants,
-                           label=scenario.kid_top.label))
+                           label=scenario.kid_top.label,
+                           label_fontsize=label_fontsize))
     parts.append(haplotype(380, 444, 280, scenario.kid_bot.color,
                            scenario.kid_bot.cpgs, scenario.kid_bot.variants,
-                           label=scenario.kid_bot.label))
+                           label=scenario.kid_bot.label,
+                           label_fontsize=label_fontsize))
 
     parts.append(SVG_TAIL)
     return '\n'.join(parts)
@@ -209,7 +216,125 @@ def build(scenario: Scenario) -> str:
 
 # ---------- matplotlib companion: BED snippet + polars query ----------
 
-def render_trio_denovo_bed():
+# Shared data for the de novo BED panel (methylation table + polars query).
+# CpG genomic coordinates mirror KID_RELS in the trio_denovo SVG: a left
+# cluster of 3 CpGs (concordant unmethylated on dad_A → kid_pat) and a
+# right cluster of 2 CpGs (de novo gain — kid_pat methylated where dad_A
+# is not). dad_B is the non-transmitted, fully methylated homolog.
+# Methylation levels jittered around the SVG values for realism.
+DENOVO_TABLE_TITLE = "Haplotype-specific methylation levels"
+DENOVO_TABLE_COLS = ("chrom", "start", "kid_pat", "pat_hap", "dad_A", "dad_B")
+DENOVO_TABLE_ROWS = [
+    ("chr1", "1100", "0.05", "A", "0.04", "0.93"),
+    ("chr1", "1200", "0.04", "A", "0.06", "0.95"),
+    ("chr1", "1300", "0.06", "A", "0.05", "0.92"),
+    ("chr1", "1550", "0.94", "A", "0.05", "0.96"),
+    ("chr1", "1650", "0.96", "A", "0.04", "0.94"),
+]
+DENOVO_CODE_TITLE = "Discover de novo gain of methylation on paternal haplotype"
+DENOVO_CODE = (
+    '# Pick the dad haplotype that was transmitted to the kid.\n'
+    'df_meth = df_meth.with_columns(\n'
+    '    dad_transmitted = pl.when(pl.col("pat_hap") == "A")\n'
+    '        .then(pl.col("dad_A"))\n'
+    '        .otherwise(pl.col("dad_B"))\n'
+    ')\n'
+    '\n'
+    '# Find runs of consecutive CpGs where the kid_pat is methylated\n'
+    '# but the dad-transmitted haplotype is not — i.e., a de novo\n'
+    '# *gain* of methylation on the kid paternal homolog.\n'
+    'WINDOW = 2\n'
+    'df_denovo_gain_pat = (\n'
+    '    df_meth.with_columns(\n'
+    '        delta = pl.col("kid_pat") - pl.col("dad_transmitted"),\n'
+    '    )\n'
+    '    .with_columns(\n'
+    '        mean_delta = pl.col("delta").rolling_mean(WINDOW),\n'
+    '    )\n'
+    '    .filter(pl.col("mean_delta") > 0.5)\n'
+    ')\n'
+)
+
+
+def render_trio_denovo_meth_table(out_path: Path | None = None,
+                                   show_title: bool = True,
+                                   fig_width: float = 8.0,
+                                   col_dx: float = 0.085,
+                                   cell_fontsize: float = 10.5,
+                                   trim_whitespace: bool = False):
+    """Methylation table only (no polars-query subpanel)."""
+    fig_h = 2.6 if show_title else 2.2
+    fig = plt.figure(figsize=(fig_width, fig_h))
+    ax = fig.add_axes([0.04, 0.05, 0.94, 0.9])
+    _draw_simple_table(
+        ax, DENOVO_TABLE_COLS, DENOVO_TABLE_ROWS,
+        title=DENOVO_TABLE_TITLE if show_title else "",
+        highlight_rows={3, 4},
+        bottom_rule=False,
+        col_dx=col_dx,
+        cell_fontsize=cell_fontsize,
+    )
+    out = out_path if out_path is not None else OUT / "trio_denovo_meth_table.png"
+    fig.savefig(out, dpi=180)
+    plt.close(fig)
+    if trim_whitespace:
+        _trim_whitespace_png(out)
+    print(f"[scratch] Wrote {out}")
+
+
+def _trim_whitespace_png(path) -> None:
+    """Crop pure-white margins off all four sides of a PNG in place."""
+    from PIL import Image, ImageChops
+    img = Image.open(path).convert("RGB")
+    bg = Image.new("RGB", img.size, (255, 255, 255))
+    diff = ImageChops.difference(img, bg)
+    bbox = diff.getbbox()
+    if bbox is not None:
+        # Add a small breathing-room margin (10 px) on all sides.
+        pad = 10
+        left = max(0, bbox[0] - pad)
+        top = max(0, bbox[1] - pad)
+        right = min(img.size[0], bbox[2] + pad)
+        bottom = min(img.size[1], bbox[3] + pad)
+        img.crop((left, top, right, bottom)).save(path)
+
+
+def render_trio_denovo_polars_code(out_path: Path | None = None,
+                                    show_title: bool = True,
+                                    trim_whitespace: bool = False):
+    """Polars discovery code snippet only (no table subpanel)."""
+    fig_h = 5.5 if show_title else 5.0
+    fig = plt.figure(figsize=(12.0, fig_h))
+    ax = fig.add_axes([0.04, 0.04, 0.94, 0.92])
+    ax.set_xlim(0, 1)
+    ax.set_ylim(0, 1)
+    ax.set_axis_off()
+
+    if show_title:
+        ax.text(
+            0.0, 0.97, DENOVO_CODE_TITLE,
+            ha="left", va="top", fontsize=12, fontweight="bold",
+            transform=ax.transAxes,
+        )
+        code_y = 0.85
+    else:
+        code_y = 0.97
+    ax.text(
+        0.0, code_y, DENOVO_CODE,
+        ha="left", va="top", fontsize=10.5,
+        family="Menlo", color=COLOR_NEUTRAL,
+        transform=ax.transAxes,
+    )
+
+    out = out_path if out_path is not None else OUT / "trio_denovo_polars_code.png"
+    fig.savefig(out, dpi=180)
+    plt.close(fig)
+    if trim_whitespace:
+        _trim_whitespace_png(out)
+    print(f"[scratch] Wrote {out}")
+
+
+def render_trio_denovo_bed(out_path: Path | None = None):
     """BED snippet + polars query for discovering de novo epimutations."""
     FIG_W, FIG_H = 12.0, 7.5
     fig = plt.figure(figsize=(FIG_W, FIG_H))
@@ -239,24 +364,9 @@ def render_trio_denovo_bed():
     ax_code_top_in = ax_meth_top_in - TABLE_H_IN - gap_table_code_in
     ax_code = add_axes_in(LEFT_IN, ax_code_top_in - code_h_in, width_in, code_h_in)
 
-    cols = ("chrom", "start", "kid_pat", "pat_hap", "dad_A", "dad_B")
-    # CpG genomic coordinates mirror KID_RELS in the trio_denovo SVG:
-    #   left cluster of 3 CpGs at 1100 / 1200 / 1300 (concordant
-    #     unmethylated on dad_A → kid_pat),
-    #   right cluster of 2 CpGs at 1550 / 1650 (de novo gain — kid_pat
-    #     methylated where dad_A is not).
-    # dad_B is the non-transmitted, fully methylated homolog.
-    # Methylation levels jittered around the SVG values for realism.
-    rows = [
-        ("chr1", "1100", "0.05", "A", "0.04", "0.93"),
-        ("chr1", "1200", "0.04", "A", "0.06", "0.95"),
-        ("chr1", "1300", "0.06", "A", "0.05", "0.92"),
-        ("chr1", "1550", "0.94", "A", "0.05", "0.96"),
-        ("chr1", "1650", "0.96", "A", "0.04", "0.94"),
-    ]
     _draw_simple_table(
-        ax_meth, cols, rows,
-        title="Haplotype-specific methylation levels",
+        ax_meth, DENOVO_TABLE_COLS, DENOVO_TABLE_ROWS,
+        title=DENOVO_TABLE_TITLE,
         highlight_rows={3, 4},
         bottom_rule=False,
     )
@@ -268,50 +378,25 @@ def render_trio_denovo_bed():
     CODE_TITLE_TO_CODE_IN = (0.97 - 0.72) * TABLE_H_IN
     code_y = CODE_TITLE_Y - CODE_TITLE_TO_CODE_IN / code_h_in
     ax_code.text(
-        0.0, CODE_TITLE_Y,
-        "Discover de novo gain of methylation on paternal haplotype",
+        0.0, CODE_TITLE_Y, DENOVO_CODE_TITLE,
         ha="left", va="top", fontsize=12, fontweight="bold",
         transform=ax_code.transAxes,
     )
-
-    CODE_FONTSIZE = 10.5
-    code = (
-        '# Pick the dad haplotype that was transmitted to the kid.\n'
-        'df_meth = df_meth.with_columns(\n'
-        '    dad_transmitted = pl.when(pl.col("pat_hap") == "A")\n'
-        '        .then(pl.col("dad_A"))\n'
-        '        .otherwise(pl.col("dad_B"))\n'
-        ')\n'
-        '\n'
-        '# Find runs of consecutive CpGs where the kid_pat is methylated\n'
-        '# but the dad-transmitted haplotype is not — i.e., a de novo\n'
-        '# *gain* of methylation on the kid paternal homolog.\n'
-        'WINDOW = 2\n'
-        'df_denovo_gain_pat = (\n'
-        '    df_meth.with_columns(\n'
-        '        delta = pl.col("kid_pat") - pl.col("dad_transmitted"),\n'
-        '    )\n'
-        '    .with_columns(\n'
-        '        mean_delta = pl.col("delta").rolling_mean(WINDOW),\n'
-        '    )\n'
-        '    .filter(pl.col("mean_delta") > 0.5)\n'
-        ')\n'
-    )
     ax_code.text(
-        0.0, code_y, code,
-        ha="left", va="top", fontsize=CODE_FONTSIZE,
+        0.0, code_y, DENOVO_CODE,
+        ha="left", va="top", fontsize=10.5,
         family="Menlo", color=COLOR_NEUTRAL,
         transform=ax_code.transAxes,
     )
 
-    out = OUT / "trio_denovo_bed.png"
+    out = out_path if out_path is not None else OUT / "trio_denovo_bed.png"
     fig.savefig(out, dpi=180)
     plt.close(fig)
     print(f"[scratch] Wrote {out}")
 
 
 def _draw_simple_table(ax, cols, rows, title, highlight_rows=frozenset(),
-                        bottom_rule=True):
+                        bottom_rule=True, col_dx=0.085, cell_fontsize=10.5):
     """Render a small fixed-width table on a transAxes axis."""
     ax.set_xlim(0, 1)
     ax.set_ylim(0, 1)
@@ -322,14 +407,14 @@ def _draw_simple_table(ax, cols, rows, title, highlight_rows=frozenset(),
         transform=ax.transAxes,
     )
     n_col = len(cols)
-    col_xs = [0.02 + 0.085 * i for i in range(n_col)]
+    col_xs = [0.02 + col_dx * i for i in range(n_col)]
     table_right = col_xs[-1] + 0.07
 
     header_y = 0.72
     for x, name in zip(col_xs, cols):
         ax.text(
             x, header_y, name,
-            ha="left", va="center", fontsize=10.5,
+            ha="left", va="center", fontsize=cell_fontsize,
             family="monospace", color=COLOR_NEUTRAL,
             transform=ax.transAxes,
         )
@@ -351,7 +436,7 @@ def _draw_simple_table(ax, cols, rows, title, highlight_rows=frozenset(),
         for x, cell in zip(col_xs, row):
             ax.text(
                 x, y, cell,
-                ha="left", va="center", fontsize=10.5,
+                ha="left", va="center", fontsize=cell_fontsize,
                 family="monospace", color=COLOR_NEUTRAL,
                 transform=ax.transAxes,
             )
@@ -363,7 +448,7 @@ def _draw_simple_table(ax, cols, rows, title, highlight_rows=frozenset(),
         )
 
 
-def render_trio_compound_het_bed():
+def render_trio_compound_het_bed(out_path: Path | None = None):
     """BED snippet (methylation + genotype) + polars query for compound
     genetic-epigenetic heterozygotes."""
     FIG_W, FIG_H = 12.0, 22.0
@@ -558,19 +643,22 @@ def render_trio_compound_het_bed():
         transform=ax_code.transAxes,
     )
 
-    out = OUT / "trio_compound_het_bed.png"
+    out = out_path if out_path is not None else OUT / "trio_compound_het_bed.png"
     fig.savefig(out, dpi=180)
     plt.close(fig)
     print(f"[scratch] Wrote {out}")
 
 
+def render_trio_svg(scenario, out_path: Path) -> None:
+    out_path.parent.mkdir(parents=True, exist_ok=True)
+    out_path.write_text(build(scenario))
+    print(f'wrote {out_path}')
+
+
 def main() -> None:
     OUT.mkdir(parents=True, exist_ok=True)
-    for name, scen in [('trio_denovo', SCENARIO_DENOVO),
-                       ('trio_compound_het', SCENARIO_COMPOUND)]:
-        path = OUT / f'{name}.svg'
-        path.write_text(build(scen))
-        print(f'wrote {path}')
+    render_trio_svg(SCENARIO_DENOVO, OUT / "trio_denovo.svg")
+    render_trio_svg(SCENARIO_COMPOUND, OUT / "trio_compound_het.svg")
     render_trio_denovo_bed()
     render_trio_compound_het_bed()
 
