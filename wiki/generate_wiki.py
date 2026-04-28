@@ -483,9 +483,10 @@ produces, for each sample, a pedMEC-phased VCF, a per-sample
 phase-block table, and a haplotagged BAM. The downstream
 [parent-phased-methylation page](../parent_phased_methylation/parent_phased_methylation.md)
 consumes the per-sample phase-block tables and the multi-sample
-phased VCF; the trio version of
+phased VCF;
 [`aligned_bam_to_cpg_scores.sh`](../../../aligned_bam_to_cpg_scores.sh)
-consumes the haplotagged BAMs.
+in *trio mode* (`-t kid_id dad_id mom_id`) consumes the haplotagged
+BAMs.
 
 The script proceeds in four steps.
 
@@ -535,7 +536,8 @@ re-tags the reads from the pedMEC-phased VCF, producing a
 `*.haplotagged.bam` whose reads carry trio-aware `HP`/`PS` tags.
 This haplotagged BAM is the input to Step 2
 ([`aligned_bam_to_cpg_scores.sh`]({permalink('aligned_bam_to_cpg_scores.sh', 1, SHA)})
-in trio mode), which calls pb-CpG-tools once per HP-tagged BAM and
+run in *trio mode* via `-t kid_id dad_id mom_id`), which calls
+pb-CpG-tools once per HP-tagged BAM and
 produces the per-haplotype methylation BEDs that Step 3 relabels
 onto the parental-letter alphabet.
 """
