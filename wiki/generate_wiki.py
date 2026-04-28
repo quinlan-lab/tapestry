@@ -458,7 +458,7 @@ For motivation — *why* phase methylation in the first place — see
 |---|---|
 | [pedMEC phasing](pedmec_phasing/pedmec_phasing.md) | Step 1 — `run-whatshap.sh`: trio-aware pedMEC phasing of the joint-called VCF, per-sample phase-block stats, and haplotagging of each sample's BAM. |
 | [Parent-phased methylation](parent_phased_methylation/parent_phased_methylation.md) | Step 3 — `phase_meth_to_parent_haps.py` + `hap_map_trio.py`: the conceptual centre of the trio-wise workflow. Within each hap-map block (intersection of the kid's whatshap phase block and one parent's whatshap phase block), a bit-vector concordance decides which of the kid's two haplotypes descends from which parental homolog (`A`/`B` for dad, `C`/`D` for mom), and per-CpG methylation re-buckets mechanically. |
-| [All-CpG expansion (trio)](all_cpg_expansion_trio/all_cpg_expansion_trio.md) | Step 4 — `expand_to_all_cpgs.trio.sh`: trio analogue of the pedigree-wise all-CpG expansion (reference CpGs vs sample CpGs vs measured CpGs, allele-specific CpGs, within-50bp-of-mismatch QC flag). *(page TODO; for now see [`expand_to_all_cpgs.trio.sh`](../../expand_to_all_cpgs.trio.sh).)* |
+| [All-CpG expansion (trio)](all_cpg_expansion_trio/all_cpg_expansion_trio.md) | Step 4 — `expand_to_all_cpgs.trio.sh` + `src/expand_to_all_cpgs_trio.py`: expand the parent-phased methylation BED to every CpG in the reference, attach unphased per-sample methylation, flag CpGs within 50 bp of a bit-vector-mismatch heterozygous site, and label CpGs as allele-specific against the joint-called trio VCF. |
 
 The trio-wise side is shorter than the pedigree-wise side because the
 bit-vector concordance machinery is established in general form on the
@@ -669,6 +669,91 @@ workflow performs in Step 4.
 """
 
 
+ALL_CPG_EXPANSION_TRIO_MD = f"""\
+# All-CpG expansion (Step 4, trio)
+
+This page is part of the [trio-wise workflow](../index.md). It covers
+Step 4 of the trio-wise pipeline:
+[`expand_to_all_cpgs.trio.sh`]({permalink('expand_to_all_cpgs.trio.sh', 1, SHA)})
+and its Python driver
+[`src/expand_to_all_cpgs_trio.py`]({permalink('src/expand_to_all_cpgs_trio.py', 1, SHA)}).
+
+By the end of Step 3, parent-phased methylation is reported only at
+the subset of CpGs where the kid's haplotagged reads supplied a
+phaseable measurement. Step 4 expands that table to every CpG in the
+reference, attaches per-sample unphased methylation as a fallback,
+adds two QC labels (proximity to bit-vector mismatches; allele-specific
+flags from the joint-called VCF), and writes a sorted, tabix-indexed
+BED.
+
+The script proceeds in four stages.
+
+## 1. Enumerate every CpG in the reference
+
+[`write_all_cpgs_in_reference.py`]({permalink('src/write_all_cpgs_in_reference.py', 1, SHA)})
+([`scan_and_write_cpgs`]({permalink('src/write_all_cpgs_in_reference.py', 8, SHA)}))
+scans the GRCh38 FASTA and emits a BED of every `CG` dinucleotide. It
+is invoked from
+[`expand_to_all_cpgs.trio.sh`]({permalink('expand_to_all_cpgs.trio.sh', 71, SHA)})
+and produces `all_cpg_sites_in_reference.bed`, the spine that the
+remaining stages join against.
+
+## 2. Expand parent-phased methylation to all CpGs and attach unphased meth
+
+[`expand_to_all_cpgs_trio.py`]({permalink('src/expand_to_all_cpgs_trio.py', 630, SHA)})
+reads three inputs: the all-CpG BED from stage 1, the parent-phased
+methylation BED from Step 3, and the per-sample (kid/dad/mom)
+count-based and model-based unphased methylation BEDs produced by
+`aligned_bam_to_cpg_scores.sh` in trio mode.
+[`read_meth_unphased_trio`]({permalink('src/expand_to_all_cpgs_trio.py', 83, SHA)})
+joins the count and model BEDs per individual; then
+[`expand_meth_to_all_cpgs`]({permalink('src/expand_to_all_cpgs_trio.py', 120, SHA)})
+left-joins the parent-phased and unphased frames onto the all-CpG
+spine, so every reference CpG appears as a row, with parent-phased
+levels (`A`/`B`/`C`/`D`) where available and unphased per-sample
+levels alongside. CpGs with no measurement carry nulls.
+
+In parallel,
+[`write_combined_bigwig`]({permalink('src/expand_to_all_cpgs_trio.py', 361, SHA)})
+emits one bigWig per (sample × `count`/`model`) combination of the
+unphased input BEDs, for IGV display.
+
+## 3. Within-50bp-of-mismatch QC flag
+
+For each side of the trio (paternal, maternal), Step 3 wrote a BED of
+heterozygous sites at which the bit-vector concordance disagreed
+between the kid and that parent (see the
+[parent-phased-methylation page](../parent_phased_methylation/parent_phased_methylation.md)).
+[`compute_proximity_to_mismatched_heterozygous_sites`]({permalink('src/expand_to_all_cpgs_trio.py', 202, SHA)})
+labels each CpG with its distance to the nearest mismatch site on each
+side and sets a within-50bp flag. The fraction of CpGs flagged is
+logged by
+[`compute_fraction_of_cpgs_that_are_close_to_mismatches`]({permalink('src/expand_to_all_cpgs_trio.py', 233, SHA)}).
+This is the trio analogue of the same QC step in the pedigree-wise
+all-CpG expansion: phase-decision quality near locally-discordant
+sites is suspect, and downstream analyses can drop or down-weight
+these CpGs.
+
+## 4. Allele-specific labelling against the joint-called VCF
+
+[`get_joint_called_variants`]({permalink('src/expand_to_all_cpgs_trio.py', 421, SHA)})
+reads the trio's joint-called multi-sample VCF and pulls SNV
+genotypes for kid, dad, and mom.
+[`label_with_variants`]({permalink('src/expand_to_all_cpgs_trio.py', 484, SHA)})
+annotates each CpG with whether it overlaps 0/1/2 SNVs, and
+[`label_cpgs_as_allele_specific`]({permalink('src/expand_to_all_cpgs_trio.py', 557, SHA)})
+flags CpGs as allele-specific (per family member) when they overlap a
+heterozygous SNV — that is, the methylation signal at those CpGs may
+reflect cis-acting allele-specific effects rather than parental
+inheritance per se.
+
+The expanded, fully-labelled frame is then written as a sorted,
+bgzipped, tabixed BED at
+`bed_meth_parent_phased_all_cpgs` — the canonical per-CpG output of
+the trio-wise workflow.
+"""
+
+
 def page_wiki_readme(outdir: Path) -> None:
     md_path = outdir / "README.md"
     md_path.write_text(WIKI_README_MD)
@@ -708,6 +793,14 @@ def page_parent_phased_methylation(outdir: Path) -> None:
     print(f"[wiki] Wrote {md_path}")
 
 
+def page_all_cpg_expansion_trio(outdir: Path) -> None:
+    page_dir = outdir / "trio_wise_workflow" / "all_cpg_expansion_trio"
+    page_dir.mkdir(parents=True, exist_ok=True)
+    md_path = page_dir / "all_cpg_expansion_trio.md"
+    md_path.write_text(ALL_CPG_EXPANSION_TRIO_MD)
+    print(f"[wiki] Wrote {md_path}")
+
+
 # ---------------------------------------------------------------------------
 # CLI
 # ---------------------------------------------------------------------------
@@ -720,6 +813,7 @@ PAGES = {
     "trio_wise_index": page_trio_wise_index,
     "pedmec_phasing": page_pedmec_phasing,
     "parent_phased_methylation": page_parent_phased_methylation,
+    "all_cpg_expansion_trio": page_all_cpg_expansion_trio,
 }
 
 
