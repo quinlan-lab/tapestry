@@ -34,6 +34,9 @@ from motivation import single_indiv_phasing, trio_discovery  # noqa: E402
 from pedigree_wise_workflow.founder_phased_methylation import (  # noqa: E402
     founder_phased_methylation,
 )
+from trio_wise_workflow.parent_phased_methylation import (  # noqa: E402
+    parent_phased_methylation,
+)
 
 
 # ---------------------------------------------------------------------------
@@ -437,39 +440,161 @@ For motivation — *why* phase methylation in the first place — see
 
 
 TRIO_WISE_INDEX_MD = """\
-# Trio-wise workflow (mostly stubbed)
+# Trio-wise workflow
 
-This section will document tapestry's trio-wise workflow — pedMEC /
-whatshap phasing across a parent–parent–child trio, with each
-methylation measurement labelled by one of the parents' haplotypes.
-Most of the section is *not yet built*. For the time being, the
-canonical reference is the **Trio-wise workflow** section of the
-top-level [`README.md`](../../README.md).
+This section of the wiki walks through tapestry's trio-wise workflow,
+in which pedMEC / whatshap phasing across a parent–parent–child trio
+is used to label every CpG-level methylation measurement with one of
+the parents' haplotypes — `A`/`B` in dad and `C`/`D` in mom.
+`A`/`B`/`C`/`D` are *fixed as dad's hap1/hap2 and mom's hap1/hap2*;
+they are not defined as transmitted vs non-transmitted.
 
 For motivation — *why* phase methylation in the first place — see
 [the shared motivation page](../motivation/motivation.md).
 
-## Planned page structure
+## Pages
 
-```
-trio_wise_workflow/
-  index.md                   # this page
-  pedmec_phasing/            # Step 1 — run-whatshap.sh                  (TODO)
-  parent_haplotype_phasing/  # Step 3 — phase_meth_to_parent_haps.py     (TODO)
-  all_cpg_expansion_trio/    # Step 4 — expand_to_all_cpgs.trio.sh       (TODO)
-```
+| Page | What it covers |
+|---|---|
+| [pedMEC phasing](pedmec_phasing/pedmec_phasing.md) | Step 1 — `run-whatshap.sh`: trio-aware pedMEC phasing of the joint-called VCF, per-sample phase-block stats, and haplotagging of each sample's BAM. *(page TODO; for now see [`run-whatshap.sh`](../../run-whatshap.sh) and the **Trio-wise workflow** section of the top-level [`README.md`](../../README.md).)* |
+| [Parent-phased methylation](parent_phased_methylation/parent_phased_methylation.md) | Step 3 — `phase_meth_to_parent_haps.py` + `hap_map_trio.py`: the conceptual centre of the trio-wise workflow. Within each hap-map block (intersection of the kid's whatshap phase block and one parent's whatshap phase block), a bit-vector concordance decides which of the kid's two haplotypes descends from which parental homolog (`A`/`B` for dad, `C`/`D` for mom), and per-CpG methylation re-buckets mechanically. |
+| [All-CpG expansion (trio)](all_cpg_expansion_trio/all_cpg_expansion_trio.md) | Step 4 — `expand_to_all_cpgs.trio.sh`: trio analogue of the pedigree-wise all-CpG expansion (reference CpGs vs sample CpGs vs measured CpGs, allele-specific CpGs, within-50bp-of-mismatch QC flag). *(page TODO; for now see [`expand_to_all_cpgs.trio.sh`](../../expand_to_all_cpgs.trio.sh).)* |
 
-The trio-wise side will be much shorter than the pedigree-wise side
-because the bit-vector concordance machinery is established in general
-form on the [pedigree-wise founder-phased-methylation
+The trio-wise side is shorter than the pedigree-wise side because the
+bit-vector concordance machinery is established in general form on the
+[pedigree-wise founder-phased-methylation
 page](../pedigree_wise_workflow/founder_phased_methylation/founder_phased_methylation.md);
 the trio-wise version only has to explain the two differences:
 (a) the phase source is pedMEC / whatshap rather than
 `gtg-concordance`, and (b) the kid's haplotypes are labelled by
 parental letters (A/B in dad, C/D in mom) rather than by
-founder-of-the-pedigree letters. A/B/C/D are *fixed as dad's hap1/hap2
-and mom's hap1/hap2* — they are not defined as transmitted vs
-non-transmitted.
+founder-of-the-pedigree letters.
+"""
+
+
+PARENT_PHASED_METHYLATION_MD = f"""\
+# Parent-phased methylation (Step 3)
+
+This page is part of the
+[trio-wise workflow](../index.md). It covers Step 3 of the trio-wise
+pipeline — `phase_meth_to_parent_haps.py` and `hap_map_trio.py` —
+which is the conceptual centre of tapestry's trio-wise side. Step 3
+takes the single phasing produced upstream by pedMEC / whatshap and
+uses it to relabel each per-CpG methylation measurement with one of
+the four parental homologs of the trio (`A`/`B` in dad; `C`/`D` in
+mom).
+
+This page mirrors the structure of the pedigree-wise
+[founder-phased-methylation page](../../pedigree_wise_workflow/founder_phased_methylation/founder_phased_methylation.md).
+Read that page first for the general bit-vector machinery; this page
+only spells out the two differences specific to the trio-wise case.
+
+## The phasing, and where blocks meet
+
+Unlike the pedigree-wise workflow — which combines a read-backed
+phasing (hiphase) with a separate inheritance-based phasing
+(`gtg-ped-map` + `gtg-concordance`) — the trio-wise workflow has a
+single phasing source: **pedMEC / whatshap**, run once on the
+trio's joint-called VCF
+([`run-whatshap.sh:128`]({permalink('run-whatshap.sh', 128, SHA)})).
+That single run produces, for each individual, a set of *whatshap
+phase blocks*, where the alleles inside one block are linked across
+heterozygous sites and across blocks the labels are independent.
+Tapestry parses those blocks per individual via
+[`get_phase_blocks`]({permalink('src/phasing_trio.py', 7, SHA)})
+(called from
+[`phase_meth_to_parent_haps.py:359–361`]({permalink('src/phase_meth_to_parent_haps.py', 359, SHA)}))
+and parses paired kid-parent allele sequences from the pedMEC-phased
+VCF in
+[`get_all_phasing`]({permalink('src/phasing_trio.py', 48, SHA)})
+(called from
+[`phase_meth_to_parent_haps.py:366`]({permalink('src/phase_meth_to_parent_haps.py', 366, SHA)})).
+
+The natural unit on which to relate the kid's phasing to a parent's
+phasing is the **hap-map block**: the intersection of one of the
+kid's whatshap phase blocks with one of the parent's whatshap phase
+blocks. There are *two* such intersections per kid block — one with
+dad and one with mom — handled independently and labelled
+*paternal* and *maternal* downstream.
+
+## Bit-vector match
+
+Inside one paternal-side hap-map block, each het SNV in dad
+contributes one bit to three parallel vectors:
+
+- `kid_pat` — the kid's allele on the paternal homolog (kid's
+  whatshap `hap1`, by tapestry's convention that pedMEC orders the
+  kid as `pat|mat`).
+- `dad_A` — dad's allele on hap1 (= `A` by definition).
+- `dad_B` — dad's allele on hap2 (= `B` by definition).
+
+![Bit-vector match (trio)](bit_vector_match_trio.png)
+
+`kid_pat` is compared against `dad_A` and `dad_B` in turn. Since
+every contributing site is heterozygous in dad, `dad_A` and `dad_B`
+carry opposite alleles at each site; consequently the per-site match
+is mutually exclusive, and
+`concordance(kid_pat, dad_A) + concordance(kid_pat, dad_B) = 1`
+exactly. The decision is a single threshold:
+
+- If `concordance(kid_pat, dad_A) > 0.5` → kid's paternal homolog
+  in this block is `A` (and would have been `B` otherwise).
+
+This decision is made once per paternal-side hap-map block; the
+relevant code is the bit-vector comparison in
+[`_build_hap_map`]({permalink('src/hap_map_trio.py', 10, SHA)}),
+specifically the `similarity > 0.5` branch at
+[line 71]({permalink('src/hap_map_trio.py', 71, SHA)}); the
+`(A, B)` label pair is wired in at
+[`get_hap_map`]({permalink('src/hap_map_trio.py', 113, SHA)})
+(called from
+[`phase_meth_to_parent_haps.py:375`]({permalink('src/phase_meth_to_parent_haps.py', 375, SHA)})).
+The maternal side is symmetric: replace `kid_pat`/`dad_A`/`dad_B`
+with `kid_mat`/`mom_C`/`mom_D` and intersect the kid's phase block
+with mom's instead of dad's.
+
+## Relabelling per-CpG methylation
+
+Per-CpG methylation has already been stratified by each individual's
+whatshap `hap1`/`hap2` partition by the time Step 3 runs: Step 2
+([`aligned_bam_to_cpg_scores.sh`]({permalink('aligned_bam_to_cpg_scores.sh', 1, SHA)}))
+calls pb-CpG-tools once on each HP-tagged BAM, so each per-CpG
+methylation level is computed only over reads carrying the same HP
+tag. Step 3 does not recompute those per-haplotype levels — it
+*relabels* them. Inside
+[`phase_meth_to_parent_haplotypes`]({permalink('src/phase_meth_to_parent_haps.py', 45, SHA)})
+(called once at
+[line 407]({permalink('src/phase_meth_to_parent_haps.py', 407, SHA)})),
+the kid's `hap1`/`hap2` and each parent's `hap1`/`hap2` are renamed
+to the parent-letter alphabet: kid `hap1`/`hap2` → `kid_pat`/`kid_mat`,
+dad `hap1`/`hap2` → `dad_A`/`dad_B`, mom `hap1`/`hap2` →
+`mom_C`/`mom_D` ([lines 80–110]({permalink('src/phase_meth_to_parent_haps.py', 80, SHA)})).
+The paternal and maternal hap maps are then overlaid onto each CpG
+([lines 117–155]({permalink('src/phase_meth_to_parent_haps.py', 117, SHA)})),
+and CpGs that fall outside any hap-map block on a given parental
+side are nulled out on that side
+([lines 157–260]({permalink('src/phase_meth_to_parent_haps.py', 157, SHA)})).
+Note that, unlike the pedigree-wise workflow, there is no second
+relabelling stage from `pat`/`mat` to founder letters: the trio-wise
+output stops at the parental-letter alphabet `A`/`B`/`C`/`D` because
+the kid's parents *are* the most distal individuals in this workflow.
+
+## Mismatch sites
+
+Most hap-map blocks have a small number of sites where `kid_pat`
+disagrees with the chosen `dad_A`/`dad_B` vector — concordance < 1.
+Those sites are recorded as `df_mismatch_pat` (and `df_mismatch_mat`
+for the maternal side) alongside the hap-map block — see the
+mismatch-collection branch at
+[line 86]({permalink('src/hap_map_trio.py', 86, SHA)}) of
+`hap_map_trio.py`, populated whichever way the
+[`similarity > 0.5`]({permalink('src/hap_map_trio.py', 71, SHA)})
+branch went. Both mismatch DataFrames are returned by
+[`get_hap_map`]({permalink('src/hap_map_trio.py', 113, SHA)}) and
+written out to BED + VCF by
+[`phase_meth_to_parent_haps.py:385–388`]({permalink('src/phase_meth_to_parent_haps.py', 385, SHA)})
+for the same downstream proximity-flag QC that the pedigree-wise
+workflow performs in Step 4.
 """
 
 
@@ -495,6 +620,15 @@ def page_trio_wise_index(outdir: Path) -> None:
     print(f"[wiki] Wrote {md_path}")
 
 
+def page_parent_phased_methylation(outdir: Path) -> None:
+    page_dir = outdir / "trio_wise_workflow" / "parent_phased_methylation"
+    page_dir.mkdir(parents=True, exist_ok=True)
+    parent_phased_methylation.main()
+    md_path = page_dir / "parent_phased_methylation.md"
+    md_path.write_text(PARENT_PHASED_METHYLATION_MD)
+    print(f"[wiki] Wrote {md_path}")
+
+
 # ---------------------------------------------------------------------------
 # CLI
 # ---------------------------------------------------------------------------
@@ -505,6 +639,7 @@ PAGES = {
     "pedigree_wise_index": page_pedigree_wise_index,
     "founder_phased_methylation": page_founder_phased_methylation,
     "trio_wise_index": page_trio_wise_index,
+    "parent_phased_methylation": page_parent_phased_methylation,
 }
 
 

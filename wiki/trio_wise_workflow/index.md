@@ -1,33 +1,29 @@
-# Trio-wise workflow (mostly stubbed)
+# Trio-wise workflow
 
-This section will document tapestry's trio-wise workflow — pedMEC /
-whatshap phasing across a parent–parent–child trio, with each
-methylation measurement labelled by one of the parents' haplotypes.
-Most of the section is *not yet built*. For the time being, the
-canonical reference is the **Trio-wise workflow** section of the
-top-level [`README.md`](../../README.md).
+This section of the wiki walks through tapestry's trio-wise workflow,
+in which pedMEC / whatshap phasing across a parent–parent–child trio
+is used to label every CpG-level methylation measurement with one of
+the parents' haplotypes — `A`/`B` in dad and `C`/`D` in mom.
+`A`/`B`/`C`/`D` are *fixed as dad's hap1/hap2 and mom's hap1/hap2*;
+they are not defined as transmitted vs non-transmitted.
 
 For motivation — *why* phase methylation in the first place — see
 [the shared motivation page](../motivation/motivation.md).
 
-## Planned page structure
+## Pages
 
-```
-trio_wise_workflow/
-  index.md                   # this page
-  pedmec_phasing/            # Step 1 — run-whatshap.sh                  (TODO)
-  parent_haplotype_phasing/  # Step 3 — phase_meth_to_parent_haps.py     (TODO)
-  all_cpg_expansion_trio/    # Step 4 — expand_to_all_cpgs.trio.sh       (TODO)
-```
+| Page | What it covers |
+|---|---|
+| [pedMEC phasing](pedmec_phasing/pedmec_phasing.md) | Step 1 — `run-whatshap.sh`: trio-aware pedMEC phasing of the joint-called VCF, per-sample phase-block stats, and haplotagging of each sample's BAM. *(page TODO; for now see [`run-whatshap.sh`](../../run-whatshap.sh) and the **Trio-wise workflow** section of the top-level [`README.md`](../../README.md).)* |
+| [Parent-phased methylation](parent_phased_methylation/parent_phased_methylation.md) | Step 3 — `phase_meth_to_parent_haps.py` + `hap_map_trio.py`: the conceptual centre of the trio-wise workflow. Within each hap-map block (intersection of the kid's whatshap phase block and one parent's whatshap phase block), a bit-vector concordance decides which of the kid's two haplotypes descends from which parental homolog (`A`/`B` for dad, `C`/`D` for mom), and per-CpG methylation re-buckets mechanically. |
+| [All-CpG expansion (trio)](all_cpg_expansion_trio/all_cpg_expansion_trio.md) | Step 4 — `expand_to_all_cpgs.trio.sh`: trio analogue of the pedigree-wise all-CpG expansion (reference CpGs vs sample CpGs vs measured CpGs, allele-specific CpGs, within-50bp-of-mismatch QC flag). *(page TODO; for now see [`expand_to_all_cpgs.trio.sh`](../../expand_to_all_cpgs.trio.sh).)* |
 
-The trio-wise side will be much shorter than the pedigree-wise side
-because the bit-vector concordance machinery is established in general
-form on the [pedigree-wise founder-phased-methylation
+The trio-wise side is shorter than the pedigree-wise side because the
+bit-vector concordance machinery is established in general form on the
+[pedigree-wise founder-phased-methylation
 page](../pedigree_wise_workflow/founder_phased_methylation/founder_phased_methylation.md);
 the trio-wise version only has to explain the two differences:
 (a) the phase source is pedMEC / whatshap rather than
 `gtg-concordance`, and (b) the kid's haplotypes are labelled by
 parental letters (A/B in dad, C/D in mom) rather than by
-founder-of-the-pedigree letters. A/B/C/D are *fixed as dad's hap1/hap2
-and mom's hap1/hap2* — they are not defined as transmitted vs
-non-transmitted.
+founder-of-the-pedigree letters.
