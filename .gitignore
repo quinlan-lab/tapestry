@@ -2,6 +2,7 @@
 .vscode
 __pycache__
 .trash
+.DS_Store
 
 control_intervals_methylation.csv
 recomb_blocks_methylation.csv
