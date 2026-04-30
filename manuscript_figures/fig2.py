@@ -1,4 +1,4 @@
-"""Render Fig 3 panels for the tapestry manuscript.
+"""Render Fig 2 panels for the tapestry manuscript.
 
 The four panels strip down figures from the upstream nuclear-family wiki
 page (`wiki/pedigree_wise_workflow/inheritance_mapping/nuclear_family/`)
@@ -10,10 +10,10 @@ context. The simulation/labeling logic is replicated from upstream
 (`7448e5e946adbc7969ad5fd5e0730d7cace23a8d`).
 
 Run:
-    .venv/bin/python manuscript_figures/fig3.py
-    .venv/bin/python manuscript_figures/fig3.py --panel A
+    .venv/bin/python manuscript_figures/fig2.py
+    .venv/bin/python manuscript_figures/fig2.py --panel A
 
-Outputs land in `manuscript_figures/fig3/` as PNG, ready for Illustrator
+Outputs land in `manuscript_figures/fig2/` as PNG, ready for Illustrator
 placement.
 """
 from __future__ import annotations
@@ -23,7 +23,7 @@ from typing import Dict, List, Optional, Tuple
 
 import matplotlib.pyplot as plt
 
-OUT = Path(__file__).resolve().parent / "fig3"
+OUT = Path(__file__).resolve().parent / "fig2"
 OUT.mkdir(parents=True, exist_ok=True)
 
 # ---------------------------------------------------------------------------
