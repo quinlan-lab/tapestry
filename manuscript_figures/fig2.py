@@ -1,20 +1,33 @@
-"""Render Fig 2 panels for the tapestry manuscript.
+"""Render Fig 2 for the tapestry manuscript.
 
-The four panels strip down figures from the upstream nuclear-family wiki
-page (`wiki/pedigree_wise_workflow/inheritance_mapping/nuclear_family/`)
-to the paternal-haplotype rows only, with no figure titles, explanatory
-text, or informative-site markers — the manuscript caption supplies that
-context. The simulation/labeling logic is replicated from upstream
-`generate_wiki.py` at the vendored SHA pinned in
+Emits a single PDF, `manuscript_figures/fig2/fig2_combined.pdf`, that
+stacks three panels with aligned columns:
+
+  A. Ground truth — fig1 stripped of title/text: founder haps plus each
+     kid's allele on both slots, with each cell filled by the inherited
+     parental haplotype (A/B/C/D).
+  B. Maternal — three tables: unphased VCF GTs for all 5 individuals at
+     mom-informative sites; raw inherited maternal allele (fig5_1); and
+     backfill swap-by-majority labels (fig3_3). A bottom track shows
+     the ground-truth maternal haplotype as colored runs (C/D).
+  C. Paternal — same three tables on the paternal side, plus the
+     perform_flips_in_place step (fig4_1), which is a no-op on the
+     maternal side and so is omitted there. A bottom track shows the
+     ground-truth paternal haplotype (A/B); Kid3's row switches from A
+     (blue) to B (orange) at the paternal recombination.
+
+Informative sites for each panel are the columns whose top-row cells
+are non-`.`. The trailing simulated site is dropped. PDFs are kept as
+vector text so collaborators can edit labels directly inside Illustrator
+after placing them.
+
+Simulation/labeling logic is replicated from upstream `generate_wiki.py`
+at the SHA pinned in
 `wiki/pedigree_wise_workflow/inheritance_mapping/README.md`
 (`7448e5e946adbc7969ad5fd5e0730d7cace23a8d`).
 
 Run:
     .venv/bin/python manuscript_figures/fig2.py
-    .venv/bin/python manuscript_figures/fig2.py --panel A
-
-Outputs land in `manuscript_figures/fig2/` as PNG, ready for Illustrator
-placement.
 """
 from __future__ import annotations
 
@@ -30,6 +43,7 @@ OUT.mkdir(parents=True, exist_ok=True)
 # Simulation — copied from upstream generate_wiki.py at the pinned SHA.
 # ---------------------------------------------------------------------------
 NUM_SITES = 9
+DISPLAY_SITES = 8  # render the first N sites only; the trailing site is dropped
 HAP_DAD_ALPHA = "100110010"
 HAP_DAD_BETA  = "010101011"
 HAP_MOM_GAMMA = "101110010"
@@ -196,145 +210,282 @@ def _flip_only(
 
 
 # ---------------------------------------------------------------------------
-# Rendering — same monospace text-block layout as upstream
-# `_render_panel_image`, with no title or caption around the body.
-# ---------------------------------------------------------------------------
-def _render_panel_image(body_lines: List[str], out_path: Path) -> None:
-    n_lines = max(len(body_lines), 1)
-    fig_w = 12.0
-    fig_h = 0.30 * n_lines + 0.4
-    fig, ax = plt.subplots(figsize=(fig_w, fig_h))
-    fig.subplots_adjust(left=0.02, right=0.98, top=0.96, bottom=0.04)
-    ax.set_axis_off()
-    ax.set_xlim(0, 1)
-    ax.set_ylim(0, 1)
-
-    top = 0.96
-    line_h = 0.92 / n_lines
-    font_size = 12
-    for i, line in enumerate(body_lines):
-        y = top - i * line_h
-        ax.text(
-            0.01, y, line,
-            ha="left", va="top",
-            fontsize=font_size, family="monospace",
-            transform=ax.transAxes,
-        )
-    out_path.parent.mkdir(parents=True, exist_ok=True)
-    fig.savefig(out_path, dpi=200)
-    plt.close(fig)
-    _trim_whitespace_png(out_path)
-    print(f"wrote {out_path}")
-
-
-def _trim_whitespace_png(path: Path) -> None:
-    """Crop pure-white margins off all four sides of a PNG in place."""
-    from PIL import Image, ImageChops
-    img = Image.open(path).convert("RGB")
-    bg = Image.new("RGB", img.size, (255, 255, 255))
-    diff = ImageChops.difference(img, bg)
-    bbox = diff.getbbox()
-    if bbox is not None:
-        pad = 10
-        left = max(0, bbox[0] - pad)
-        top = max(0, bbox[1] - pad)
-        right = min(img.size[0], bbox[2] + pad)
-        bottom = min(img.size[1], bbox[3] + pad)
-        img.crop((left, top, right, bottom)).save(path)
-
-
-# ---------------------------------------------------------------------------
-# Panels
+# Rendering — single-page PDF with per-cell text and optional palette fill.
+# Vector text survives placement in Illustrator so collaborators can edit
+# labels; per-cell fills make haplotype provenance visible at a glance.
 # ---------------------------------------------------------------------------
 KIDS = ["Kid1", "Kid2", "Kid3"]
+KID_PHASED_KEY = {"Kid1": "kid1_phased", "Kid2": "kid2_phased", "Kid3": "kid3_phased"}
 KID_UNPHASED_KEY = {
     "Kid1": "kid1_unphased",
     "Kid2": "kid2_unphased",
     "Kid3": "kid3_unphased",
 }
 
+HAP_PALETTE = {
+    "A": "#a6cee3",  # light blue   — dad hap1
+    "B": "#fdbf6f",  # light orange — dad hap2
+    "C": "#b2df8a",  # light green  — mom hap1
+    "D": "#fb9a99",  # light pink   — mom hap2
+}
+_GREEK_TO_LETTER = {"α": "A", "β": "B", "γ": "C", "δ": "D"}
+KID_LABELS_MAP = {"Kid1": KID1_LABELS, "Kid2": KID2_LABELS, "Kid3": KID3_LABELS}
 
-def _kid_pat_row(kid_phased) -> str:
-    return " ".join(str(a) for a, _ in kid_phased)
+# Row = (label, cells, colors, merge_runs).
+#   colors[i] is a palette key or None.
+#   merge_runs=True draws one rectangle per run of identical colors with a
+#   single centered letter, instead of one rectangle+glyph per cell.
+Row = Tuple[str, List[str], List[Optional[str]], bool]
+SPACER: Row = ("", [], [], False)
 
 
-def _paternal_only_rows(state: Dict[str, List[str]], info_sites: List[int]) -> List[str]:
-    rows = []
+def _plain(label: str, cells: List[str]) -> Row:
+    return (label, cells, [None] * len(cells), False)
+
+
+def _draw_panel(
+    ax,
+    rows: List[Row],
+    pitch: float,
+    cells_x0: float,
+) -> None:
+    n = max(len(rows), 1)
+    ax.set_axis_off()
+    ax.set_xlim(0, 1)
+    ax.set_ylim(0, 1)
+
+    line_h = 1.0 / n
+    font_size = 11
+    label_x = 0.02
+    cell_w = pitch
+    cell_h = line_h * 0.85
+
+    for i, (label, cells, colors, merge_runs) in enumerate(rows):
+        y = 1.0 - (i + 0.5) * line_h
+        if label:
+            ax.text(
+                label_x, y, label, ha="left", va="center",
+                fontsize=font_size, family="monospace",
+            )
+        if merge_runs:
+            j = 0
+            while j < len(cells):
+                k = j
+                while k + 1 < len(cells) and colors[k + 1] == colors[j]:
+                    k += 1
+                run_color = colors[j]
+                if run_color is not None:
+                    x_left = cells_x0 + j * pitch - cell_w / 2
+                    width = (k - j) * pitch + cell_w
+                    ax.add_patch(plt.Rectangle(
+                        (x_left, y - cell_h / 2),
+                        width, cell_h,
+                        facecolor=HAP_PALETTE[run_color],
+                        edgecolor="none", zorder=1,
+                    ))
+                    cx = cells_x0 + (j + k) * pitch / 2
+                    ax.text(
+                        cx, y, cells[j], ha="center", va="center",
+                        fontsize=font_size, family="monospace",
+                        color="black", zorder=2,
+                    )
+                j = k + 1
+            continue
+        for j, (c, color_key) in enumerate(zip(cells, colors)):
+            x = cells_x0 + j * pitch
+            if color_key is not None:
+                ax.add_patch(plt.Rectangle(
+                    (x - cell_w / 2, y - cell_h / 2),
+                    cell_w, cell_h,
+                    facecolor=HAP_PALETTE[color_key],
+                    edgecolor="none", zorder=1,
+                ))
+            ax.text(
+                x, y, c, ha="center", va="center",
+                fontsize=font_size, family="monospace",
+                color="black", zorder=2,
+            )
+
+
+def _render_combined_pdf(
+    panels: List[List[Row]],
+    out_path: Path,
+    fig_w: float = 5.5,
+    pitch: float = 0.105,
+    cells_x0: float = 0.22,
+    row_height_in: float = 0.30,
+    panel_gap_rows: float = 1.5,
+) -> None:
+    """Stack multiple panels in one figure, sharing x layout so columns
+    align across panels. Each panel's vertical extent is proportional to
+    its row count, giving every line the same physical height."""
+    counts = [max(len(p), 1) for p in panels]
+    total_rows = sum(counts)
+    fig_h = row_height_in * total_rows + row_height_in * panel_gap_rows * (len(panels) - 1) + 0.3
+    fig, axes = plt.subplots(
+        nrows=len(panels), ncols=1,
+        figsize=(fig_w, fig_h),
+        gridspec_kw={"height_ratios": counts, "hspace": panel_gap_rows / (total_rows / len(panels))},
+    )
+    if len(panels) == 1:
+        axes = [axes]
+    for ax, rows in zip(axes, panels):
+        _draw_panel(ax, rows, pitch=pitch, cells_x0=cells_x0)
+    out_path.parent.mkdir(parents=True, exist_ok=True)
+    fig.savefig(out_path, bbox_inches="tight", pad_inches=0.1)
+    plt.close(fig)
+    print(f"wrote {out_path}")
+
+
+# ---------------------------------------------------------------------------
+# Sub-table builders
+# ---------------------------------------------------------------------------
+def _ground_truth_rows(sim: Dict) -> List[Row]:
+    rows: List[Row] = []
+
+    def founder(label, hap_key, color_key):
+        cells = [str(x) for x in sim[hap_key][:DISPLAY_SITES]]
+        rows.append((label, cells, [color_key] * DISPLAY_SITES, False))
+
+    founder("Dad  A:", "dad_alpha", "A")
+    founder("Dad  B:", "dad_beta", "B")
+    founder("Mom  C:", "mom_gamma", "C")
+    founder("Mom  D:", "mom_delta", "D")
+    rows.append(SPACER)
+
     for k in KIDS:
-        cells = [state[k][i] if i in info_sites else "." for i in range(NUM_SITES)]
-        rows.append(f"{k} p:  " + " ".join(cells))
+        labels = KID_LABELS_MAP[k]
+        phased = sim[KID_PHASED_KEY[k]]
+        cells_p = [str(phased[i][0]) for i in range(DISPLAY_SITES)]
+        colors_p = [_GREEK_TO_LETTER[labels[i][0]] for i in range(DISPLAY_SITES)]
+        rows.append((f"{k} p:", cells_p, colors_p, False))
+        cells_m = [str(phased[i][1]) for i in range(DISPLAY_SITES)]
+        colors_m = [_GREEK_TO_LETTER[labels[i][1]] for i in range(DISPLAY_SITES)]
+        rows.append((f"{k} m:", cells_m, colors_m, False))
     return rows
 
 
-def panel_A() -> None:
-    """Ground-truth founder haplotypes + kid paternal allele rows."""
-    sim = _build_simulation()
-    body = [
-        "Dad  α:  " + " ".join(str(x) for x in sim["dad_alpha"]),
-        "Dad  β:  " + " ".join(str(x) for x in sim["dad_beta"]),
-        "Mom  γ:  " + " ".join(str(x) for x in sim["mom_gamma"]),
-        "Mom  δ:  " + " ".join(str(x) for x in sim["mom_delta"]),
-        "",
-        "Kid1 p:  " + _kid_pat_row(sim["kid1_phased"]),
-        "Kid2 p:  " + _kid_pat_row(sim["kid2_phased"]),
-        "Kid3 p:  " + _kid_pat_row(sim["kid3_phased"]),
+def _unphased_section(sim: Dict, info_sites: List[int]) -> List[Row]:
+    """Top of paternal/maternal panels: unphased GT for all 5 individuals,
+    shown only at the parent-specific informative sites."""
+    dad_gt = [_unphased_gt(sim["dad_alpha"][i], sim["dad_beta"][i]) for i in range(DISPLAY_SITES)]
+    mom_gt = [_unphased_gt(sim["mom_gamma"][i], sim["mom_delta"][i]) for i in range(DISPLAY_SITES)]
+
+    def gated(values):
+        return [v if i in info_sites else "." for i, v in enumerate(values)]
+
+    rows: List[Row] = [
+        _plain("Dad:", gated(dad_gt)),
+        _plain("Mom:", gated(mom_gt)),
     ]
-    _render_panel_image(body, OUT / "panel_A_founder_haps.png")
-
-
-def _pat_stage(sim, dad_info, stage_idx: int) -> Dict[str, List[str]]:
-    pat_stage1, pat_stage2, pat_stage3 = _per_site_parent_labels(
-        sim, dad_info,
-        parent_hap_a_key="dad_alpha", parent_hap_b_key="dad_beta",
-        other_hap_a_key="mom_gamma", other_hap_b_key="mom_delta",
-        kid_unphased_key=KID_UNPHASED_KEY,
-        letter_first="A", letter_second="B",
-    )
-    return [pat_stage1, pat_stage2, pat_stage3][stage_idx]
-
-
-def panel_B() -> None:
-    """fig3_2 — backfill non-carrier fill, paternal-only rows."""
-    sim = _build_simulation()
-    dad_info = _informative_sites_dad(sim)
-    rows = _paternal_only_rows(_pat_stage(sim, dad_info, 1), dad_info)
-    _render_panel_image(rows, OUT / "panel_B_backfill_before_swap.png")
-
-
-def panel_C() -> None:
-    """fig3_3 — backfill swap-by-majority, paternal-only rows."""
-    sim = _build_simulation()
-    dad_info = _informative_sites_dad(sim)
-    rows = _paternal_only_rows(_pat_stage(sim, dad_info, 2), dad_info)
-    _render_panel_image(rows, OUT / "panel_C_backfill_after_swap.png")
-
-
-def panel_D() -> None:
-    """fig4_1 — perform_flips_in_place #1, paternal-only rows."""
-    sim = _build_simulation()
-    dad_info = _informative_sites_dad(sim)
-    pat_flipped = _flip_only(_pat_stage(sim, dad_info, 2), dad_info, ("A", "B"))
-    rows = []
     for k in KIDS:
-        cells = [pat_flipped[k][i] if pat_flipped[k][i] != "?" else "." for i in range(NUM_SITES)]
-        rows.append(f"{k} p:  " + " ".join(cells))
-    _render_panel_image(rows, OUT / "panel_D_after_flip.png")
+        unphased = sim[KID_UNPHASED_KEY[k]][:DISPLAY_SITES]
+        rows.append(_plain(f"{k}:", gated(unphased)))
+    return rows
 
 
-PANELS = {"A": panel_A, "B": panel_B, "C": panel_C, "D": panel_D}
+def _inherited_section(sim: Dict, info_sites: List[int], side: str) -> List[Row]:
+    """fig5_1 — raw 0/1 allele on the informative slot, `.` elsewhere."""
+    slot = 0 if side == "paternal" else 1
+    suffix = "p" if side == "paternal" else "m"
+    rows: List[Row] = []
+    for k in KIDS:
+        phased = sim[KID_PHASED_KEY[k]]
+        cells: List[str] = []
+        for i in range(DISPLAY_SITES):
+            if i not in info_sites:
+                cells.append(".")
+            elif i in KID_MISSING[k]:
+                cells.append("?")
+            else:
+                cells.append(str(phased[i][slot]))
+        rows.append(_plain(f"{k} {suffix}:", cells))
+    return rows
+
+
+def _kid_truth_letters(k: str, side: str) -> List[str]:
+    slot = 0 if side == "paternal" else 1
+    return [_GREEK_TO_LETTER[KID_LABELS_MAP[k][i][slot]] for i in range(DISPLAY_SITES)]
+
+
+def _truth_track_rows(side: str) -> List[Row]:
+    """Bottom table of paternal/maternal panels: a per-site colored track
+    of the ground-truth haplotype each kid inherited on the relevant slot.
+    Every cell is filled and labelled with its A/B/C/D letter."""
+    suffix = "p" if side == "paternal" else "m"
+    rows: List[Row] = []
+    for k in KIDS:
+        letters = _kid_truth_letters(k, side)
+        rows.append((f"{k} {suffix}:", letters, list(letters), True))
+    return rows
+
+
+def _stage(sim: Dict, info_sites: List[int], side: str, stage_idx: int) -> Dict[str, List[str]]:
+    if side == "paternal":
+        s1, s2, s3 = _per_site_parent_labels(
+            sim, info_sites,
+            parent_hap_a_key="dad_alpha", parent_hap_b_key="dad_beta",
+            other_hap_a_key="mom_gamma", other_hap_b_key="mom_delta",
+            kid_unphased_key=KID_UNPHASED_KEY,
+            letter_first="A", letter_second="B",
+        )
+    else:
+        s1, s2, s3 = _per_site_parent_labels(
+            sim, info_sites,
+            parent_hap_a_key="mom_gamma", parent_hap_b_key="mom_delta",
+            other_hap_a_key="dad_alpha", other_hap_b_key="dad_beta",
+            kid_unphased_key=KID_UNPHASED_KEY,
+            letter_first="C", letter_second="D",
+        )
+    return [s1, s2, s3][stage_idx]
+
+
+def _label_rows(state: Dict[str, List[str]], info_sites: List[int], side: str) -> List[Row]:
+    suffix = "p" if side == "paternal" else "m"
+    rows: List[Row] = []
+    for k in KIDS:
+        cells = [state[k][i] if i in info_sites else "." for i in range(DISPLAY_SITES)]
+        rows.append(_plain(f"{k} {suffix}:", cells))
+    return rows
+
+
+def _flipped_rows(state: Dict[str, List[str]], info_sites: List[int], side: str) -> List[Row]:
+    letters = ("A", "B") if side == "paternal" else ("C", "D")
+    suffix = "p" if side == "paternal" else "m"
+    flipped = _flip_only(state, info_sites, letters)
+    rows: List[Row] = []
+    for k in KIDS:
+        cells = [flipped[k][i] if flipped[k][i] != "?" else "." for i in range(DISPLAY_SITES)]
+        rows.append(_plain(f"{k} {suffix}:", cells))
+    return rows
+
+
+def _compose(side: str) -> List[Row]:
+    sim = _build_simulation()
+    info_full = _informative_sites_dad(sim) if side == "paternal" else _informative_sites_mom(sim)
+    info = [i for i in info_full if i < DISPLAY_SITES]
+    body: List[Row] = []
+    body += _unphased_section(sim, info)
+    body.append(SPACER)
+    body += _inherited_section(sim, info, side)
+    body.append(SPACER)
+    body += _label_rows(_stage(sim, info, side, 2), info, side)  # fig3_3
+    if side == "paternal":
+        body.append(SPACER)
+        body += _flipped_rows(_stage(sim, info, side, 2), info, side)  # fig4_1
+    body.append(SPACER)
+    body += _truth_track_rows(side)  # bottom: colored ground-truth track
+    return body
 
 
 def main() -> None:
-    import argparse
-    parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument(
-        "--panel", choices=sorted(PANELS.keys()),
-        help="Render only one panel (default: render every panel).",
-    )
-    args = parser.parse_args()
-    targets = [PANELS[args.panel]] if args.panel else list(PANELS.values())
-    for fn in targets:
-        fn()
+    sim = _build_simulation()
+    panels = [
+        _ground_truth_rows(sim),
+        _compose("maternal"),
+        _compose("paternal"),
+    ]
+    _render_combined_pdf(panels, OUT / "fig2_combined.pdf")
 
 
 if __name__ == "__main__":
