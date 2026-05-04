@@ -29,9 +29,11 @@ OUT.mkdir(parents=True, exist_ok=True)
 
 
 def _trio_svg_to_pdf(scenario, out_path: Path, label_fontsize: int = 16,
-                     swap_parents: bool = False) -> None:
+                     swap_parents: bool = False,
+                     vertical_haps: bool = False) -> None:
     svg = trio_discovery.build(scenario, label_fontsize=label_fontsize,
-                                swap_parents=swap_parents)
+                                swap_parents=swap_parents,
+                                vertical_haps=vertical_haps)
     cairosvg.svg2pdf(
         bytestring=svg.encode("utf-8"),
         write_to=str(out_path),
@@ -92,12 +94,14 @@ def panel_E() -> None:
 
 
 # Panel F — trio cartoon for compound genetic-epigenetic heterozygote.
+# Haplotypes stack above each parent and below the kid (no left/right side).
 def panel_F() -> None:
     _trio_svg_to_pdf(
         trio_discovery.SCENARIO_COMPOUND,
         out_path=OUT / "panel_F_trio_compound_het.pdf",
         label_fontsize=28,
         swap_parents=True,
+        vertical_haps=True,
     )
 
 

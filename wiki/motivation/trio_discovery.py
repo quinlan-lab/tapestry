@@ -63,10 +63,11 @@ def star(cx, cy, r=7, fill='#d62728', stroke='black', sw=1.0):
 # ---------- haplotype ----------
 
 def haplotype(x, y, w, color, cpgs, variants=(), label=None, label_at_start=False,
-              label_fontsize=16):
+              label_fontsize=16, stems_below=False):
     """cpgs: list of (rel_x, methylated_bool). variants: list of rel_x drawn as red stars.
     label: optional single-letter hap id (drawn just outside the bar, adjacent
-    to the person's shape). label_at_start puts it at bar_x0 (left end)."""
+    to the person's shape). label_at_start puts it at bar_x0 (left end).
+    stems_below: when True, CpG stems extend downward from the bar instead of upward."""
     rels = [r for r, _ in cpgs] + list(variants)
     pad = min(rels)
     bar_x0 = x
@@ -85,10 +86,14 @@ def haplotype(x, y, w, color, cpgs, variants=(), label=None, label_at_start=Fals
             )
     stem_h = 24
     r = 7
+    sign = 1 if stems_below else -1
+    bar_edge = y + sign * 4  # bottom edge if stems_below else top edge
+    stem_end = bar_edge + sign * stem_h
+    circle_cy = bar_edge + sign * (stem_h + r - 2)
     for rx, meth in cpgs:
         cx = x + rx * w
-        out.append(line(cx, y - 4, cx, y - 4 - stem_h, sw=1.2))
-        out.append(circle(cx, y - 4 - stem_h - r + 2, r,
+        out.append(line(cx, bar_edge, cx, stem_end, sw=1.2))
+        out.append(circle(cx, circle_cy, r,
                           fill='black' if meth else 'white', sw=1.2))
     for rx in variants:
         cx = x + rx * w
@@ -169,8 +174,76 @@ SCENARIO_COMPOUND = Scenario(
 
 # ---------- layout ----------
 
+def _build_vertical(scenario: Scenario, label_fontsize: int,
+                    swap_parents: bool) -> str:
+    """Variant layout: both of each parent's haplotypes sit above the parent
+    shape, and both of the kid's sit below the kid shape. Stems are NOT
+    flipped — CpGs always sit above their bar (default haplotype orientation)."""
+    X0v, Y0v, VWv, VHv = 220, 120, 880, 580
+    head = (
+        f'<svg xmlns="http://www.w3.org/2000/svg" viewBox="{X0v} {Y0v} {VWv} {VHv}" '
+        f'font-family="Arial, sans-serif" font-size="14">'
+        f'<rect x="{X0v}" y="{Y0v}" width="{VWv}" height="{VHv}" fill="white"/>'
+    )
+    parts = [head]
+
+    if swap_parents:
+        left_shape, right_shape = 'M', 'F'
+        left_top, left_bot = scenario.dad_top, scenario.dad_bot
+        right_top, right_bot = scenario.mom_top, scenario.mom_bot
+    else:
+        left_shape, right_shape = 'F', 'M'
+        left_top, left_bot = scenario.mom_top, scenario.mom_bot
+        right_top, right_bot = scenario.dad_top, scenario.dad_bot
+
+    SHAPE = 80
+    HAP_W = 280
+    LEFT_X, RIGHT_X = 480, 880
+    PARENT_Y = 320
+    KID_X = (LEFT_X + RIGHT_X) // 2
+    KID_Y = 500
+    OUTER_OFFSET = 140       # parent outer hap bar offset above shape center
+    INNER_OFFSET = 85        # parent inner hap bar offset above shape center
+    KID_OUTER_OFFSET = 180   # kid outer hap bar offset below shape center
+    KID_INNER_OFFSET = 125   # kid inner hap bar offset below shape center
+
+    parts.append(person(LEFT_X, PARENT_Y, left_shape, size=SHAPE))
+    parts.append(person(RIGHT_X, PARENT_Y, right_shape, size=SHAPE))
+
+    def vhap(cx, y, hap):
+        # Center the bar's drawn extent on cx. The haplotype's visible bar
+        # spans (max(rels) + min(rels)) * HAP_W in x; offsetting by half
+        # that span centers the bar on cx independent of CpG/variant rels.
+        rels = [r for r, _ in hap.cpgs] + list(hap.variants)
+        span = (max(rels) + min(rels)) * HAP_W
+        return haplotype(cx - span / 2, y, HAP_W, hap.color,
+                         hap.cpgs, hap.variants,
+                         label=hap.label, label_fontsize=label_fontsize)
+
+    # Both parent haps above the shape: top hap higher, bot hap closer to shape.
+    parts.append(vhap(LEFT_X, PARENT_Y - OUTER_OFFSET, left_top))
+    parts.append(vhap(RIGHT_X, PARENT_Y - OUTER_OFFSET, right_top))
+    parts.append(vhap(LEFT_X, PARENT_Y - INNER_OFFSET, left_bot))
+    parts.append(vhap(RIGHT_X, PARENT_Y - INNER_OFFSET, right_bot))
+
+    # Marriage line + line down to kid (terminating at top of kid figure).
+    parts.append(line(LEFT_X + SHAPE / 2, PARENT_Y, RIGHT_X - SHAPE / 2, PARENT_Y))
+    parts.append(line(KID_X, PARENT_Y, KID_X, KID_Y - SHAPE / 2))
+
+    parts.append(person(KID_X, KID_Y, 'M', size=SHAPE))
+    # Both kid haps below the shape: top hap closer to kid, bot hap further.
+    parts.append(vhap(KID_X, KID_Y + KID_INNER_OFFSET, scenario.kid_top))
+    parts.append(vhap(KID_X, KID_Y + KID_OUTER_OFFSET, scenario.kid_bot))
+
+    parts.append(SVG_TAIL)
+    return '\n'.join(parts)
+
+
 def build(scenario: Scenario, label_fontsize: int = 16,
-          swap_parents: bool = False) -> str:
+          swap_parents: bool = False,
+          vertical_haps: bool = False) -> str:
+    if vertical_haps:
+        return _build_vertical(scenario, label_fontsize, swap_parents)
     parts = [SVG_HEAD]
 
     left_pos = (560, 190)
