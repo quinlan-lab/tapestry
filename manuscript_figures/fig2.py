@@ -403,19 +403,40 @@ def _inherited_section(sim: Dict, info_sites: List[int], side: str) -> List[Row]
     return rows
 
 
-def _kid_truth_letters(k: str, side: str) -> List[str]:
-    slot = 0 if side == "paternal" else 1
-    return [_GREEK_TO_LETTER[KID_LABELS_MAP[k][i][slot]] for i in range(DISPLAY_SITES)]
+def _collapse_to_blocks(
+    state: Dict[str, List[str]],
+    info_sites: List[int],
+) -> Dict[str, List[str]]:
+    """Fill non-informative sites by extending each kid's most-recent
+    informative-site letter forward (and the first informative letter
+    backward), mirroring collapse_identical_iht's `?`-as-wildcard merge.
+    The result is a contiguous A/B (or C/D) string per kid, ready to be
+    drawn with merge_runs=True so equal-letter runs render as one block."""
+    kids = list(state.keys())
+    out = {k: ["?"] * DISPLAY_SITES for k in kids}
+    for k in kids:
+        first = next((state[k][i] for i in info_sites if state[k][i] != "?"), "?")
+        cur = first
+        for i in range(DISPLAY_SITES):
+            if i in info_sites and state[k][i] != "?":
+                cur = state[k][i]
+            out[k][i] = cur
+    return out
 
 
-def _truth_track_rows(side: str) -> List[Row]:
-    """Bottom table of paternal/maternal panels: a per-site colored track
-    of the ground-truth haplotype each kid inherited on the relevant slot.
-    Every cell is filled and labelled with its A/B/C/D letter."""
+def _reconstruction_track_rows(
+    state: Dict[str, List[str]],
+    info_sites: List[int],
+    side: str,
+) -> List[Row]:
+    """Bottom table: the per-site reconstruction collapsed into blocks
+    by run-merging identical letters across (informative + filled-in)
+    sites. Cells are colored by their A/B/C/D letter."""
     suffix = "p" if side == "paternal" else "m"
+    filled = _collapse_to_blocks(state, info_sites)
     rows: List[Row] = []
     for k in KIDS:
-        letters = _kid_truth_letters(k, side)
+        letters = filled[k]
         rows.append((f"{k} {suffix}:", letters, list(letters), True))
     return rows
 
@@ -469,12 +490,17 @@ def _compose(side: str) -> List[Row]:
     body.append(SPACER)
     body += _inherited_section(sim, info, side)
     body.append(SPACER)
-    body += _label_rows(_stage(sim, info, side, 2), info, side)  # fig3_3
+    stage3 = _stage(sim, info, side, 2)
+    body += _label_rows(stage3, info, side)  # fig3_3
     if side == "paternal":
         body.append(SPACER)
-        body += _flipped_rows(_stage(sim, info, side, 2), info, side)  # fig4_1
-    body.append(SPACER)
-    body += _truth_track_rows(side)  # bottom: colored ground-truth track
+        body += _flipped_rows(stage3, info, side)  # fig4_1
+        flipped = _flip_only(stage3, info, ("A", "B"))
+        body.append(SPACER)
+        body += _reconstruction_track_rows(flipped, info, side)
+    else:
+        body.append(SPACER)
+        body += _reconstruction_track_rows(stage3, info, side)
     return body
 
 
