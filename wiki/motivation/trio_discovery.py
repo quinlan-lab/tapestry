@@ -132,10 +132,10 @@ KID_RELS = [0.10, 0.20, 0.30, 0.55, 0.65]
 # ---------- scenarios ----------
 
 SCENARIO_DENOVO = Scenario(
-    mom_top=HapData(METH5, '#8ecae6', label='C'),
-    mom_bot=HapData(UNMETH5, '#1f6ea8', label='D'),
-    dad_top=HapData(UNMETH5, '#f4b860', label='A'),
-    dad_bot=HapData(METH5, '#e8734a', label='B'),
+    mom_top=HapData(METH5, '#b2df8a', label='C'),
+    mom_bot=HapData(UNMETH5, '#fb9a99', label='D'),
+    dad_top=HapData(UNMETH5, '#a6cee3', label='A'),
+    dad_bot=HapData(METH5, '#fdbf6f', label='B'),
     # Kid pat = dad A; kid mat = mom C. Two de novo events both sit at
     # the right CpG cluster (positions KID_RELS[3:]). Paternal A inherits
     # dad's unmethylated state at the left cluster but is methylated at
@@ -143,9 +143,9 @@ SCENARIO_DENOVO = Scenario(
     # methylated state at the left cluster but is unmethylated at the
     # right cluster (de novo loss).
     kid_top=HapData([(r, m) for r, m in zip(KID_RELS, [False, False, False, True, True])],
-                    '#f4b860', label='A'),
+                    '#a6cee3', label='A'),
     kid_bot=HapData([(r, m) for r, m in zip(KID_RELS, [True, True, True, False, False])],
-                    '#8ecae6', label='C'),
+                    '#b2df8a', label='C'),
 )
 
 # Compound genetic-epigenetic heterozygote:
@@ -155,50 +155,60 @@ SCENARIO_DENOVO = Scenario(
 SCENARIO_COMPOUND = Scenario(
     # Mom: C = hyper-methylated carrier; D = normal unmethylated
     mom_top=HapData([(r, True) for r in RELS[:3]] + [(r, False) for r in RELS[3:]],
-                    '#8ecae6', label='C'),
-    mom_bot=HapData(UNMETH5, '#1f6ea8', label='D'),
+                    '#b2df8a', label='C'),
+    mom_bot=HapData(UNMETH5, '#fb9a99', label='D'),
     # Dad: A = genetic-variant carrier; B = normal
-    dad_top=HapData(UNMETH5, '#f4b860', variants=(0.40,), label='A'),
-    dad_bot=HapData(UNMETH5, '#e8734a', label='B'),
+    dad_top=HapData(UNMETH5, '#a6cee3', variants=(0.40,), label='A'),
+    dad_bot=HapData(UNMETH5, '#fdbf6f', label='B'),
     # Kid: paternal = A (variant); maternal = C (aberrant meth) — compound het in trans
-    kid_top=HapData([(r, False) for r in KID_RELS], '#f4b860', variants=(0.42,), label='A'),
+    kid_top=HapData([(r, False) for r in KID_RELS], '#a6cee3', variants=(0.42,), label='A'),
     kid_bot=HapData([(r, True) for r in KID_RELS[:3]] + [(r, False) for r in KID_RELS[3:]],
-                   '#8ecae6', label='C'),
+                   '#b2df8a', label='C'),
 )
 
 
 # ---------- layout ----------
 
-def build(scenario: Scenario, label_fontsize: int = 16) -> str:
+def build(scenario: Scenario, label_fontsize: int = 16,
+          swap_parents: bool = False) -> str:
     parts = [SVG_HEAD]
 
-    mom = (560, 190)
-    dad = (800, 190)
-    parts.append(person(*mom, 'F'))
-    parts.append(person(*dad, 'M'))
+    left_pos = (560, 190)
+    right_pos = (800, 190)
+    if swap_parents:
+        left_shape, right_shape = 'M', 'F'
+        left_top, left_bot = scenario.dad_top, scenario.dad_bot
+        right_top, right_bot = scenario.mom_top, scenario.mom_bot
+    else:
+        left_shape, right_shape = 'F', 'M'
+        left_top, left_bot = scenario.mom_top, scenario.mom_bot
+        right_top, right_bot = scenario.dad_top, scenario.dad_bot
+    parts.append(person(*left_pos, left_shape))
+    parts.append(person(*right_pos, right_shape))
 
-    # Mom/kid labels sit on the bar's tail (person side); dad labels sit on the head.
-    parts.append(haplotype(240, 184, 340, scenario.mom_top.color,
-                           scenario.mom_top.cpgs, scenario.mom_top.variants,
-                           label=scenario.mom_top.label,
+    # Left-parent labels sit on the bar's tail (person side, right end);
+    # right-parent labels sit on the head (person side, left end).
+    parts.append(haplotype(240, 184, 340, left_top.color,
+                           left_top.cpgs, left_top.variants,
+                           label=left_top.label,
                            label_fontsize=label_fontsize))
-    parts.append(haplotype(240, 234, 340, scenario.mom_bot.color,
-                           scenario.mom_bot.cpgs, scenario.mom_bot.variants,
-                           label=scenario.mom_bot.label,
+    parts.append(haplotype(240, 234, 340, left_bot.color,
+                           left_bot.cpgs, left_bot.variants,
+                           label=left_bot.label,
                            label_fontsize=label_fontsize))
-    parts.append(haplotype(890, 184, 280, scenario.dad_top.color,
-                           scenario.dad_top.cpgs, scenario.dad_top.variants,
-                           label=scenario.dad_top.label, label_at_start=True,
+    parts.append(haplotype(890, 184, 280, right_top.color,
+                           right_top.cpgs, right_top.variants,
+                           label=right_top.label, label_at_start=True,
                            label_fontsize=label_fontsize))
-    parts.append(haplotype(890, 234, 280, scenario.dad_bot.color,
-                           scenario.dad_bot.cpgs, scenario.dad_bot.variants,
-                           label=scenario.dad_bot.label, label_at_start=True,
+    parts.append(haplotype(890, 234, 280, right_bot.color,
+                           right_bot.cpgs, right_bot.variants,
+                           label=right_bot.label, label_at_start=True,
                            label_fontsize=label_fontsize))
 
-    parts.append(line(mom[0] + 50, mom[1], dad[0] - 50, dad[1]))
-    midx = (mom[0] + dad[0]) / 2
+    parts.append(line(left_pos[0] + 50, left_pos[1], right_pos[0] - 50, right_pos[1]))
+    midx = (left_pos[0] + right_pos[0]) / 2
     son = (int(midx), 400)
-    parts.append(line(midx, mom[1], son[0], son[1] - 50))
+    parts.append(line(midx, left_pos[1], son[0], son[1] - 50))
     parts.append(person(*son, 'M'))
 
     parts.append(haplotype(380, 394, 280, scenario.kid_top.color,
@@ -275,11 +285,41 @@ def render_trio_denovo_meth_table(out_path: Path | None = None,
         cell_fontsize=cell_fontsize,
     )
     out = out_path if out_path is not None else OUT / "trio_denovo_meth_table.png"
-    fig.savefig(out, dpi=180)
+    _save_fig(fig, out, trim_whitespace=trim_whitespace)
     plt.close(fig)
-    if trim_whitespace:
-        _trim_whitespace_png(out)
     print(f"[scratch] Wrote {out}")
+
+
+def _save_fig(fig, out, trim_whitespace: bool = False) -> None:
+    if trim_whitespace and Path(out).suffix.lower() == ".pdf":
+        from matplotlib.transforms import Bbox
+        fig.canvas.draw()
+        r = fig.canvas.get_renderer()
+        from matplotlib.spines import Spine
+        from matplotlib.axis import XAxis, YAxis
+        from matplotlib.text import Text
+        bboxes = []
+        for ax in fig.axes:
+            for child in ax.get_children():
+                if child is ax.patch or not child.get_visible():
+                    continue
+                if isinstance(child, (Spine, XAxis, YAxis)):
+                    continue
+                if isinstance(child, Text) and not child.get_text():
+                    continue
+                try:
+                    b = child.get_window_extent(r)
+                except Exception:
+                    continue
+                if b.width > 0 and b.height > 0:
+                    bboxes.append(b)
+        bbox_in = (Bbox.union(bboxes)
+                   .transformed(fig.dpi_scale_trans.inverted()))
+        fig.savefig(out, dpi=180, bbox_inches=bbox_in, pad_inches=0.02)
+    else:
+        fig.savefig(out, dpi=180)
+        if trim_whitespace:
+            _trim_whitespace_png(out)
 
 
 def _trim_whitespace_png(path) -> None:
@@ -309,6 +349,7 @@ def render_trio_denovo_polars_code(out_path: Path | None = None,
     ax.set_xlim(0, 1)
     ax.set_ylim(0, 1)
     ax.set_axis_off()
+    ax.patch.set_visible(False)
 
     if show_title:
         ax.text(
@@ -327,10 +368,8 @@ def render_trio_denovo_polars_code(out_path: Path | None = None,
     )
 
     out = out_path if out_path is not None else OUT / "trio_denovo_polars_code.png"
-    fig.savefig(out, dpi=180)
+    _save_fig(fig, out, trim_whitespace=trim_whitespace)
     plt.close(fig)
-    if trim_whitespace:
-        _trim_whitespace_png(out)
     print(f"[scratch] Wrote {out}")
 
 
@@ -401,11 +440,13 @@ def _draw_simple_table(ax, cols, rows, title, highlight_rows=frozenset(),
     ax.set_xlim(0, 1)
     ax.set_ylim(0, 1)
     ax.set_axis_off()
-    ax.text(
-        0.0, 0.97, title,
-        ha="left", va="top", fontsize=12, fontweight="bold",
-        transform=ax.transAxes,
-    )
+    ax.patch.set_visible(False)
+    if title:
+        ax.text(
+            0.0, 0.97, title,
+            ha="left", va="top", fontsize=12, fontweight="bold",
+            transform=ax.transAxes,
+        )
     n_col = len(cols)
     col_xs = [0.02 + col_dx * i for i in range(n_col)]
     table_right = col_xs[-1] + 0.07
@@ -615,10 +656,8 @@ def render_trio_compound_het_tables(out_path: Path | None = None,
     )
 
     out = out_path if out_path is not None else OUT / "trio_compound_het_tables.png"
-    fig.savefig(out, dpi=180)
+    _save_fig(fig, out, trim_whitespace=trim_whitespace)
     plt.close(fig)
-    if trim_whitespace:
-        _trim_whitespace_png(out)
     print(f"[scratch] Wrote {out}")
 
 
@@ -635,6 +674,7 @@ def render_trio_compound_het_polars_code(out_path: Path | None = None,
     ax.set_xlim(0, 1)
     ax.set_ylim(0, 1)
     ax.set_axis_off()
+    ax.patch.set_visible(False)
 
     if show_title:
         ax.text(
@@ -653,10 +693,8 @@ def render_trio_compound_het_polars_code(out_path: Path | None = None,
     )
 
     out = out_path if out_path is not None else OUT / "trio_compound_het_polars_code.png"
-    fig.savefig(out, dpi=180)
+    _save_fig(fig, out, trim_whitespace=trim_whitespace)
     plt.close(fig)
-    if trim_whitespace:
-        _trim_whitespace_png(out)
     print(f"[scratch] Wrote {out}")
 
 
