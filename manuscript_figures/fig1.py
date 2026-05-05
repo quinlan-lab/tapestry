@@ -30,10 +30,14 @@ OUT.mkdir(parents=True, exist_ok=True)
 
 def _trio_svg_to_pdf(scenario, out_path: Path, label_fontsize: int = 16,
                      swap_parents: bool = False,
-                     vertical_haps: bool = False) -> None:
+                     vertical_haps: bool = False,
+                     highlight_denovo: bool = False,
+                     highlight_compound: bool = False) -> None:
     svg = trio_discovery.build(scenario, label_fontsize=label_fontsize,
                                 swap_parents=swap_parents,
-                                vertical_haps=vertical_haps)
+                                vertical_haps=vertical_haps,
+                                highlight_denovo=highlight_denovo,
+                                highlight_compound=highlight_compound)
     cairosvg.svg2pdf(
         bytestring=svg.encode("utf-8"),
         write_to=str(out_path),
@@ -46,7 +50,7 @@ def panel_A() -> None:
     single_indiv_phasing.render_before_phasing(
         out_path=OUT / "panel_A_before_phasing.pdf",
         glyph_fontsize=18,
-        ytick_fontsize=18,
+        ytick_fontsize=24,
         show_left_labels=False,
         show_title=False,
     )
@@ -57,7 +61,7 @@ def panel_B() -> None:
     single_indiv_phasing.render_after_phasing(
         out_path=OUT / "panel_B_after_phasing.pdf",
         glyph_fontsize=18,
-        ytick_fontsize=18,
+        ytick_fontsize=24,
         show_left_labels=False,
         show_title=False,
     )
@@ -70,6 +74,7 @@ def panel_C() -> None:
         out_path=OUT / "panel_C_trio_denovo.pdf",
         label_fontsize=28,
         swap_parents=True,
+        highlight_denovo=True,
     )
 
 
@@ -84,40 +89,23 @@ def panel_D() -> None:
     )
 
 
-# Panel E — polars discovery snippet (de novo scenario).
+# Panel E — trio cartoon for compound genetic-epigenetic heterozygote.
+# Haplotypes stack above each parent and to the right of the kid.
 def panel_E() -> None:
-    trio_discovery.render_trio_denovo_polars_code(
-        out_path=OUT / "panel_E_trio_denovo_polars_code.pdf",
-        show_title=False,
-        trim_whitespace=True,
-    )
-
-
-# Panel F — trio cartoon for compound genetic-epigenetic heterozygote.
-# Haplotypes stack above each parent and below the kid (no left/right side).
-def panel_F() -> None:
     _trio_svg_to_pdf(
         trio_discovery.SCENARIO_COMPOUND,
-        out_path=OUT / "panel_F_trio_compound_het.pdf",
+        out_path=OUT / "panel_E_trio_compound_het.pdf",
         label_fontsize=28,
         swap_parents=True,
         vertical_haps=True,
+        highlight_compound=True,
     )
 
 
-# Panel G — haplotype-specific methylation + phased-genotype tables (compound scenario).
-def panel_G() -> None:
+# Panel F — haplotype-specific methylation + phased-genotype tables (compound scenario).
+def panel_F() -> None:
     trio_discovery.render_trio_compound_het_tables(
-        out_path=OUT / "panel_G_trio_compound_het_tables.pdf",
-        show_title=False,
-        trim_whitespace=True,
-    )
-
-
-# Panel H — polars discovery snippet (compound scenario).
-def panel_H() -> None:
-    trio_discovery.render_trio_compound_het_polars_code(
-        out_path=OUT / "panel_H_trio_compound_het_polars_code.pdf",
+        out_path=OUT / "panel_F_trio_compound_het_tables.pdf",
         show_title=False,
         trim_whitespace=True,
     )
@@ -130,8 +118,6 @@ PANELS = {
     "D": panel_D,
     "E": panel_E,
     "F": panel_F,
-    "G": panel_G,
-    "H": panel_H,
 }
 
 

@@ -44,12 +44,13 @@ OUT = Path(__file__).resolve().parent
 OUT.mkdir(parents=True, exist_ok=True)
 
 
-# --- Site layout: 25 sites, mixed SNVs (10) + CpGs (15) ---
-# 'S' = SNV, 'C' = CpG.
-SITE_KIND = list("SCSCCSCCSCSCCSCCSCSCCSCSC")
+# --- Site layout: 13 sites, mixed SNVs (4) + CpGs (9) ---
+# 'S' = SNV, 'C' = CpG. 3 flanking sites on each side of the 7-site
+# discordant block (originally 5 flanking; trimmed 2 sites from each end).
+SITE_KIND = list("CSCCSCCSCCSCC")
 N_SITES = len(SITE_KIND)
-assert SITE_KIND.count("S") == 10
-assert SITE_KIND.count("C") == 15
+assert SITE_KIND.count("S") == 4
+assert SITE_KIND.count("C") == 9
 
 CPG_INDICES = [i for i, k in enumerate(SITE_KIND) if k == "C"]
 SNV_INDICES = [i for i, k in enumerate(SITE_KIND) if k == "S"]
@@ -68,7 +69,7 @@ MAT = [None] * N_SITES
 # SNV alleles per haplotype: a mixture of 0s and 1s on each haplotype
 # (each SNV is still heterozygous in the individual — pat and mat carry
 # opposite alleles — but neither haplotype is purely-REF or purely-ALT).
-SNV_PAT_BITS = [0, 1, 0, 1, 1, 0, 1, 0, 1, 0]
+SNV_PAT_BITS = [1, 0, 1, 1]
 SNV_MAT_BITS = [1 - b for b in SNV_PAT_BITS]
 for k, i in enumerate(SNV_INDICES):
     PAT[i] = SNV_PAT_BITS[k]
@@ -77,7 +78,7 @@ for k, i in enumerate(SNV_INDICES):
 # Discordant subregion: pat ~unmethylated, mat ~methylated across CpGs
 # whose site index falls in [DISCORDANT_LO, DISCORDANT_HI], with a small
 # noise rate so even the discordant region carries some heterogeneity.
-DISCORDANT_LO, DISCORDANT_HI = 6, 12
+DISCORDANT_LO, DISCORDANT_HI = 3, 9
 DISCORDANT_NOISE = 0.10  # fraction of reads flipped against the discordant pattern
 
 # Target methylation level per (haplotype, CpG):
@@ -103,20 +104,20 @@ for cpg_i in CPG_INDICES:
 # Format: (source, start_site, end_site_inclusive)
 READS_BY_SOURCE = {
     "pat": [
-        (0, 11),
-        (2, 14),
-        (4, 17),
-        (7, 20),
-        (10, 23),
-        (13, 24),
+        (0, 5),
+        (0, 6),
+        (1, 8),
+        (3, 10),
+        (5, 12),
+        (7, 12),
     ],
     "mat": [
-        (0, 9),
-        (3, 15),
-        (5, 18),
-        (8, 21),
-        (11, 24),
-        (15, 24),
+        (0, 4),
+        (0, 7),
+        (2, 9),
+        (4, 11),
+        (6, 12),
+        (8, 12),
     ],
 }
 READS_GROUPED = (
@@ -142,6 +143,10 @@ for _ in range(max(len(READS_BY_SOURCE["pat"]), len(READS_BY_SOURCE["mat"]))):
 COLOR_NEUTRAL = "#444444"
 COLOR_METH = "#dc2626"    # red
 COLOR_UNMETH = "#1d4ed8"  # blue
+# Pre-blended (≈55% color over white) so cells can be drawn opaque and
+# fully hide the underlying read-tether line.
+COLOR_METH_FILL = "#ec8888"
+COLOR_UNMETH_FILL = "#82a3e9"
 COLOR_OUT = "#cccccc"     # light grey for `-`
 
 
@@ -182,29 +187,64 @@ def _read_data(source: str, read_idx: int, start: int, end: int):
 
 
 def _draw_read_row(ax, row_y, source, read_idx, start, end, hap_color,
-                   prefix, prefix_color, glyph_fontsize=GLYPH_FONTSIZE):
+                   prefix, prefix_color, glyph_fontsize=GLYPH_FONTSIZE,
+                   snv_cell_background=False):
+    """Draw one read row.
+
+    snv_cell_background=False (option 1): a single continuous connector
+    spans the read; SNV digits get a white text-bbox so they mask the
+    connector locally.
+    snv_cell_background=True (option 2): the connector is drawn only in
+    the gaps between sites, and SNV digits get a CpG-sized neutral cell
+    rectangle behind them so they look like cells too."""
     ax.text(
         PREFIX_X, row_y, prefix,
         ha="left", va="center", fontsize=PREFIX_FONTSIZE,
         family="Arial", color=prefix_color,
     )
+    if snv_cell_background:
+        half_w = CPG_BOX_W / 2
+        for i in range(start, end):
+            ax.plot([i + half_w, (i + 1) - half_w], [row_y, row_y],
+                    color="#bbbbbb", linewidth=0.8, solid_capstyle="butt",
+                    zorder=0)
+    else:
+        ax.plot([start, end], [row_y, row_y],
+                color="#bbbbbb", linewidth=0.8, solid_capstyle="butt",
+                zorder=0)
     for i, (val, in_window) in enumerate(_read_data(source, read_idx, start, end)):
         if not in_window:
             continue
         if SITE_KIND[i] == "S":
-            ax.text(
-                i, row_y, str(val),
-                ha="center", va="center",
-                fontsize=glyph_fontsize, family="Arial",
-                color=hap_color,
-            )
-        else:  # CpG: same-cell-size colored rectangle
-            box_color = COLOR_METH if val else COLOR_UNMETH
+            if snv_cell_background:
+                ax.add_patch(
+                    Rectangle(
+                        (i - CPG_BOX_W / 2, row_y - CPG_BOX_H / 2),
+                        CPG_BOX_W, CPG_BOX_H,
+                        facecolor="#e6e6e6", edgecolor="none",
+                    )
+                )
+                ax.text(
+                    i, row_y, str(val),
+                    ha="center", va="center",
+                    fontsize=glyph_fontsize, family="Arial",
+                    color=hap_color,
+                )
+            else:
+                ax.text(
+                    i, row_y, str(val),
+                    ha="center", va="center",
+                    fontsize=glyph_fontsize, family="Arial",
+                    color=hap_color,
+                    bbox=dict(facecolor="white", edgecolor="none", pad=2.0),
+                )
+        else:  # CpG: same-cell-size colored rectangle (opaque, masks tether)
+            box_color = COLOR_METH_FILL if val else COLOR_UNMETH_FILL
             ax.add_patch(
                 Rectangle(
                     (i - CPG_BOX_W / 2, row_y - CPG_BOX_H / 2),
                     CPG_BOX_W, CPG_BOX_H,
-                    facecolor=box_color, edgecolor="none", alpha=0.55,
+                    facecolor=box_color, edgecolor="none",
                 )
             )
 
@@ -230,6 +270,40 @@ def _draw_discordant_track(ax, label="Discordant region", xlim_left=None):
                 N_SITES - 0.5)
     ax.set_ylim(0, 1)
     ax.set_axis_off()
+
+
+LABELED_SITES = (3,)  # one informative discordant CpG (pat all-unmethylated, mat all-methylated)
+COUNT_LABEL_FONTSIZE = 28
+TALL_BAR_THRESHOLD = 0.5
+
+
+def _draw_count_labels(ax, levels_dict, counts_dict, color, sites=LABELED_SITES,
+                       fontsize=COUNT_LABEL_FONTSIZE, force_outside=False):
+    """Annotate selected CpG bars with stacked m-over-n read counts (rendered
+    as a mathtext fraction with a horizontal rule; mathtext uses matplotlib's
+    own math font, not Arial). Tall bars get a white label inside the bar
+    near its top; short bars get a black label just above the bar. With
+    force_outside=True, every label is placed above the bar in black
+    regardless of height. Bars below MIN_COVERAGE are skipped."""
+    for cpg_i in sites:
+        if cpg_i not in counts_dict:
+            continue
+        m, n = counts_dict[cpg_i]
+        level = levels_dict.get(cpg_i, 0.0)
+        text = rf'$\frac{{{m}}}{{{n}}}$'
+        # Mathtext \frac bbox is slightly left-skewed (the fraction-bar tail
+        # extends past the numerator/denominator on the left), so nudge the
+        # anchor right by a small amount to visually center it on the bar.
+        x_nudge = 0.07
+        if not force_outside and level >= TALL_BAR_THRESHOLD:
+            ax.text(cpg_i + x_nudge, level - 0.05, text,
+                    ha="center", va="top",
+                    fontsize=fontsize, color="white",
+                    fontweight="bold")
+        else:
+            ax.text(cpg_i + x_nudge, level + 0.05, text,
+                    ha="center", va="bottom",
+                    fontsize=fontsize, color="black")
 
 
 def _draw_meth_bars(ax, levels_dict, color, track_label=None,
@@ -283,11 +357,12 @@ def _per_source_indexed_reads():
             yield (src, k, start, end)
 
 
-MIN_COVERAGE = 3  # don't report a methylation level below this read count
+MIN_COVERAGE = 2  # don't report a methylation level below this read count
 
 
 def _pooled_methylation():
-    out = {}
+    levels = {}
+    counts = {}
     for cpg_i in CPG_INDICES:
         meth = 0
         cov = 0
@@ -296,12 +371,14 @@ def _pooled_methylation():
                 cov += 1
                 meth += READ_CPG_VAL[(src, k, cpg_i)]
         if cov >= MIN_COVERAGE:
-            out[cpg_i] = meth / cov
-    return out
+            levels[cpg_i] = meth / cov
+            counts[cpg_i] = (meth, cov)
+    return levels, counts
 
 
 def _phased_methylation():
-    out = {"pat": {}, "mat": {}}
+    levels = {"pat": {}, "mat": {}}
+    counts = {"pat": {}, "mat": {}}
     for cpg_i in CPG_INDICES:
         for src in ("pat", "mat"):
             meth = 0
@@ -311,8 +388,9 @@ def _phased_methylation():
                     cov += 1
                     meth += READ_CPG_VAL[(src, k, cpg_i)]
             if cov >= MIN_COVERAGE:
-                out[src][cpg_i] = meth / cov
-    return out
+                levels[src][cpg_i] = meth / cov
+                counts[src][cpg_i] = (meth, cov)
+    return levels, counts
 
 
 # --- Figures ---
@@ -324,7 +402,7 @@ def render_before_phasing(out_path: Path | None = None,
                           show_title: bool = True,
                           ylabel: str | None = None,
                           ylabel_fontsize: int = 10):
-    fig = plt.figure(figsize=(11.0, 5.7))
+    fig = plt.figure(figsize=(5.5, 5.7))
     gs = GridSpec(
         nrows=3, ncols=1,
         height_ratios=(1.0, 0.25, 4.5),
@@ -335,7 +413,7 @@ def render_before_phasing(out_path: Path | None = None,
     ax_discordant = fig.add_subplot(gs[1], sharex=ax_meth)
     ax_reads = fig.add_subplot(gs[2], sharex=ax_meth)
 
-    pooled = _pooled_methylation()
+    pooled, pooled_counts = _pooled_methylation()
     xlim_left = None if show_left_labels else -1.5
     _draw_meth_bars(
         ax_meth, pooled, COLOR_NEUTRAL,
@@ -345,6 +423,8 @@ def render_before_phasing(out_path: Path | None = None,
         ylabel=ylabel,
         ylabel_fontsize=ylabel_fontsize,
     )
+    _draw_count_labels(ax_meth, pooled, pooled_counts, COLOR_NEUTRAL,
+                       force_outside=True)
     _draw_discordant_track(
         ax_discordant,
         label="Discordant region" if show_left_labels else None,
@@ -386,32 +466,36 @@ def render_after_phasing(out_path: Path | None = None,
                          pat_ylabel: str | None = None,
                          mat_ylabel: str | None = None,
                          ylabel_fontsize: int = 10):
-    fig = plt.figure(figsize=(11.0, 6.7))
+    fig = plt.figure(figsize=(5.5, 6.7))
+    # gs[1] is an empty spacer row that widens the visible gap between the
+    # pat and mat methylation tracks without affecting the other gaps.
     gs = GridSpec(
-        nrows=4, ncols=1,
-        height_ratios=(0.85, 0.85, 0.25, 4.5),
+        nrows=5, ncols=1,
+        height_ratios=(0.85, 0.3, 0.85, 0.25, 4.5),
         hspace=0.18,
         left=0.04, right=0.98, top=0.93, bottom=0.04,
     )
     ax_pat = fig.add_subplot(gs[0])
-    ax_mat = fig.add_subplot(gs[1], sharex=ax_pat)
-    ax_discordant = fig.add_subplot(gs[2], sharex=ax_pat)
-    ax_reads = fig.add_subplot(gs[3], sharex=ax_pat)
+    ax_mat = fig.add_subplot(gs[2], sharex=ax_pat)
+    ax_discordant = fig.add_subplot(gs[3], sharex=ax_pat)
+    ax_reads = fig.add_subplot(gs[4], sharex=ax_pat)
 
     xlim_left = None if show_left_labels else -1.5
-    phased = _phased_methylation()
+    phased, phased_counts = _phased_methylation()
     _draw_meth_bars(
         ax_pat, phased["pat"], COLOR_NEUTRAL,
         track_label="Pat meth" if show_left_labels else None,
         ytick_fontsize=ytick_fontsize, xlim_left=xlim_left,
         ylabel=pat_ylabel, ylabel_fontsize=ylabel_fontsize,
     )
+    _draw_count_labels(ax_pat, phased["pat"], phased_counts["pat"], COLOR_NEUTRAL)
     _draw_meth_bars(
         ax_mat, phased["mat"], COLOR_NEUTRAL,
         track_label="Mat meth" if show_left_labels else None,
         ytick_fontsize=ytick_fontsize, xlim_left=xlim_left,
         ylabel=mat_ylabel, ylabel_fontsize=ylabel_fontsize,
     )
+    _draw_count_labels(ax_mat, phased["mat"], phased_counts["mat"], COLOR_NEUTRAL)
     _draw_discordant_track(
         ax_discordant,
         label="Discordant region" if show_left_labels else None,

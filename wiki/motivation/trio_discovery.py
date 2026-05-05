@@ -63,15 +63,20 @@ def star(cx, cy, r=7, fill='#d62728', stroke='black', sw=1.0):
 # ---------- haplotype ----------
 
 def haplotype(x, y, w, color, cpgs, variants=(), label=None, label_at_start=False,
-              label_fontsize=16, stems_below=False):
+              label_fontsize=16, stems_below=False, tss=None, right_extent=None):
     """cpgs: list of (rel_x, methylated_bool). variants: list of rel_x drawn as red stars.
     label: optional single-letter hap id (drawn just outside the bar, adjacent
     to the person's shape). label_at_start puts it at bar_x0 (left end).
     stems_below: when True, CpG stems extend downward from the bar instead of upward."""
     rels = [r for r, _ in cpgs] + list(variants)
+    if tss is not None:
+        rels = rels + [tss]
     pad = min(rels)
     bar_x0 = x
-    bar_x1 = x + (max(rels) + pad) * w
+    if right_extent is not None:
+        bar_x1 = x + (right_extent + pad) * w
+    else:
+        bar_x1 = x + (max(rels) + pad) * w
     out = [f'<rect x="{bar_x0}" y="{y - 4}" width="{bar_x1 - bar_x0}" height="8" fill="{color}"/>']
     if label is not None:
         if label_at_start:
@@ -98,6 +103,20 @@ def haplotype(x, y, w, color, cpgs, variants=(), label=None, label_at_start=Fals
     for rx in variants:
         cx = x + rx * w
         out.append(star(cx, y, r=12))
+    if tss is not None:
+        tx = x + tss * w
+        bar_top = y - 4
+        h_up = 30
+        h_right = 22
+        ay = bar_top - h_up
+        out.append(line(tx, bar_top, tx, ay, sw=1.8))
+        out.append(line(tx, ay, tx + h_right, ay, sw=1.8))
+        ah = 5
+        out.append(
+            f'<polygon points="{tx + h_right + ah},{ay} '
+            f'{tx + h_right - 2},{ay - ah} '
+            f'{tx + h_right - 2},{ay + ah}" fill="black"/>'
+        )
     return '\n'.join(out)
 
 
@@ -159,27 +178,48 @@ SCENARIO_DENOVO = Scenario(
 # Each parent is a silent carrier of one of the two hits.
 SCENARIO_COMPOUND = Scenario(
     # Mom: C = hyper-methylated carrier; D = normal unmethylated
-    mom_top=HapData([(r, True) for r in RELS[:3]] + [(r, False) for r in RELS[3:]],
+    mom_top=HapData([(r, True) for r in RELS[:3]],
                     '#b2df8a', label='C'),
-    mom_bot=HapData(UNMETH5, '#fb9a99', label='D'),
+    mom_bot=HapData([(r, False) for r in RELS[:3]], '#fb9a99', label='D'),
     # Dad: A = genetic-variant carrier; B = normal
-    dad_top=HapData(UNMETH5, '#a6cee3', variants=(0.40,), label='A'),
-    dad_bot=HapData(UNMETH5, '#fdbf6f', label='B'),
+    dad_top=HapData([(r, False) for r in RELS[:3]], '#a6cee3',
+                    variants=(0.80,), label='A'),
+    dad_bot=HapData([(r, False) for r in RELS[:3]], '#fdbf6f', label='B'),
     # Kid: paternal = A (variant); maternal = C (aberrant meth) — compound het in trans
-    kid_top=HapData([(r, False) for r in KID_RELS], '#a6cee3', variants=(0.42,), label='A'),
-    kid_bot=HapData([(r, True) for r in KID_RELS[:3]] + [(r, False) for r in KID_RELS[3:]],
+    kid_top=HapData([(r, False) for r in KID_RELS[:3]], '#a6cee3',
+                    variants=(0.82,), label='A'),
+    kid_bot=HapData([(r, True) for r in KID_RELS[:3]],
                    '#b2df8a', label='C'),
 )
 
 
 # ---------- layout ----------
 
+def _vhap_leftmost_box(cx, bar_y, w, hap, n=3,
+                       tss_rel=0.50, bar_right_rel=0.90):
+    """Dashed rectangle around the n leftmost CpGs on a vertically-laid
+    haplotype bar (CpGs above the bar)."""
+    rels = [r for r, _ in hap.cpgs] + list(hap.variants) + [tss_rel]
+    span = (bar_right_rel + min(rels)) * w
+    bar_x0 = cx - span / 2
+    cpg_rels = sorted(r for r, _ in hap.cpgs)[:n]
+    pad_x = 12
+    pad_top = 6
+    pad_bot = 4
+    x_left = bar_x0 + cpg_rels[0] * w - pad_x
+    x_right = bar_x0 + cpg_rels[-1] * w + pad_x
+    y_top = bar_y - 42 - pad_top
+    y_bot = bar_y - 4 - pad_bot
+    return rect(x_left, y_top, x_right - x_left, y_bot - y_top,
+                fill='none', stroke='black', sw=2.0, dash='6,4', rx=0)
+
+
 def _build_vertical(scenario: Scenario, label_fontsize: int,
-                    swap_parents: bool) -> str:
+                    swap_parents: bool, highlight_compound: bool = False) -> str:
     """Variant layout: both of each parent's haplotypes sit above the parent
     shape, and both of the kid's sit below the kid shape. Stems are NOT
     flipped — CpGs always sit above their bar (default haplotype orientation)."""
-    X0v, Y0v, VWv, VHv = 220, 120, 880, 580
+    X0v, Y0v, VWv, VHv = 335, 80, 725, 495
     head = (
         f'<svg xmlns="http://www.w3.org/2000/svg" viewBox="{X0v} {Y0v} {VWv} {VHv}" '
         f'font-family="Arial, sans-serif" font-size="14">'
@@ -202,7 +242,7 @@ def _build_vertical(scenario: Scenario, label_fontsize: int,
     PARENT_Y = 320
     KID_X = (LEFT_X + RIGHT_X) // 2
     KID_Y = 500
-    OUTER_OFFSET = 140       # parent outer hap bar offset above shape center
+    OUTER_OFFSET = 160       # parent outer hap bar offset above shape center
     INNER_OFFSET = 85        # parent inner hap bar offset above shape center
     KID_OUTER_OFFSET = 180   # kid outer hap bar offset below shape center
     KID_INNER_OFFSET = 125   # kid inner hap bar offset below shape center
@@ -210,15 +250,18 @@ def _build_vertical(scenario: Scenario, label_fontsize: int,
     parts.append(person(LEFT_X, PARENT_Y, left_shape, size=SHAPE))
     parts.append(person(RIGHT_X, PARENT_Y, right_shape, size=SHAPE))
 
+    TSS_REL = 0.50
+    BAR_RIGHT_REL = 0.90
+
     def vhap(cx, y, hap):
-        # Center the bar's drawn extent on cx. The haplotype's visible bar
-        # spans (max(rels) + min(rels)) * HAP_W in x; offsetting by half
-        # that span centers the bar on cx independent of CpG/variant rels.
-        rels = [r for r, _ in hap.cpgs] + list(hap.variants)
-        span = (max(rels) + min(rels)) * HAP_W
+        # Center the bar's drawn extent on cx. With right_extent fixed,
+        # the bar spans (BAR_RIGHT_REL + min(rels)) * HAP_W in x.
+        rels = [r for r, _ in hap.cpgs] + list(hap.variants) + [TSS_REL]
+        span = (BAR_RIGHT_REL + min(rels)) * HAP_W
         return haplotype(cx - span / 2, y, HAP_W, hap.color,
                          hap.cpgs, hap.variants,
-                         label=hap.label, label_fontsize=label_fontsize)
+                         label=hap.label, label_fontsize=label_fontsize,
+                         tss=TSS_REL, right_extent=BAR_RIGHT_REL)
 
     # Both parent haps above the shape: top hap higher, bot hap closer to shape.
     parts.append(vhap(LEFT_X, PARENT_Y - OUTER_OFFSET, left_top))
@@ -231,19 +274,56 @@ def _build_vertical(scenario: Scenario, label_fontsize: int,
     parts.append(line(KID_X, PARENT_Y, KID_X, KID_Y - SHAPE / 2))
 
     parts.append(person(KID_X, KID_Y, 'M', size=SHAPE))
-    # Both kid haps below the shape: top hap closer to kid, bot hap further.
-    parts.append(vhap(KID_X, KID_Y + KID_INNER_OFFSET, scenario.kid_top))
-    parts.append(vhap(KID_X, KID_Y + KID_OUTER_OFFSET, scenario.kid_bot))
+    # Kid hap pair sits to the RIGHT of the kid shape, stacked vertically
+    # (kid_top above kid_bot). Compute bar centers so that bar_x0 sits
+    # just past the shape's right edge with a small gap.
+    KID_HAP_GAP = 20  # gap between shape right edge and bar left edge
+    kid_rels = [r for r, _ in scenario.kid_top.cpgs] \
+        + list(scenario.kid_top.variants) + [TSS_REL]
+    kid_span = (BAR_RIGHT_REL + min(kid_rels)) * HAP_W
+    KID_HAP_CX = KID_X + SHAPE / 2 + KID_HAP_GAP + kid_span / 2
+    KID_TOP_DY = -38
+    KID_BOT_DY = 38
+    parts.append(vhap(KID_HAP_CX, KID_Y + KID_TOP_DY, scenario.kid_top))
+    parts.append(vhap(KID_HAP_CX, KID_Y + KID_BOT_DY, scenario.kid_bot))
+
+    if highlight_compound:
+        # Dashed boxes around the 3 leftmost CpGs on hap C (mom_top, the
+        # outer parent bar on the mom side after swap_parents) and the
+        # kid's maternal hap C (kid_bot) — marking where hap C is the
+        # methylation outlier relative to A, B, D.
+        parts.append(_vhap_leftmost_box(
+            RIGHT_X, PARENT_Y - OUTER_OFFSET, HAP_W, right_top))
+        parts.append(_vhap_leftmost_box(
+            KID_HAP_CX, KID_Y + KID_BOT_DY, HAP_W, scenario.kid_bot))
 
     parts.append(SVG_TAIL)
     return '\n'.join(parts)
 
 
+def _denovo_highlight_box(bar_x0, bar_y, w, cpgs):
+    """Dashed rectangle around the two rightmost CpGs on a haplotype bar."""
+    last_two = sorted(r for r, _ in cpgs)[-2:]
+    pad_x = 12
+    pad_top = 6
+    pad_bot = 4
+    x_left = bar_x0 + last_two[0] * w - pad_x
+    x_right = bar_x0 + last_two[1] * w + pad_x
+    # CpG circle top sits at bar_y - 4 - stem_h(24) - r(7) - r(7) ≈ bar_y - 42.
+    y_top = bar_y - 42 - pad_top
+    y_bot = bar_y - 4 - pad_bot
+    return rect(x_left, y_top, x_right - x_left, y_bot - y_top,
+                fill='none', stroke='black', sw=2.0, dash='6,4', rx=0)
+
+
 def build(scenario: Scenario, label_fontsize: int = 16,
           swap_parents: bool = False,
-          vertical_haps: bool = False) -> str:
+          vertical_haps: bool = False,
+          highlight_denovo: bool = False,
+          highlight_compound: bool = False) -> str:
     if vertical_haps:
-        return _build_vertical(scenario, label_fontsize, swap_parents)
+        return _build_vertical(scenario, label_fontsize, swap_parents,
+                               highlight_compound=highlight_compound)
     parts = [SVG_HEAD]
 
     left_pos = (560, 190)
@@ -293,6 +373,13 @@ def build(scenario: Scenario, label_fontsize: int = 16,
                            label=scenario.kid_bot.label,
                            label_fontsize=label_fontsize))
 
+    if highlight_denovo:
+        # Dashed boxes around the two rightmost CpGs on dad's hap A (top
+        # parent bar on the dad side) and on the kid's paternal hap A —
+        # marking where the de novo gain of methylation arises.
+        parts.append(_denovo_highlight_box(240, 184, 340, left_top.cpgs))
+        parts.append(_denovo_highlight_box(380, 394, 280, scenario.kid_top.cpgs))
+
     parts.append(SVG_TAIL)
     return '\n'.join(parts)
 
@@ -306,13 +393,13 @@ def build(scenario: Scenario, label_fontsize: int = 16,
 # is not). dad_B is the non-transmitted, fully methylated homolog.
 # Methylation levels jittered around the SVG values for realism.
 DENOVO_TABLE_TITLE = "Haplotype-specific methylation levels"
-DENOVO_TABLE_COLS = ("chrom", "start", "kid_pat", "pat_hap", "dad_A", "dad_B")
+DENOVO_TABLE_COLS = ("chrom", "start", "kid_pat", "pat_hap", "dad_A")
 DENOVO_TABLE_ROWS = [
-    ("chr1", "1100", "0.05", "A", "0.04", "0.93"),
-    ("chr1", "1200", "0.04", "A", "0.06", "0.95"),
-    ("chr1", "1300", "0.06", "A", "0.05", "0.92"),
-    ("chr1", "1550", "0.94", "A", "0.05", "0.96"),
-    ("chr1", "1650", "0.96", "A", "0.04", "0.94"),
+    ("chr1", "1100", "0.05", "A", "0.04"),
+    ("chr1", "1200", "0.04", "A", "0.06"),
+    ("chr1", "1300", "0.06", "A", "0.05"),
+    ("chr1", "1550", "0.94", "A", "0.05"),
+    ("chr1", "1650", "0.96", "A", "0.04"),
 ]
 DENOVO_CODE_TITLE = "Discover de novo gain of methylation on paternal haplotype"
 DENOVO_CODE = (
@@ -356,6 +443,7 @@ def render_trio_denovo_meth_table(out_path: Path | None = None,
         bottom_rule=False,
         col_dx=col_dx,
         cell_fontsize=cell_fontsize,
+        highlight_color="#a6cee3",  # haplotype A color (where the de novo arises)
     )
     out = out_path if out_path is not None else OUT / "trio_denovo_meth_table.png"
     _save_fig(fig, out, trim_whitespace=trim_whitespace)
@@ -508,7 +596,8 @@ def render_trio_denovo_bed(out_path: Path | None = None):
 
 
 def _draw_simple_table(ax, cols, rows, title, highlight_rows=frozenset(),
-                        bottom_rule=True, col_dx=0.085, cell_fontsize=10.5):
+                        bottom_rule=True, col_dx=0.085, cell_fontsize=10.5,
+                        highlight_color="#e5e5e5"):
     """Render a small fixed-width table on a transAxes axis."""
     ax.set_xlim(0, 1)
     ax.set_ylim(0, 1)
@@ -544,7 +633,7 @@ def _draw_simple_table(ax, cols, rows, title, highlight_rows=frozenset(),
             ax.add_patch(Rectangle(
                 (0.005, y - row_dy / 2 + 0.01),
                 table_right - 0.005, row_dy - 0.02,
-                facecolor="#e5e5e5", edgecolor="none",
+                facecolor=highlight_color, edgecolor="none",
                 transform=ax.transAxes,
             ))
         for x, cell in zip(col_xs, row):
@@ -565,23 +654,22 @@ def _draw_simple_table(ax, cols, rows, title, highlight_rows=frozenset(),
 # Shared data for the compound genetic-epigenetic heterozygote BED panel.
 COMPOUND_METH_TITLE = "Haplotype-specific methylation levels"
 COMPOUND_METH_COLS = ("chrom", "start",
-                      "kid_pat", "pat_hap", "kid_mat", "mat_hap",
-                      "dad_A", "dad_B", "mom_C", "mom_D")
+                      "kid_mat", "mat_hap",
+                      "mom_C", "mom_D")
 COMPOUND_METH_ROWS = [
-    ("chr1", "1100", "0.05", "A", "0.94", "C", "0.04", "0.05", "0.93", "0.06"),
-    ("chr1", "1200", "0.04", "A", "0.96", "C", "0.06", "0.04", "0.95", "0.05"),
-    ("chr1", "1300", "0.06", "A", "0.91", "C", "0.05", "0.06", "0.92", "0.04"),
-    ("chr1", "1550", "0.05", "A", "0.04", "C", "0.04", "0.05", "0.05", "0.06"),
-    ("chr1", "1650", "0.05", "A", "0.04", "C", "0.05", "0.04", "0.06", "0.03"),
+    ("chr1", "1100", "0.94", "C", "0.93", "0.06"),
+    ("chr1", "1200", "0.96", "C", "0.95", "0.05"),
+    ("chr1", "1300", "0.91", "C", "0.92", "0.04"),
+    ("chr1", "1550", "0.04", "C", "0.05", "0.06"),
+    ("chr1", "1650", "0.04", "C", "0.06", "0.03"),
 ]
 COMPOUND_METH_HIGHLIGHT = {0, 1, 2}
 
 COMPOUND_GENO_TITLE = "Phased genotypes"
 COMPOUND_GENO_COLS = ("chrom", "pos",
-                      "dad_A", "dad_B", "mom_C", "mom_D",
-                      "kid_pat", "kid_mat")
+                      "kid_pat", "dad_A", "dad_B")
 COMPOUND_GENO_ROWS = [
-    ("chr1", "1420", "1", "0", "0", "0", "1", "0"),
+    ("chr1", "1420", "1", "1", "0"),
 ]
 COMPOUND_GENO_HIGHLIGHT = {0}
 
@@ -719,12 +807,14 @@ def render_trio_compound_het_tables(out_path: Path | None = None,
         ax_meth, COMPOUND_METH_COLS, COMPOUND_METH_ROWS,
         title=COMPOUND_METH_TITLE if show_title else "",
         highlight_rows=COMPOUND_METH_HIGHLIGHT,
+        highlight_color="#b2df8a",
         bottom_rule=False,
     )
     _draw_simple_table(
         ax_geno, COMPOUND_GENO_COLS, COMPOUND_GENO_ROWS,
         title=COMPOUND_GENO_TITLE if show_title else "",
         highlight_rows=COMPOUND_GENO_HIGHLIGHT,
+        highlight_color="#a6cee3",
         bottom_rule=False,
     )
 
