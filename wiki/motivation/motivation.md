@@ -29,10 +29,10 @@ tapestry's BED output to surface each one.
 
 ![Before phasing](single_indiv_before_phasing.png)
 
-A small synthetic locus with mixed SNVs and CpGs. Ten ragged reads
+A small synthetic locus with mixed SNVs and CpGs. Ragged reads
 cover overlapping windows; each read is one monospace row carrying a
-`0`/`1` glyph at SNV columns and a small **red** (unmethylated) /
-**blue** (methylated) box at CpG columns. Above the pile-up, a single
+`0`/`1` glyph at SNV columns and a small **red** (methylated) /
+**blue** (unmethylated) box at CpG columns. Above the pile-up, a single
 gray bigwig-style methylation track reports the *pooled* per-CpG
 methylation level. With reads unpartitioned, the two haplotypes'
 methylation states get averaged into one number per CpG — so per-CpG
@@ -40,7 +40,7 @@ heterozygous methylation is hidden inside an intermediate value.
 
 ![After phasing](single_indiv_after_phasing.png)
 
-The same ten reads, now partitioned by haplotype: rows are grouped
+The same reads, now partitioned by haplotype: rows are grouped
 paternal-above-maternal (one `Pat hap` / `Mat hap` label per group on
 the left) and the SNV bits themselves carry the partition. With the
 partition in hand, the pooled profile splits into two stacked
@@ -84,7 +84,7 @@ surface either de novo direction on the maternal side.
 Same trio, different scenario: the kid inherits **dad's hap A** —
 which carries a SNV variant (red star) — *and* **mom's hap C** —
 which carries an aberrantly hyper-methylated promoter region (filled
-lollipops at the leftmost three CpGs). The two hits sit on opposite
+lollipops). The two hits sit on opposite
 parental haplotypes, so the kid is a compound genetic-epigenetic
 heterozygote *in trans* — silenced on the maternal allele by aberrant
 methylation, broken on the paternal allele by a coding variant. Each

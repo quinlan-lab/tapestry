@@ -22,7 +22,7 @@ mpl.rcParams["font.family"] = "Arial"
 COLOR_NEUTRAL = "#444444"
 OUT = Path(__file__).resolve().parent
 
-X0, Y0, VW, VH = 220, 125, 880, 375
+X0, Y0, VW, VH = 220, 125, 880, 335
 SVG_HEAD = (
     f'<svg xmlns="http://www.w3.org/2000/svg" viewBox="{X0} {Y0} {VW} {VH}" '
     f'font-family="Arial, sans-serif" font-size="14">'
@@ -63,7 +63,8 @@ def star(cx, cy, r=7, fill='#d62728', stroke='black', sw=1.0):
 # ---------- haplotype ----------
 
 def haplotype(x, y, w, color, cpgs, variants=(), label=None, label_at_start=False,
-              label_fontsize=16, stems_below=False, tss=None, right_extent=None):
+              label_fontsize=16, stems_below=False, tss=None, right_extent=None,
+              bar_length=None):
     """cpgs: list of (rel_x, methylated_bool). variants: list of rel_x drawn as red stars.
     label: optional single-letter hap id (drawn just outside the bar, adjacent
     to the person's shape). label_at_start puts it at bar_x0 (left end).
@@ -73,7 +74,9 @@ def haplotype(x, y, w, color, cpgs, variants=(), label=None, label_at_start=Fals
         rels = rels + [tss]
     pad = min(rels)
     bar_x0 = x
-    if right_extent is not None:
+    if bar_length is not None:
+        bar_x1 = x + bar_length
+    elif right_extent is not None:
         bar_x1 = x + (right_extent + pad) * w
     else:
         bar_x1 = x + (max(rels) + pad) * w
@@ -320,11 +323,18 @@ def build(scenario: Scenario, label_fontsize: int = 16,
           swap_parents: bool = False,
           vertical_haps: bool = False,
           highlight_denovo: bool = False,
-          highlight_compound: bool = False) -> str:
+          highlight_compound: bool = False,
+          kid_y_offset: int = 0,
+          uniform_bars: bool = False) -> str:
     if vertical_haps:
         return _build_vertical(scenario, label_fontsize, swap_parents,
                                highlight_compound=highlight_compound)
-    parts = [SVG_HEAD]
+    vh = VH + kid_y_offset
+    parts = [
+        f'<svg xmlns="http://www.w3.org/2000/svg" viewBox="{X0} {Y0} {VW} {vh}" '
+        f'font-family="Arial, sans-serif" font-size="14">'
+        f'<rect x="{X0}" y="{Y0}" width="{VW}" height="{vh}" fill="white"/>'
+    ]
 
     left_pos = (560, 190)
     right_pos = (800, 190)
@@ -341,44 +351,69 @@ def build(scenario: Scenario, label_fontsize: int = 16,
 
     # Left-parent labels sit on the bar's tail (person side, right end);
     # right-parent labels sit on the head (person side, left end).
-    parts.append(haplotype(240, 184, 340, left_top.color,
+    # Pin all 6 haplotype bars to a single pixel length so partner haps
+    # (and kid vs. parents) match visually even when only some carry a
+    # variant. Length is the largest natural bar extent across all six,
+    # computed per-call from each hap's own w/pad/max-rel so no CpG or
+    # variant glyph is clipped.
+    # In uniform_bars mode (wiki SVGs), use a single narrower w for all
+    # six haplotype calls so that bars fit inside the viewBox and don't
+    # overlap the parent/kid shapes, even when one hap carries a variant
+    # at a large rel offset (~0.80). The unified pixel length is the
+    # max natural extent across the six haps under that w.
+    w_left, w_right, w_kid = (200, 200, 200) if uniform_bars else (340, 280, 280)
+    def _natural_len(h, w):
+        rels = [r for r, _ in h.cpgs] + list(h.variants)
+        return (max(rels) + min(rels)) * w
+    bar_len = max(
+        _natural_len(left_top, w_left), _natural_len(left_bot, w_left),
+        _natural_len(right_top, w_right), _natural_len(right_bot, w_right),
+        _natural_len(scenario.kid_top, w_kid), _natural_len(scenario.kid_bot, w_kid),
+    ) if uniform_bars else None
+    parts.append(haplotype(240, 184, w_left, left_top.color,
                            left_top.cpgs, left_top.variants,
                            label=left_top.label,
-                           label_fontsize=label_fontsize))
-    parts.append(haplotype(240, 234, 340, left_bot.color,
+                           label_fontsize=label_fontsize,
+                           bar_length=bar_len))
+    parts.append(haplotype(240, 234, w_left, left_bot.color,
                            left_bot.cpgs, left_bot.variants,
                            label=left_bot.label,
-                           label_fontsize=label_fontsize))
-    parts.append(haplotype(890, 184, 280, right_top.color,
+                           label_fontsize=label_fontsize,
+                           bar_length=bar_len))
+    parts.append(haplotype(890, 184, w_right, right_top.color,
                            right_top.cpgs, right_top.variants,
                            label=right_top.label, label_at_start=True,
-                           label_fontsize=label_fontsize))
-    parts.append(haplotype(890, 234, 280, right_bot.color,
+                           label_fontsize=label_fontsize,
+                           bar_length=bar_len))
+    parts.append(haplotype(890, 234, w_right, right_bot.color,
                            right_bot.cpgs, right_bot.variants,
                            label=right_bot.label, label_at_start=True,
-                           label_fontsize=label_fontsize))
+                           label_fontsize=label_fontsize,
+                           bar_length=bar_len))
 
     parts.append(line(left_pos[0] + 50, left_pos[1], right_pos[0] - 50, right_pos[1]))
     midx = (left_pos[0] + right_pos[0]) / 2
-    son = (int(midx), 440)
+    son = (int(midx), 400 + kid_y_offset)
     parts.append(line(midx, left_pos[1], son[0], son[1] - 50))
     parts.append(person(*son, 'M'))
 
-    parts.append(haplotype(380, 434, 280, scenario.kid_top.color,
+    parts.append(haplotype(380, 394 + kid_y_offset, w_kid, scenario.kid_top.color,
                            scenario.kid_top.cpgs, scenario.kid_top.variants,
                            label=scenario.kid_top.label,
-                           label_fontsize=label_fontsize))
-    parts.append(haplotype(380, 484, 280, scenario.kid_bot.color,
+                           label_fontsize=label_fontsize,
+                           bar_length=bar_len))
+    parts.append(haplotype(380, 444 + kid_y_offset, w_kid, scenario.kid_bot.color,
                            scenario.kid_bot.cpgs, scenario.kid_bot.variants,
                            label=scenario.kid_bot.label,
-                           label_fontsize=label_fontsize))
+                           label_fontsize=label_fontsize,
+                           bar_length=bar_len))
 
     if highlight_denovo:
         # Dashed boxes around the two rightmost CpGs on dad's hap A (top
         # parent bar on the dad side) and on the kid's paternal hap A —
         # marking where the de novo gain of methylation arises.
         parts.append(_denovo_highlight_box(240, 184, 340, left_top.cpgs))
-        parts.append(_denovo_highlight_box(380, 434, 280, scenario.kid_top.cpgs))
+        parts.append(_denovo_highlight_box(380, 394 + kid_y_offset, 280, scenario.kid_top.cpgs))
 
     parts.append(SVG_TAIL)
     return '\n'.join(parts)
@@ -660,8 +695,6 @@ COMPOUND_METH_ROWS = [
     ("chr1", "1100", "0.94", "C", "0.93", "0.06"),
     ("chr1", "1200", "0.96", "C", "0.95", "0.05"),
     ("chr1", "1300", "0.91", "C", "0.92", "0.04"),
-    ("chr1", "1550", "0.04", "C", "0.05", "0.06"),
-    ("chr1", "1650", "0.04", "C", "0.06", "0.03"),
 ]
 COMPOUND_METH_HIGHLIGHT = {0, 1, 2}
 
@@ -954,15 +987,16 @@ def render_trio_compound_het_bed(out_path: Path | None = None):
     print(f"[scratch] Wrote {out}")
 
 
-def render_trio_svg(scenario, out_path: Path) -> None:
+def render_trio_svg(scenario, out_path: Path, kid_y_offset: int = 0) -> None:
     out_path.parent.mkdir(parents=True, exist_ok=True)
-    out_path.write_text(build(scenario))
+    out_path.write_text(build(scenario, kid_y_offset=kid_y_offset,
+                               uniform_bars=True))
     print(f'wrote {out_path}')
 
 
 def main() -> None:
     OUT.mkdir(parents=True, exist_ok=True)
-    render_trio_svg(SCENARIO_DENOVO, OUT / "trio_denovo.svg")
+    render_trio_svg(SCENARIO_DENOVO, OUT / "trio_denovo.svg", kid_y_offset=40)
     render_trio_svg(SCENARIO_COMPOUND, OUT / "trio_compound_het.svg")
     render_trio_denovo_bed()
     render_trio_compound_het_bed()

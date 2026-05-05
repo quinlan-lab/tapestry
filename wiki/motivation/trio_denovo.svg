@@ -1,79 +1,79 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="220 125 880 375" font-family="Arial, sans-serif" font-size="14"><rect x="220" y="125" width="880" height="375" fill="white"/>
 <circle cx="560" cy="190" r="50.0" fill="white" stroke="black" stroke-width="1.8"/>
 <rect x="750.0" y="140.0" width="100" height="100" fill="none" stroke="black" stroke-width="1.8" rx="0"/>
-<rect x="240" y="180" width="231.2" height="8" fill="#b2df8a"/>
-<text x="481.2" y="189" text-anchor="start" font-family="Arial, sans-serif" font-size="16">C</text>
-<line x1="267.2" y1="180" x2="267.2" y2="156" stroke="black" stroke-width="1.2"/>
-<circle cx="267.2" cy="151" r="7" fill="black" stroke="black" stroke-width="1.2"/>
-<line x1="301.2" y1="180" x2="301.2" y2="156" stroke="black" stroke-width="1.2"/>
-<circle cx="301.2" cy="151" r="7" fill="black" stroke="black" stroke-width="1.2"/>
-<line x1="335.2" y1="180" x2="335.2" y2="156" stroke="black" stroke-width="1.2"/>
-<circle cx="335.2" cy="151" r="7" fill="black" stroke="black" stroke-width="1.2"/>
-<line x1="410.0" y1="180" x2="410.0" y2="156" stroke="black" stroke-width="1.2"/>
-<circle cx="410.0" cy="151" r="7" fill="black" stroke="black" stroke-width="1.2"/>
-<line x1="444.0" y1="180" x2="444.0" y2="156" stroke="black" stroke-width="1.2"/>
-<circle cx="444.0" cy="151" r="7" fill="black" stroke="black" stroke-width="1.2"/>
-<rect x="240" y="230" width="231.2" height="8" fill="#fb9a99"/>
-<text x="481.2" y="239" text-anchor="start" font-family="Arial, sans-serif" font-size="16">D</text>
-<line x1="267.2" y1="230" x2="267.2" y2="206" stroke="black" stroke-width="1.2"/>
-<circle cx="267.2" cy="201" r="7" fill="white" stroke="black" stroke-width="1.2"/>
-<line x1="301.2" y1="230" x2="301.2" y2="206" stroke="black" stroke-width="1.2"/>
-<circle cx="301.2" cy="201" r="7" fill="white" stroke="black" stroke-width="1.2"/>
-<line x1="335.2" y1="230" x2="335.2" y2="206" stroke="black" stroke-width="1.2"/>
-<circle cx="335.2" cy="201" r="7" fill="white" stroke="black" stroke-width="1.2"/>
-<line x1="410.0" y1="230" x2="410.0" y2="206" stroke="black" stroke-width="1.2"/>
-<circle cx="410.0" cy="201" r="7" fill="white" stroke="black" stroke-width="1.2"/>
-<line x1="444.0" y1="230" x2="444.0" y2="206" stroke="black" stroke-width="1.2"/>
-<circle cx="444.0" cy="201" r="7" fill="white" stroke="black" stroke-width="1.2"/>
-<rect x="890" y="180" width="190.4000000000001" height="8" fill="#a6cee3"/>
+<rect x="240" y="180" width="150.0" height="8" fill="#b2df8a"/>
+<text x="400.0" y="189" text-anchor="start" font-family="Arial, sans-serif" font-size="16">C</text>
+<line x1="256.0" y1="180" x2="256.0" y2="156" stroke="black" stroke-width="1.2"/>
+<circle cx="256.0" cy="151" r="7" fill="black" stroke="black" stroke-width="1.2"/>
+<line x1="276.0" y1="180" x2="276.0" y2="156" stroke="black" stroke-width="1.2"/>
+<circle cx="276.0" cy="151" r="7" fill="black" stroke="black" stroke-width="1.2"/>
+<line x1="296.0" y1="180" x2="296.0" y2="156" stroke="black" stroke-width="1.2"/>
+<circle cx="296.0" cy="151" r="7" fill="black" stroke="black" stroke-width="1.2"/>
+<line x1="340.0" y1="180" x2="340.0" y2="156" stroke="black" stroke-width="1.2"/>
+<circle cx="340.0" cy="151" r="7" fill="black" stroke="black" stroke-width="1.2"/>
+<line x1="360.0" y1="180" x2="360.0" y2="156" stroke="black" stroke-width="1.2"/>
+<circle cx="360.0" cy="151" r="7" fill="black" stroke="black" stroke-width="1.2"/>
+<rect x="240" y="230" width="150.0" height="8" fill="#fb9a99"/>
+<text x="400.0" y="239" text-anchor="start" font-family="Arial, sans-serif" font-size="16">D</text>
+<line x1="256.0" y1="230" x2="256.0" y2="206" stroke="black" stroke-width="1.2"/>
+<circle cx="256.0" cy="201" r="7" fill="white" stroke="black" stroke-width="1.2"/>
+<line x1="276.0" y1="230" x2="276.0" y2="206" stroke="black" stroke-width="1.2"/>
+<circle cx="276.0" cy="201" r="7" fill="white" stroke="black" stroke-width="1.2"/>
+<line x1="296.0" y1="230" x2="296.0" y2="206" stroke="black" stroke-width="1.2"/>
+<circle cx="296.0" cy="201" r="7" fill="white" stroke="black" stroke-width="1.2"/>
+<line x1="340.0" y1="230" x2="340.0" y2="206" stroke="black" stroke-width="1.2"/>
+<circle cx="340.0" cy="201" r="7" fill="white" stroke="black" stroke-width="1.2"/>
+<line x1="360.0" y1="230" x2="360.0" y2="206" stroke="black" stroke-width="1.2"/>
+<circle cx="360.0" cy="201" r="7" fill="white" stroke="black" stroke-width="1.2"/>
+<rect x="890" y="180" width="150.0" height="8" fill="#a6cee3"/>
 <text x="880" y="189" text-anchor="end" font-family="Arial, sans-serif" font-size="16">A</text>
-<line x1="912.4" y1="180" x2="912.4" y2="156" stroke="black" stroke-width="1.2"/>
-<circle cx="912.4" cy="151" r="7" fill="white" stroke="black" stroke-width="1.2"/>
-<line x1="940.4" y1="180" x2="940.4" y2="156" stroke="black" stroke-width="1.2"/>
-<circle cx="940.4" cy="151" r="7" fill="white" stroke="black" stroke-width="1.2"/>
-<line x1="968.4" y1="180" x2="968.4" y2="156" stroke="black" stroke-width="1.2"/>
-<circle cx="968.4" cy="151" r="7" fill="white" stroke="black" stroke-width="1.2"/>
-<line x1="1030.0" y1="180" x2="1030.0" y2="156" stroke="black" stroke-width="1.2"/>
-<circle cx="1030.0" cy="151" r="7" fill="white" stroke="black" stroke-width="1.2"/>
-<line x1="1058.0" y1="180" x2="1058.0" y2="156" stroke="black" stroke-width="1.2"/>
-<circle cx="1058.0" cy="151" r="7" fill="white" stroke="black" stroke-width="1.2"/>
-<rect x="890" y="230" width="190.4000000000001" height="8" fill="#fdbf6f"/>
+<line x1="906.0" y1="180" x2="906.0" y2="156" stroke="black" stroke-width="1.2"/>
+<circle cx="906.0" cy="151" r="7" fill="white" stroke="black" stroke-width="1.2"/>
+<line x1="926.0" y1="180" x2="926.0" y2="156" stroke="black" stroke-width="1.2"/>
+<circle cx="926.0" cy="151" r="7" fill="white" stroke="black" stroke-width="1.2"/>
+<line x1="946.0" y1="180" x2="946.0" y2="156" stroke="black" stroke-width="1.2"/>
+<circle cx="946.0" cy="151" r="7" fill="white" stroke="black" stroke-width="1.2"/>
+<line x1="990.0" y1="180" x2="990.0" y2="156" stroke="black" stroke-width="1.2"/>
+<circle cx="990.0" cy="151" r="7" fill="white" stroke="black" stroke-width="1.2"/>
+<line x1="1010.0" y1="180" x2="1010.0" y2="156" stroke="black" stroke-width="1.2"/>
+<circle cx="1010.0" cy="151" r="7" fill="white" stroke="black" stroke-width="1.2"/>
+<rect x="890" y="230" width="150.0" height="8" fill="#fdbf6f"/>
 <text x="880" y="239" text-anchor="end" font-family="Arial, sans-serif" font-size="16">B</text>
-<line x1="912.4" y1="230" x2="912.4" y2="206" stroke="black" stroke-width="1.2"/>
-<circle cx="912.4" cy="201" r="7" fill="black" stroke="black" stroke-width="1.2"/>
-<line x1="940.4" y1="230" x2="940.4" y2="206" stroke="black" stroke-width="1.2"/>
-<circle cx="940.4" cy="201" r="7" fill="black" stroke="black" stroke-width="1.2"/>
-<line x1="968.4" y1="230" x2="968.4" y2="206" stroke="black" stroke-width="1.2"/>
-<circle cx="968.4" cy="201" r="7" fill="black" stroke="black" stroke-width="1.2"/>
-<line x1="1030.0" y1="230" x2="1030.0" y2="206" stroke="black" stroke-width="1.2"/>
-<circle cx="1030.0" cy="201" r="7" fill="black" stroke="black" stroke-width="1.2"/>
-<line x1="1058.0" y1="230" x2="1058.0" y2="206" stroke="black" stroke-width="1.2"/>
-<circle cx="1058.0" cy="201" r="7" fill="black" stroke="black" stroke-width="1.2"/>
+<line x1="906.0" y1="230" x2="906.0" y2="206" stroke="black" stroke-width="1.2"/>
+<circle cx="906.0" cy="201" r="7" fill="black" stroke="black" stroke-width="1.2"/>
+<line x1="926.0" y1="230" x2="926.0" y2="206" stroke="black" stroke-width="1.2"/>
+<circle cx="926.0" cy="201" r="7" fill="black" stroke="black" stroke-width="1.2"/>
+<line x1="946.0" y1="230" x2="946.0" y2="206" stroke="black" stroke-width="1.2"/>
+<circle cx="946.0" cy="201" r="7" fill="black" stroke="black" stroke-width="1.2"/>
+<line x1="990.0" y1="230" x2="990.0" y2="206" stroke="black" stroke-width="1.2"/>
+<circle cx="990.0" cy="201" r="7" fill="black" stroke="black" stroke-width="1.2"/>
+<line x1="1010.0" y1="230" x2="1010.0" y2="206" stroke="black" stroke-width="1.2"/>
+<circle cx="1010.0" cy="201" r="7" fill="black" stroke="black" stroke-width="1.2"/>
 <line x1="610" y1="190" x2="750" y2="190" stroke="black" stroke-width="1.5"/>
 <line x1="680.0" y1="190" x2="680" y2="390" stroke="black" stroke-width="1.5"/>
 <rect x="630.0" y="390.0" width="100" height="100" fill="none" stroke="black" stroke-width="1.8" rx="0"/>
-<rect x="380" y="430" width="210.0" height="8" fill="#a6cee3"/>
-<text x="600.0" y="439" text-anchor="start" font-family="Arial, sans-serif" font-size="16">A</text>
-<line x1="408.0" y1="430" x2="408.0" y2="406" stroke="black" stroke-width="1.2"/>
-<circle cx="408.0" cy="401" r="7" fill="white" stroke="black" stroke-width="1.2"/>
-<line x1="436.0" y1="430" x2="436.0" y2="406" stroke="black" stroke-width="1.2"/>
-<circle cx="436.0" cy="401" r="7" fill="white" stroke="black" stroke-width="1.2"/>
-<line x1="464.0" y1="430" x2="464.0" y2="406" stroke="black" stroke-width="1.2"/>
-<circle cx="464.0" cy="401" r="7" fill="white" stroke="black" stroke-width="1.2"/>
-<line x1="534.0" y1="430" x2="534.0" y2="406" stroke="black" stroke-width="1.2"/>
-<circle cx="534.0" cy="401" r="7" fill="black" stroke="black" stroke-width="1.2"/>
-<line x1="562.0" y1="430" x2="562.0" y2="406" stroke="black" stroke-width="1.2"/>
-<circle cx="562.0" cy="401" r="7" fill="black" stroke="black" stroke-width="1.2"/>
-<rect x="380" y="480" width="210.0" height="8" fill="#b2df8a"/>
-<text x="600.0" y="489" text-anchor="start" font-family="Arial, sans-serif" font-size="16">C</text>
-<line x1="408.0" y1="480" x2="408.0" y2="456" stroke="black" stroke-width="1.2"/>
-<circle cx="408.0" cy="451" r="7" fill="black" stroke="black" stroke-width="1.2"/>
-<line x1="436.0" y1="480" x2="436.0" y2="456" stroke="black" stroke-width="1.2"/>
-<circle cx="436.0" cy="451" r="7" fill="black" stroke="black" stroke-width="1.2"/>
-<line x1="464.0" y1="480" x2="464.0" y2="456" stroke="black" stroke-width="1.2"/>
-<circle cx="464.0" cy="451" r="7" fill="black" stroke="black" stroke-width="1.2"/>
-<line x1="534.0" y1="480" x2="534.0" y2="456" stroke="black" stroke-width="1.2"/>
-<circle cx="534.0" cy="451" r="7" fill="white" stroke="black" stroke-width="1.2"/>
-<line x1="562.0" y1="480" x2="562.0" y2="456" stroke="black" stroke-width="1.2"/>
-<circle cx="562.0" cy="451" r="7" fill="white" stroke="black" stroke-width="1.2"/>
+<rect x="380" y="430" width="150.0" height="8" fill="#a6cee3"/>
+<text x="540.0" y="439" text-anchor="start" font-family="Arial, sans-serif" font-size="16">A</text>
+<line x1="400.0" y1="430" x2="400.0" y2="406" stroke="black" stroke-width="1.2"/>
+<circle cx="400.0" cy="401" r="7" fill="white" stroke="black" stroke-width="1.2"/>
+<line x1="420.0" y1="430" x2="420.0" y2="406" stroke="black" stroke-width="1.2"/>
+<circle cx="420.0" cy="401" r="7" fill="white" stroke="black" stroke-width="1.2"/>
+<line x1="440.0" y1="430" x2="440.0" y2="406" stroke="black" stroke-width="1.2"/>
+<circle cx="440.0" cy="401" r="7" fill="white" stroke="black" stroke-width="1.2"/>
+<line x1="490.0" y1="430" x2="490.0" y2="406" stroke="black" stroke-width="1.2"/>
+<circle cx="490.0" cy="401" r="7" fill="black" stroke="black" stroke-width="1.2"/>
+<line x1="510.0" y1="430" x2="510.0" y2="406" stroke="black" stroke-width="1.2"/>
+<circle cx="510.0" cy="401" r="7" fill="black" stroke="black" stroke-width="1.2"/>
+<rect x="380" y="480" width="150.0" height="8" fill="#b2df8a"/>
+<text x="540.0" y="489" text-anchor="start" font-family="Arial, sans-serif" font-size="16">C</text>
+<line x1="400.0" y1="480" x2="400.0" y2="456" stroke="black" stroke-width="1.2"/>
+<circle cx="400.0" cy="451" r="7" fill="black" stroke="black" stroke-width="1.2"/>
+<line x1="420.0" y1="480" x2="420.0" y2="456" stroke="black" stroke-width="1.2"/>
+<circle cx="420.0" cy="451" r="7" fill="black" stroke="black" stroke-width="1.2"/>
+<line x1="440.0" y1="480" x2="440.0" y2="456" stroke="black" stroke-width="1.2"/>
+<circle cx="440.0" cy="451" r="7" fill="black" stroke="black" stroke-width="1.2"/>
+<line x1="490.0" y1="480" x2="490.0" y2="456" stroke="black" stroke-width="1.2"/>
+<circle cx="490.0" cy="451" r="7" fill="white" stroke="black" stroke-width="1.2"/>
+<line x1="510.0" y1="480" x2="510.0" y2="456" stroke="black" stroke-width="1.2"/>
+<circle cx="510.0" cy="451" r="7" fill="white" stroke="black" stroke-width="1.2"/>
 </svg>
