@@ -444,7 +444,7 @@ def render_before_phasing(out_path: Path | None = None,
         )
     ax_reads.set_xlim(PREFIX_X - 0.5 if xlim_left is None else xlim_left,
                       N_SITES - 0.5)
-    ax_reads.set_ylim(N_READS - 0.5, -1.0)
+    ax_reads.set_ylim(N_READS - 0.5, -2.0)
     ax_reads.set_axis_off()
 
     if show_title:
@@ -530,7 +530,7 @@ def render_after_phasing(out_path: Path | None = None,
 
     ax_reads.set_xlim(PREFIX_X - 0.5 if xlim_left is None else xlim_left,
                       N_SITES - 0.5)
-    ax_reads.set_ylim(last_y + 0.6, -1.0)
+    ax_reads.set_ylim(last_y + 0.6, -2.0)
     ax_reads.set_axis_off()
 
     if show_title:
