@@ -32,12 +32,14 @@ def _trio_svg_to_pdf(scenario, out_path: Path, label_fontsize: int = 16,
                      swap_parents: bool = False,
                      vertical_haps: bool = False,
                      highlight_denovo: bool = False,
-                     highlight_compound: bool = False) -> None:
+                     highlight_compound: bool = False,
+                     kid_y_offset: int = 0) -> None:
     svg = trio_discovery.build(scenario, label_fontsize=label_fontsize,
                                 swap_parents=swap_parents,
                                 vertical_haps=vertical_haps,
                                 highlight_denovo=highlight_denovo,
-                                highlight_compound=highlight_compound)
+                                highlight_compound=highlight_compound,
+                                kid_y_offset=kid_y_offset)
     cairosvg.svg2pdf(
         bytestring=svg.encode("utf-8"),
         write_to=str(out_path),
@@ -75,6 +77,7 @@ def panel_C() -> None:
         label_fontsize=28,
         swap_parents=True,
         highlight_denovo=True,
+        kid_y_offset=40,
     )
 
 
