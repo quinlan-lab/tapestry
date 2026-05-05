@@ -81,23 +81,13 @@ def panel_C() -> None:
     )
 
 
-# Panel D — haplotype-specific methylation table (de novo scenario).
+# Panel D — trio cartoon for compound genetic-epigenetic heterozygote.
+# Haplotypes stack above each parent and to the right of the kid. (Was
+# panel E before the methylation tables were moved to Fig 3.)
 def panel_D() -> None:
-    trio_discovery.render_trio_denovo_meth_table(
-        out_path=OUT / "panel_D_trio_denovo_meth_table.pdf",
-        show_title=False,
-        col_dx=0.105,
-        cell_fontsize=9,
-        trim_whitespace=True,
-    )
-
-
-# Panel E — trio cartoon for compound genetic-epigenetic heterozygote.
-# Haplotypes stack above each parent and to the right of the kid.
-def panel_E() -> None:
     _trio_svg_to_pdf(
         trio_discovery.SCENARIO_COMPOUND,
-        out_path=OUT / "panel_E_trio_compound_het.pdf",
+        out_path=OUT / "panel_D_trio_compound_het.pdf",
         label_fontsize=28,
         swap_parents=True,
         vertical_haps=True,
@@ -105,22 +95,16 @@ def panel_E() -> None:
     )
 
 
-# Panel F — haplotype-specific methylation + phased-genotype tables (compound scenario).
-def panel_F() -> None:
-    trio_discovery.render_trio_compound_het_tables(
-        out_path=OUT / "panel_F_trio_compound_het_tables.pdf",
-        show_title=False,
-        trim_whitespace=True,
-    )
-
+# Note: the haplotype-specific methylation tables (formerly Fig 1D and
+# Fig 1F) now live in Fig 3 (panels D and E), so the reader meets them
+# after the founder-haplotype machinery has been introduced. They are
+# rendered by `manuscript_figures/fig3.py`.
 
 PANELS = {
     "A": panel_A,
     "B": panel_B,
     "C": panel_C,
     "D": panel_D,
-    "E": panel_E,
-    "F": panel_F,
 }
 
 
