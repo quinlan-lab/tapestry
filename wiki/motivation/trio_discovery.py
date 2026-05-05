@@ -22,7 +22,7 @@ mpl.rcParams["font.family"] = "Arial"
 COLOR_NEUTRAL = "#444444"
 OUT = Path(__file__).resolve().parent
 
-X0, Y0, VW, VH = 220, 125, 880, 335
+X0, Y0, VW, VH = 220, 125, 880, 375
 SVG_HEAD = (
     f'<svg xmlns="http://www.w3.org/2000/svg" viewBox="{X0} {Y0} {VW} {VH}" '
     f'font-family="Arial, sans-serif" font-size="14">'
@@ -360,15 +360,15 @@ def build(scenario: Scenario, label_fontsize: int = 16,
 
     parts.append(line(left_pos[0] + 50, left_pos[1], right_pos[0] - 50, right_pos[1]))
     midx = (left_pos[0] + right_pos[0]) / 2
-    son = (int(midx), 400)
+    son = (int(midx), 440)
     parts.append(line(midx, left_pos[1], son[0], son[1] - 50))
     parts.append(person(*son, 'M'))
 
-    parts.append(haplotype(380, 394, 280, scenario.kid_top.color,
+    parts.append(haplotype(380, 434, 280, scenario.kid_top.color,
                            scenario.kid_top.cpgs, scenario.kid_top.variants,
                            label=scenario.kid_top.label,
                            label_fontsize=label_fontsize))
-    parts.append(haplotype(380, 444, 280, scenario.kid_bot.color,
+    parts.append(haplotype(380, 484, 280, scenario.kid_bot.color,
                            scenario.kid_bot.cpgs, scenario.kid_bot.variants,
                            label=scenario.kid_bot.label,
                            label_fontsize=label_fontsize))
@@ -378,7 +378,7 @@ def build(scenario: Scenario, label_fontsize: int = 16,
         # parent bar on the dad side) and on the kid's paternal hap A —
         # marking where the de novo gain of methylation arises.
         parts.append(_denovo_highlight_box(240, 184, 340, left_top.cpgs))
-        parts.append(_denovo_highlight_box(380, 394, 280, scenario.kid_top.cpgs))
+        parts.append(_denovo_highlight_box(380, 434, 280, scenario.kid_top.cpgs))
 
     parts.append(SVG_TAIL)
     return '\n'.join(parts)
