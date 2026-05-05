@@ -488,6 +488,12 @@ def render_trio_denovo_meth_table(out_path: Path | None = None,
 
 def _save_fig(fig, out, trim_whitespace: bool = False) -> None:
     if trim_whitespace and Path(out).suffix.lower() == ".pdf":
+        # Manual bbox union over visible children — gives a tighter crop
+        # on the right and bottom than bbox_inches='tight', which uses
+        # axes-level bboxes that include empty axes area. Pad the bottom
+        # by half a line height to compensate for matplotlib's
+        # Text.get_window_extent() under-reporting the height of long
+        # multi-line code blocks (otherwise the last 1-3 lines clip).
         from matplotlib.transforms import Bbox
         fig.canvas.draw()
         r = fig.canvas.get_renderer()
@@ -495,6 +501,7 @@ def _save_fig(fig, out, trim_whitespace: bool = False) -> None:
         from matplotlib.axis import XAxis, YAxis
         from matplotlib.text import Text
         bboxes = []
+        max_text_h_px = 0.0
         for ax in fig.axes:
             for child in ax.get_children():
                 if child is ax.patch or not child.get_visible():
@@ -509,8 +516,15 @@ def _save_fig(fig, out, trim_whitespace: bool = False) -> None:
                     continue
                 if b.width > 0 and b.height > 0:
                     bboxes.append(b)
-        bbox_in = (Bbox.union(bboxes)
-                   .transformed(fig.dpi_scale_trans.inverted()))
+                    if isinstance(child, Text) and "\n" in child.get_text():
+                        max_text_h_px = max(max_text_h_px, b.height)
+        u = Bbox.union(bboxes)
+        # Pad the bottom by ~5% of the tallest multi-line text's bbox to
+        # absorb matplotlib's under-counted height on long snippets.
+        # Scales with text length so short panels keep tight bottoms.
+        u = Bbox.from_extents(
+            u.x0, u.y0 - 0.05 * max_text_h_px, u.x1, u.y1)
+        bbox_in = u.transformed(fig.dpi_scale_trans.inverted())
         fig.savefig(out, dpi=180, bbox_inches=bbox_in, pad_inches=0.02)
     else:
         fig.savefig(out, dpi=180)
