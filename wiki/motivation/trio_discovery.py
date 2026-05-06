@@ -430,12 +430,14 @@ def build(scenario: Scenario, label_fontsize: int = 16,
 DENOVO_TABLE_TITLE = "Haplotype-specific methylation levels"
 DENOVO_TABLE_COLS = ("chrom", "start", "kid_pat", "pat_hap", "dad_A")
 DENOVO_TABLE_ROWS = [
-    ("chr1", "1100", "0.05", "A", "0.04"),
-    ("chr1", "1200", "0.04", "A", "0.06"),
-    ("chr1", "1300", "0.06", "A", "0.05"),
+    ("chr1", "1400", "0.07", "A", "0.05"),
+    ("chr1", "1450", "0.06", "A", "0.04"),
     ("chr1", "1550", "0.94", "A", "0.05"),
     ("chr1", "1650", "0.96", "A", "0.04"),
+    ("chr1", "1700", "0.07", "A", "0.05"),
+    ("chr1", "1800", "0.05", "A", "0.06"),
 ]
+DENOVO_TABLE_HIGHLIGHT = {2, 3}
 DENOVO_CODE_TITLE = "Discover de novo gain of methylation on paternal haplotype"
 DENOVO_CODE = (
     '# Pick the dad haplotype that was transmitted to the kid.\n'
@@ -474,7 +476,7 @@ def render_trio_denovo_meth_table(out_path: Path | None = None,
     _draw_simple_table(
         ax, DENOVO_TABLE_COLS, DENOVO_TABLE_ROWS,
         title=DENOVO_TABLE_TITLE if show_title else "",
-        highlight_rows={3, 4},
+        highlight_rows=DENOVO_TABLE_HIGHLIGHT,
         bottom_rule=False,
         col_dx=col_dx,
         cell_fontsize=cell_fontsize,
@@ -616,7 +618,7 @@ def render_trio_denovo_bed(out_path: Path | None = None):
     _draw_simple_table(
         ax_meth, DENOVO_TABLE_COLS, DENOVO_TABLE_ROWS,
         title=DENOVO_TABLE_TITLE,
-        highlight_rows={3, 4},
+        highlight_rows=DENOVO_TABLE_HIGHLIGHT,
         bottom_rule=False,
     )
 
@@ -706,19 +708,27 @@ COMPOUND_METH_COLS = ("chrom", "start",
                       "kid_mat", "mat_hap",
                       "mom_C", "mom_D")
 COMPOUND_METH_ROWS = [
+    ("chr1", "0900", "0.06", "C", "0.07", "0.05"),
+    ("chr1", "1000", "0.05", "C", "0.06", "0.04"),
     ("chr1", "1100", "0.94", "C", "0.93", "0.06"),
     ("chr1", "1200", "0.96", "C", "0.95", "0.05"),
     ("chr1", "1300", "0.91", "C", "0.92", "0.04"),
+    ("chr1", "1400", "0.04", "C", "0.05", "0.06"),
+    ("chr1", "1500", "0.06", "C", "0.04", "0.05"),
 ]
-COMPOUND_METH_HIGHLIGHT = {0, 1, 2}
+COMPOUND_METH_HIGHLIGHT = {2, 3, 4}
 
 COMPOUND_GENO_TITLE = "Phased genotypes"
 COMPOUND_GENO_COLS = ("chrom", "pos",
                       "kid_pat", "dad_A", "dad_B")
 COMPOUND_GENO_ROWS = [
+    ("chr1", "0500", "0", "0", "1"),
+    ("chr1", "0800", "0", "0", "1"),
     ("chr1", "1420", "1", "1", "0"),
+    ("chr1", "2000", "0", "0", "1"),
+    ("chr1", "2300", "0", "0", "1"),
 ]
-COMPOUND_GENO_HIGHLIGHT = {0}
+COMPOUND_GENO_HIGHLIGHT = {2}
 
 COMPOUND_CODE_TITLE = "Discover compound genetic-epigenetic heterozygous locus"
 COMPOUND_CODE = (
@@ -820,19 +830,23 @@ def render_trio_compound_het_tables(out_path: Path | None = None,
                                      fig_width: float = 12.0,
                                      trim_whitespace: bool = False):
     """Methylation + phased-genotype tables only (no polars-query subpanel)."""
-    FIG_W, FIG_H = fig_width, 5.0
+    TABLE_H_IN = 2.04
+    # _draw_simple_table places the header at axes-y 0.72 and rows below it
+    # at row_dy=0.09. The bottom of the last data row therefore sits at
+    # axes-y = 0.565 - (n-1)*0.09; convert to a fraction of TABLE_H_IN.
+    n_meth = len(COMPOUND_METH_ROWS)
+    METH_CONTENT_BOTTOM_FRAC = max(0.025, 0.565 - (n_meth - 1) * 0.09)
+    GENO_CONTENT_TOP_FRAC = 0.78
+    VISIBLE_GAP_IN = 0.15
+    # Grow the figure if the meth content extends below the original 5-row
+    # budget, so the geno table still has room beneath it.
+    extra_meth_in = max(0.0, (0.205 - METH_CONTENT_BOTTOM_FRAC)) * TABLE_H_IN
+    FIG_W = fig_width
+    FIG_H = 5.0 + extra_meth_in
     fig = plt.figure(figsize=(FIG_W, FIG_H))
     LEFT_IN, RIGHT_IN = 0.04 * FIG_W, 0.98 * FIG_W
     TOP_IN = FIG_H - 0.06 * FIG_H
     BOTTOM_IN = 0.04 * FIG_H
-
-    TABLE_H_IN = 2.04
-    # _draw_simple_table places the header at axes-y 0.72 and rows below it
-    # at row_dy=0.09. With 5 data rows the last cell-row sits at y≈0.24, so
-    # content extends down to ~y=0.195; the header top sits at ~y=0.78.
-    METH_CONTENT_BOTTOM_FRAC = 0.195
-    GENO_CONTENT_TOP_FRAC = 0.78
-    VISIBLE_GAP_IN = 0.15
     width_in = RIGHT_IN - LEFT_IN
 
     def add_axes_in(left_in, bottom_in, w_in, h_in):
@@ -866,6 +880,97 @@ def render_trio_compound_het_tables(out_path: Path | None = None,
     )
 
     out = out_path if out_path is not None else OUT / "trio_compound_het_tables.png"
+    _save_fig(fig, out, trim_whitespace=trim_whitespace)
+    plt.close(fig)
+    print(f"[scratch] Wrote {out}")
+
+
+# Rebucket panel: shows the per-CpG methylation values of one kid first
+# under the arbitrary hap1/hap2 partition produced by hiphase, then under
+# the founder-aware (pat / mat / founder-letter) labels produced by Step
+# 3's relabel — the literal "relabel, don't recompute" message of the
+# wiki section "Relabelling per-CpG methylation". Same numerical values
+# in both sub-tables; only the column names change.
+REBUCKET_TOP_COLS = ("chrom", "start", "Kid1_hap1", "Kid1_hap2")
+REBUCKET_BOTTOM_COLS = ("chrom", "start",
+                         "Kid1_pat", "pat_hap",
+                         "Kid1_mat", "mat_hap")
+REBUCKET_ROWS_TOP = [
+    ("chr1", "1100", "0.05", "0.93"),
+]
+REBUCKET_ROWS_BOTTOM = [
+    ("chr1", "1100", "0.05", "A", "0.93", "C"),
+]
+
+
+def render_rebucket_panel(out_path: Path | None = None,
+                          show_title: bool = True,
+                          fig_width: float = 8.0,
+                          col_dx: float = 0.15,
+                          cell_fontsize: float = 10.5,
+                          trim_whitespace: bool = False) -> None:
+    """Two stacked sub-tables joined by a downward arrow: same per-CpG
+    methylation values, first under hiphase's arbitrary hap1/hap2 labels,
+    then under founder-aware (pat/mat + founder-letter) labels.
+
+    Used as the "rebucketing" panel in Fig 3 of the manuscript; corresponds
+    to the wiki section
+    `wiki/pedigree_wise_workflow/founder_phased_methylation/founder_phased_methylation.md`
+    "Relabelling per-CpG methylation".
+    """
+    fig_h = 4.0
+    fig = plt.figure(figsize=(fig_width, fig_h))
+    LEFT = 0.04
+    WIDTH = 0.94
+    TOP_H = 0.42
+    BOTTOM_H = 0.42
+    TOP_BOTTOM = 1.0 - TOP_H - 0.02       # top subtable bottom edge
+    BOT_BOTTOM = 0.04                      # bottom subtable bottom edge
+    ax_top = fig.add_axes([LEFT, TOP_BOTTOM, WIDTH, TOP_H])
+    ax_bot = fig.add_axes([LEFT, BOT_BOTTOM, WIDTH, BOTTOM_H])
+
+    title_top = "Per-CpG methylation under hiphase hap1/hap2 partition" if show_title else ""
+    title_bot = "After relabelling to founder-aware labels (pat/mat + founder letter)" if show_title else ""
+
+    _draw_simple_table(
+        ax_top, REBUCKET_TOP_COLS, REBUCKET_ROWS_TOP,
+        title=title_top,
+        bottom_rule=False,
+        col_dx=col_dx,
+        cell_fontsize=cell_fontsize,
+    )
+    _draw_simple_table(
+        ax_bot, REBUCKET_BOTTOM_COLS, REBUCKET_ROWS_BOTTOM,
+        title=title_bot,
+        bottom_rule=False,
+        col_dx=col_dx,
+        cell_fontsize=cell_fontsize,
+    )
+
+    # Downward arrow between the two sub-tables (figure-level).
+    arrow_x = LEFT + 0.10
+    arrow_y_tail = TOP_BOTTOM - 0.005
+    arrow_y_head = BOT_BOTTOM + BOTTOM_H + 0.005
+    fig.patches.append(
+        plt.matplotlib.patches.FancyArrow(
+            arrow_x, arrow_y_tail,
+            0.0, arrow_y_head - arrow_y_tail,
+            width=0.002, head_width=0.012, head_length=0.012,
+            length_includes_head=True,
+            color=COLOR_NEUTRAL,
+            transform=fig.transFigure,
+            figure=fig,
+        )
+    )
+    fig.text(
+        arrow_x + 0.02, (arrow_y_tail + arrow_y_head) / 2,
+        "relabel using bit-vector match (Fig 3B)\n"
+        "+ founder-letter map (Fig 3A)",
+        ha="left", va="center", fontsize=cell_fontsize - 1,
+        color=COLOR_NEUTRAL, style="italic",
+    )
+
+    out = out_path if out_path is not None else OUT / "trio_rebucket_panel.png"
     _save_fig(fig, out, trim_whitespace=trim_whitespace)
     plt.close(fig)
     print(f"[scratch] Wrote {out}")
