@@ -14,7 +14,7 @@ Run:
 
 Render kwargs mirror the pedigree-wise sibling
 (`wiki/pedigree_wise_workflow/founder_phased_methylation/founder_phased_methylation.py`)
-so a `manuscript_figures/*.py` driver can reuse this function with
+so a `manuscript/*.py` driver can reuse this function with
 manuscript-specific styling overrides.
 
 Outputs:

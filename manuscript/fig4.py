@@ -5,7 +5,7 @@ discovery tables. These panels were previously B–E of Fig 3 and have
 been relettered A–D for Fig 4. The exhaustive-enumeration table at
 clean site N1 remains in Fig 3 (panel A there).
 
-Panel A — `manuscript_figures/fig4/fig4_panelA.pdf`
+Panel A — `manuscript/fig4/fig4_panelA.pdf`
     The bit-vector match cartoon (hap1 vs pat/mat over a hap-map block).
     Wiki source:
       `wiki/pedigree_wise_workflow/founder_phased_methylation/founder_phased_methylation.md`
@@ -14,7 +14,7 @@ Panel A — `manuscript_figures/fig4/fig4_panelA.pdf`
     (`wiki/.../founder_phased_methylation.py:render_match`), so panel A
     is byte-equivalent to the wiki figure modulo the PDF container.
 
-Panel B — `manuscript_figures/fig4/fig4_panelB.pdf`
+Panel B — `manuscript/fig4/fig4_panelB.pdf`
     The rebucketing moment: the same per-CpG methylation values for one
     kid (Kid1) shown first under hiphase's arbitrary hap1/hap2 labels,
     then relabelled to founder-aware (pat/mat + founder letter) labels.
@@ -26,7 +26,7 @@ Panel B — `manuscript_figures/fig4/fig4_panelB.pdf`
       section "Relabelling per-CpG methylation".
     Rendered by `wiki/motivation/trio_discovery.py:render_rebucket_panel`.
 
-Panel C — `manuscript_figures/fig4/fig4_panelC.pdf`
+Panel C — `manuscript/fig4/fig4_panelC.pdf`
     De novo gain-of-methylation discovery table (use case 1). Moved from
     Fig 1D so the reader sees it after the rebucketing machinery has been
     introduced. Trio context (parental cartoon) remains in Fig 1C.
@@ -38,7 +38,7 @@ Panel C — `manuscript_figures/fig4/fig4_panelC.pdf`
     The row data was extended (10 CpGs, 2 highlighted) so highlighted
     rows read as a discovery rather than as the entire region.
 
-Panel D — `manuscript_figures/fig4/fig4_panelD.pdf`
+Panel D — `manuscript/fig4/fig4_panelD.pdf`
     Compound genetic-epigenetic heterozygote discovery tables (use case
     2). Moved from Fig 1F. Trio context remains in Fig 1E.
     Wiki source: simulated in `wiki/motivation/trio_discovery.py`
@@ -49,7 +49,7 @@ Panel D — `manuscript_figures/fig4/fig4_panelD.pdf`
     highlighted run reads as a discovery within a baseline window.
 
 Run:
-    .venv/bin/python manuscript_figures/fig4.py
+    .venv/bin/python manuscript/fig4.py
 """
 from __future__ import annotations
 

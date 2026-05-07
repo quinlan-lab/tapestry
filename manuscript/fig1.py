@@ -7,9 +7,9 @@ the single source of truth; this script is the only place where Fig 1's
 manuscript-specific styling lives.
 
 Run:
-    .venv/bin/python manuscript_figures/fig1.py
+    .venv/bin/python manuscript/fig1.py
 
-Outputs land in `manuscript_figures/fig1/` as PDF, ready to drop into
+Outputs land in `manuscript/fig1/` as PDF, ready to drop into
 the Illustrator composite via File → Place with Link checked.
 """
 from __future__ import annotations
@@ -98,7 +98,7 @@ def panel_D() -> None:
 # Note: the haplotype-specific methylation tables (formerly Fig 1D and
 # Fig 1F) now live in Fig 3 (panels D and E), so the reader meets them
 # after the founder-haplotype machinery has been introduced. They are
-# rendered by `manuscript_figures/fig3.py`.
+# rendered by `manuscript/fig3.py`.
 
 PANELS = {
     "A": panel_A,

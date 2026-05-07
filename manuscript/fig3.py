@@ -20,7 +20,7 @@ in `wiki/pedigree_wise_workflow/inheritance_mapping/README.md`
 section 3.
 
 Run:
-    .venv/bin/python manuscript_figures/fig3.py
+    .venv/bin/python manuscript/fig3.py
 """
 from __future__ import annotations
 

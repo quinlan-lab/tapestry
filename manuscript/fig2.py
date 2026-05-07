@@ -1,6 +1,6 @@
 """Render Fig 2 for the tapestry manuscript.
 
-Emits a single PDF, `manuscript_figures/fig2/fig2.pdf`, that
+Emits a single PDF, `manuscript/fig2/fig2.pdf`, that
 stacks three panels with aligned columns:
 
   A. Ground truth — fig1 stripped of title/text: founder haps plus each
@@ -27,7 +27,7 @@ at the SHA pinned in
 (`7448e5e946adbc7969ad5fd5e0730d7cace23a8d`).
 
 Run:
-    .venv/bin/python manuscript_figures/fig2.py
+    .venv/bin/python manuscript/fig2.py
 """
 from __future__ import annotations
 

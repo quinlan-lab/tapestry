@@ -5,9 +5,9 @@ Panel B: polars discovery snippet for the compound genetic-epigenetic
 heterozygote scenario.
 
 Run:
-    .venv/bin/python manuscript_figures/supp_fig1.py
+    .venv/bin/python manuscript/supp_fig1.py
 
-Outputs land in `manuscript_figures/supp_fig1/` as PDF, ready to drop
+Outputs land in `manuscript/supp_fig1/` as PDF, ready to drop
 into the Illustrator composite via File → Place with Link checked.
 """
 from __future__ import annotations
