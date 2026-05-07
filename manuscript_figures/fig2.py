@@ -1,6 +1,6 @@
 """Render Fig 2 for the tapestry manuscript.
 
-Emits a single PDF, `manuscript_figures/fig2/fig2_combined.pdf`, that
+Emits a single PDF, `manuscript_figures/fig2/fig2.pdf`, that
 stacks three panels with aligned columns:
 
   A. Ground truth — fig1 stripped of title/text: founder haps plus each
@@ -575,7 +575,7 @@ def main() -> None:
         _compose("paternal"),
         _bilateral_block_rows(sim),
     ]
-    _render_combined_pdf(panels, OUT / "fig2_combined.pdf")
+    _render_combined_pdf(panels, OUT / "fig2.pdf")
 
 
 if __name__ == "__main__":
