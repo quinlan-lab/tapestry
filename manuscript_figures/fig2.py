@@ -231,11 +231,16 @@ HAP_PALETTE = {
 _GREEK_TO_LETTER = {"α": "A", "β": "B", "γ": "C", "δ": "D"}
 KID_LABELS_MAP = {"Kid1": KID1_LABELS, "Kid2": KID2_LABELS, "Kid3": KID3_LABELS}
 
-# Row = (label, cells, colors, merge_runs).
+# Row = (label, cells, colors, merge_runs[, bottom_colors]).
 #   colors[i] is a palette key or None.
 #   merge_runs=True draws one rectangle per run of identical colors with a
 #   single centered letter, instead of one rectangle+glyph per cell.
-Row = Tuple[str, List[str], List[Optional[str]], bool]
+#   bottom_colors (optional 5th element) — when supplied alongside
+#   merge_runs=True, each merged rectangle is split horizontally: top half
+#   uses colors[j], bottom half uses bottom_colors[j], and a run extends
+#   only while *both* colour streams stay constant. Used by panel D
+#   (bilateral IBD blocks).
+Row = Tuple
 SPACER: Row = ("", [], [], False)
 
 
@@ -260,7 +265,9 @@ def _draw_panel(
     cell_w = pitch
     cell_h = line_h * 0.85
 
-    for i, (label, cells, colors, merge_runs) in enumerate(rows):
+    for i, row in enumerate(rows):
+        label, cells, colors, merge_runs = row[:4]
+        bottom_colors = row[4] if len(row) > 4 else None
         y = 1.0 - (i + 0.5) * line_h
         if label:
             ax.text(
@@ -271,18 +278,47 @@ def _draw_panel(
             j = 0
             while j < len(cells):
                 k = j
-                while k + 1 < len(cells) and colors[k + 1] == colors[j]:
+                while k + 1 < len(cells) and colors[k + 1] == colors[j] and (
+                    bottom_colors is None
+                    or bottom_colors[k + 1] == bottom_colors[j]
+                ):
                     k += 1
                 run_color = colors[j]
                 if run_color is not None:
                     x_left = cells_x0 + j * pitch - cell_w / 2
                     width = (k - j) * pitch + cell_w
-                    ax.add_patch(plt.Rectangle(
-                        (x_left, y - cell_h / 2),
-                        width, cell_h,
-                        facecolor=HAP_PALETTE[run_color],
-                        edgecolor="none", zorder=1,
-                    ))
+                    if bottom_colors is None:
+                        ax.add_patch(plt.Rectangle(
+                            (x_left, y - cell_h / 2),
+                            width, cell_h,
+                            facecolor=HAP_PALETTE[run_color],
+                            edgecolor="none", zorder=1,
+                        ))
+                    else:
+                        # Split top/bottom: top half = paternal colour,
+                        # bottom half = maternal colour. Letter centred on
+                        # the rectangle's mid-line. Where another bilateral
+                        # block follows (or precedes), inset the rectangle
+                        # by half a gap on the boundary-facing side so the
+                        # whitespace straddles the true boundary rather
+                        # than sitting entirely on one side.
+                        half_gap = pitch * 0.10
+                        gap_left  = half_gap if j > 0                 else 0.0
+                        gap_right = half_gap if k + 1 < len(cells)    else 0.0
+                        rect_x = x_left + gap_left
+                        rect_w = width - gap_left - gap_right
+                        ax.add_patch(plt.Rectangle(
+                            (rect_x, y),
+                            rect_w, cell_h / 2,
+                            facecolor=HAP_PALETTE[run_color],
+                            edgecolor="none", zorder=1,
+                        ))
+                        ax.add_patch(plt.Rectangle(
+                            (rect_x, y - cell_h / 2),
+                            rect_w, cell_h / 2,
+                            facecolor=HAP_PALETTE[bottom_colors[j]],
+                            edgecolor="none", zorder=1,
+                        ))
                     cx = cells_x0 + (j + k) * pitch / 2
                     ax.text(
                         cx, y, cells[j], ha="center", va="center",
@@ -504,12 +540,40 @@ def _compose(side: str) -> List[Row]:
     return body
 
 
+def _bilateral_block_rows(sim: Dict) -> List[Row]:
+    """Panel D: one row per kid, listing the bilateral IBD segments as
+    labelled rectangles whose top half is filled with the paternal-letter
+    colour and bottom half with the maternal-letter colour. The label is
+    the founder-haplotype pair (e.g. ``A|C``); a colour change in either
+    stream marks a bilateral-block boundary, so Kid3's paternal
+    recombination splits its row into two adjacent rectangles
+    (``A|C`` then ``B|C``)."""
+    info_pat = [i for i in _informative_sites_dad(sim) if i < DISPLAY_SITES]
+    info_mat = [i for i in _informative_sites_mom(sim) if i < DISPLAY_SITES]
+
+    pat_state = _stage(sim, info_pat, "paternal", 2)
+    pat_state = _flip_only(pat_state, info_pat, ("A", "B"))
+    pat_filled = _collapse_to_blocks(pat_state, info_pat)
+
+    mat_state = _stage(sim, info_mat, "maternal", 2)
+    mat_filled = _collapse_to_blocks(mat_state, info_mat)
+
+    rows: List[Row] = []
+    for k in KIDS:
+        pat = pat_filled[k]
+        mat = mat_filled[k]
+        cells = [f"{pat[i]}|{mat[i]}" for i in range(DISPLAY_SITES)]
+        rows.append((f"{k}:", cells, list(pat), True, list(mat)))
+    return rows
+
+
 def main() -> None:
     sim = _build_simulation()
     panels = [
         _ground_truth_rows(sim),
         _compose("maternal"),
         _compose("paternal"),
+        _bilateral_block_rows(sim),
     ]
     _render_combined_pdf(panels, OUT / "fig2_combined.pdf")
 
