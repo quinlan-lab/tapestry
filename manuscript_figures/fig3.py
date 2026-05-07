@@ -1,78 +1,34 @@
-"""Render Fig 3 for the tapestry manuscript.
+"""Render Fig 3 for the tapestry manuscript as a single combined PDF.
 
-Each panel mirrors a specific wiki section so the manuscript figure and
-its caption can be traced back to a single source of truth. When writing
-the figure caption, pull context from the linked sections.
+Fig 3 walks the reader through exhaustive-enumeration phasing at a clean
+non-informative site (N1). Algorithm inputs (observed unphased genotypes
+and the inferred founder-haplotype label each kid carries) are coloured
+red wherever they appear; match ticks are coloured green. The winning
+row (0 mismatches) is boxed.
 
-Panel A — `manuscript_figures/fig3/fig3_panelA.pdf`
-    The exhaustive-enumeration table at clean site N1.
-    Wiki source:
-      `wiki/pedigree_wise_workflow/inheritance_mapping/concordance/concordance.md`
-      section 3 ("Deducing variant phase by exhaustive enumeration at a
-      clean site"), which embeds `concordance/fig2.png`.
-    The orientation-enumeration logic is replicated from upstream
-    `Platinum-Pedigree-Inheritance/wiki/generate_wiki.py` at the SHA
-    pinned in
-    `wiki/pedigree_wise_workflow/inheritance_mapping/README.md`
-    (`7448e5e946adbc7969ad5fd5e0730d7cace23a8d`), so the row contents
-    stay in lockstep with the wiki figure rather than being hand-typed.
-    Differences from the wiki rendering: the table is laid out with a
-    two-row header so A/B/C/D sit under "Founder assignment" and
-    K1/K2/K3 sit under each "Kids (...)" group, the "<- winner"
-    annotation is dropped, and the output is a vector PDF for Illustrator
-    placement.
+Ground truth chosen so that some kids show a change of allele order on
+phasing (`1|0` → unphased `0/1`) and at least one kid is homozygous, so
+the enumeration has a unique winner (otherwise the two-fold
+parent-relabeling symmetry at an all-heterozygous non-informative site
+ties two orientations at zero mismatches).
 
-Panel B — `manuscript_figures/fig3/fig3_panelB.pdf`
-    The bit-vector match cartoon (hap1 vs pat/mat over a hap-map block).
-    Wiki source:
-      `wiki/pedigree_wise_workflow/founder_phased_methylation/founder_phased_methylation.md`
-      section "Bit-vector match", which embeds `bit_vector_match.png`.
-    Rendering is delegated to that wiki page's own generator
-    (`wiki/.../founder_phased_methylation.py:render_match`), so panel B
-    is byte-equivalent to the wiki figure modulo the PDF container.
-
-Panel C — `manuscript_figures/fig3/fig3_panelC.pdf`
-    The rebucketing moment: the same per-CpG methylation values for one
-    kid (Kid1) shown first under hiphase's arbitrary hap1/hap2 labels,
-    then relabelled to founder-aware (pat/mat + founder letter) labels.
-    The two sub-tables share their numerical content; only the column
-    names change — this is the literal "relabel, don't recompute"
-    message of the wiki section.
-    Wiki source:
-      `wiki/pedigree_wise_workflow/founder_phased_methylation/founder_phased_methylation.md`
-      section "Relabelling per-CpG methylation".
-    Rendered by `wiki/motivation/trio_discovery.py:render_rebucket_panel`.
-
-Panel D — `manuscript_figures/fig3/fig3_panelD.pdf`
-    De novo gain-of-methylation discovery table (use case 1). Moved from
-    Fig 1D so the reader sees it after the rebucketing machinery has been
-    introduced. Trio context (parental cartoon) remains in Fig 1C.
-    Wiki source: this is the manuscript-side table, simulated in
-    `wiki/motivation/trio_discovery.py` (DENOVO_TABLE_*); the polars-query
-    discovery code lives alongside (DENOVO_CODE) and is rendered into
-    Supp Fig 1.
-    Rendered by `wiki/motivation/trio_discovery.py:render_trio_denovo_meth_table`.
-    The row data was extended (10 CpGs, 2 highlighted) so highlighted
-    rows read as a discovery rather than as the entire region.
-
-Panel E — `manuscript_figures/fig3/fig3_panelE.pdf`
-    Compound genetic-epigenetic heterozygote discovery tables (use case
-    2). Moved from Fig 1F. Trio context remains in Fig 1E.
-    Wiki source: simulated in `wiki/motivation/trio_discovery.py`
-    (COMPOUND_METH_*, COMPOUND_GENO_*); the polars-query discovery code
-    is rendered into Supp Fig 1.
-    Rendered by `wiki/motivation/trio_discovery.py:render_trio_compound_het_tables`.
-    The methylation row data was extended (7 CpGs, 3 highlighted) so the
-    highlighted run reads as a discovery within a baseline window.
+Orientation-enumeration logic is replicated from upstream
+`Platinum-Pedigree-Inheritance/wiki/generate_wiki.py` at the SHA pinned
+in `wiki/pedigree_wise_workflow/inheritance_mapping/README.md`
+(`7448e5e946adbc7969ad5fd5e0730d7cace23a8d`); see also
+`wiki/pedigree_wise_workflow/inheritance_mapping/concordance/concordance.md`
+section 3.
 
 Run:
     .venv/bin/python manuscript_figures/fig3.py
 """
 from __future__ import annotations
 
+import re
 from pathlib import Path
-from typing import Dict, List, Tuple
+from typing import Dict, List, Sequence, Tuple
 
+import matplotlib.patheffects as pe
 import matplotlib.pyplot as plt
 from matplotlib.patches import Rectangle
 
@@ -80,20 +36,15 @@ OUT = Path(__file__).resolve().parent / "fig3"
 OUT.mkdir(parents=True, exist_ok=True)
 
 
-# ---------------------------------------------------------------------------
-# Replicated from upstream generate_wiki.py at the pinned SHA.
-# ---------------------------------------------------------------------------
-# Site N1: clean pass at a non-informative site (dad=0/1, mom=0/1).
-N1_TRUTH = {"A": 0, "B": 1, "C": 0, "D": 1}
+# Site N1 ground truth (non-informative: dad=0/1, mom=0/1).
+N1_TRUTH = {"A": 1, "B": 0, "C": 0, "D": 1}
 
-# Block letter labels, kid -> (paternal letter, maternal letter).
 BLOCK_LABELS: Dict[str, Tuple[str, str]] = {
     "Kid1": ("A", "C"),
     "Kid2": ("B", "D"),
-    "Kid3": ("A", "C"),
+    "Kid3": ("A", "D"),
 }
 
-# All 2^2 = 4 founder-letter orientations.
 ORIENTATIONS: List[Tuple[Tuple[str, str], Tuple[str, str]]] = [
     (("A", "B"), ("C", "D")),
     (("B", "A"), ("C", "D")),
@@ -107,14 +58,13 @@ def _sorted_unphased(pair: Tuple[int, int]) -> Tuple[int, int]:
 
 
 def _site_observed() -> Dict[str, Tuple[int, int]]:
-    """Observed unphased genotypes at site N1 (no injected error)."""
     a, b, c, d = N1_TRUTH["A"], N1_TRUTH["B"], N1_TRUTH["C"], N1_TRUTH["D"]
     truth = {
         "Dad": (a, b),
         "Mom": (c, d),
         "Kid1": (a, c),
         "Kid2": (b, d),
-        "Kid3": (a, c),
+        "Kid3": (a, d),
     }
     return {k: _sorted_unphased(v) for k, v in truth.items()}
 
@@ -150,15 +100,50 @@ def _count_mismatches(
     )
 
 
-# ---------------------------------------------------------------------------
-# Build the rows shown in the table.
-# ---------------------------------------------------------------------------
-def _build_rows() -> List[List[str]]:
-    observed = _site_observed()
-    dad_vcf = observed["Dad"]
-    mom_vcf = observed["Mom"]
+def _kid_hap_label(kid: str) -> str:
+    p, m = BLOCK_LABELS[kid]
+    return f"{p}|{m}"
 
-    rows: List[Tuple[Tuple[int, int, int, int], List[str]]] = []
+
+# ---------------------------------------------------------------------------
+# Layout constants and colours.
+# ---------------------------------------------------------------------------
+COL_BASE = 0.85
+COL_WIDE = 1.15   # unphased kid columns (need room for tick / right-side gap)
+COL_MATCH = 1.40  # "# Matches" header column
+ROW_H = 0.42
+LEFT_OFFSET = 0.2
+RIGHT_PAD = 0.2
+
+# Per-column widths (inches). Cols 5, 7, 9 are kids' "expected unphased"
+# columns (need horizontal room between the unphased number, the tick,
+# and the right-side separator); col 10 is "# Matches".
+COL_WIDTHS: List[float] = [
+    COL_BASE, COL_BASE,       # A, B  (Dad)
+    COL_BASE, COL_BASE,       # C, D  (Mom)
+    COL_BASE, COL_WIDE,       # Kid1 phased, Kid1 unphased
+    COL_BASE, COL_WIDE,       # Kid2 phased, Kid2 unphased
+    COL_BASE, COL_WIDE,       # Kid3 phased, Kid3 unphased
+    COL_MATCH,                # # Matches
+]
+TICK_RIGHT_INSET = 0.20       # inches from the right edge of the unphased cell
+
+HEADER_FONT = 16     # super, group, and sub all share this size
+BODY_FONT = 16
+TICK_FONT = 28       # body ticks rendered larger for emphasis
+PROSE_FONT = 17
+
+INPUT_COLOR = "#cc0000"   # red: algorithm inputs
+TICK_COLOR  = "#1b8a1b"   # green: match tick
+BOX_COLOR   = "#1f77b4"   # blue: winning-row box
+
+N_COLS = 11   # 0..3 parents (A,B,C,D); 4..9 kids (phased,unphased) × 3; 10 = # Mis
+
+
+def _build_enum_rows(obs):
+    dad_vcf = obs["Dad"]
+    mom_vcf = obs["Mom"]
+    rows = []
     for dad_letters, mom_letters in ORIENTATIONS:
         expected = _expected_under_orientation(dad_letters, mom_letters, dad_vcf, mom_vcf)
         letter_to_allele = {
@@ -166,118 +151,339 @@ def _build_rows() -> List[List[str]]:
             mom_letters[0]: mom_vcf[0], mom_letters[1]: mom_vcf[1],
         }
         a, b, c, d = (letter_to_allele[L] for L in "ABCD")
-        n_mis = _count_mismatches(observed, expected)
-        cells: List[str] = [str(a), str(b), str(c), str(d)]
+        n_mis = _count_mismatches(obs, expected)
+        kids = []
         for k in ("Kid1", "Kid2", "Kid3"):
-            cells.append(f"{expected[k][0]} {expected[k][1]}")
-        for k in ("Kid1", "Kid2", "Kid3"):
-            s = _sorted_unphased(expected[k])
-            cells.append(f"{s[0]} {s[1]}")
-        for k in ("Kid1", "Kid2", "Kid3"):
-            s = observed[k]
-            cells.append(f"{s[0]} {s[1]}")
-        cells.append(str(n_mis))
-        rows.append(((a, b, c, d), cells))
-
+            ph = expected[k]
+            unph = _sorted_unphased(ph)
+            kids.append((ph, unph, unph == obs[k]))
+        rows.append(((a, b, c, d), kids, n_mis))
     rows.sort(key=lambda r: r[0])
-    return [cells for _, cells in rows]
+    return rows
 
 
-# ---------------------------------------------------------------------------
-# Rendering — two-row header with grouped sub-columns.
-# ---------------------------------------------------------------------------
-GROUPS: List[Tuple[str, List[str]]] = [
-    ("Hap-allele assignment in parents", ["A", "B", "C", "D"]),
-    ("Kids (expected, phased)",   ["K1", "K2", "K3"]),
-    ("Kids (expected, unphased)", ["K1", "K2", "K3"]),
-    ("Kids (observed, unphased)", ["K1", "K2", "K3"]),
-    ("# Mis",                      [""]),
-]
+# Segment = (text, colour). Used to render multi-coloured text in one line.
+Segment = Tuple[str, str]
 
 
-def _render(out_path: Path, rows: List[List[str]]) -> None:
-    sub_cols = [s for _, subs in GROUPS for s in subs]
-    n_cols = len(sub_cols)
-    n_rows = len(rows)
-    header_rows = 2
+def _wrap_segments(segments, max_w_inches, fontsize, family, measure):
+    """Greedy word-wrap a list of segments to fit in `max_w_inches`.
 
-    col_w = 0.85
-    row_h = 0.36
-    left_pad = right_pad = 0.2
-    top_pad = bot_pad = 0.15
+    Returns a list of lines, each a list of segments. Continuation lines
+    inherit the leading-whitespace indent of the original first segment so
+    bulleted / numbered items hang properly.
+    """
+    if not segments:
+        return [[]]
 
-    fig_w = left_pad + right_pad + n_cols * col_w
-    fig_h = top_pad + bot_pad + (header_rows + n_rows) * row_h
+    first_text = segments[0][0]
+    # Continuation indent matches the start of the line's content. For a
+    # numbered/bulleted item like "    2. ...", the hanging indent extends
+    # past the number+period+space so continuation lines align with the
+    # body of the item rather than the leading "2.".
+    m = re.match(r"^(\s*)((?:\d+\.|[•·–-])\s+)", first_text)
+    if m:
+        indent = m.group(1) + " " * len(m.group(2))
+    else:
+        indent = first_text[:len(first_text) - len(first_text.lstrip(" "))]
+
+    # Tokenise: split each segment into runs of spaces and runs of non-spaces,
+    # tagging each token with its colour.
+    tokens = []   # (text, colour, is_space)
+    for seg_text, color in segments:
+        if not seg_text:
+            continue
+        for m in re.finditer(r"\s+|\S+", seg_text):
+            tok = m.group()
+            tokens.append((tok, color, tok.isspace()))
+
+    lines = [[]]
+    cur_w = 0.0
+    pending = []  # buffered spaces; dropped on wrap
+
+    for text, color, is_sp in tokens:
+        if is_sp:
+            pending.append((text, color, measure(text, fontsize, family)))
+            continue
+        w = measure(text, fontsize, family)
+        pend_w = sum(p[2] for p in pending)
+        if lines[-1] and cur_w + pend_w + w > max_w_inches:
+            # Wrap.
+            lines.append([])
+            cur_w = 0.0
+            pending = []
+            if indent:
+                lines[-1].append((indent, color))
+                cur_w += measure(indent, fontsize, family)
+        for p_text, p_color, p_w in pending:
+            lines[-1].append((p_text, p_color))
+            cur_w += p_w
+        pending = []
+        lines[-1].append((text, color))
+        cur_w += w
+
+    return lines
+
+
+def _render_figure(out_path: Path) -> None:
+    obs = _site_observed()
+    enum_rows = _build_enum_rows(obs)
+
+    win_idx = next(i for i, (_, _, m) in enumerate(enum_rows) if m == 0)
+    win_kids = enum_rows[win_idx][1]
+    deduced = {
+        name: f"{ph[0]}|{ph[1]}"
+        for name, (ph, _, _) in zip(("K1", "K2", "K3"), win_kids)
+    }
+
+    def fmt_unph(p): return f"{p[0]}/{p[1]}"
+    def fmt_ph(p):   return f"{p[0]}|{p[1]}"
+
+    obs_strs = {k: fmt_unph(obs[k]) for k in ("Dad", "Mom", "Kid1", "Kid2", "Kid3")}
+
+    # ---- Prose lines (lists of coloured segments) ----
+    BLK = "black"
+    R = INPUT_COLOR
+    G = TICK_COLOR
+
+    inputs_lines: List[List[Segment]] = [
+        [("Inputs", BLK)],
+        [("  • Observed unphased genotypes:  Dad = ", BLK), (obs_strs["Dad"], R),
+         (",  Mom = ", BLK),  (obs_strs["Mom"], R),
+         (",  Kid1 = ", BLK), (obs_strs["Kid1"], R),
+         (",  Kid2 = ", BLK), (obs_strs["Kid2"], R),
+         (",  Kid3 = ", BLK), (obs_strs["Kid3"], R), (".", BLK)],
+        [("  • Inferred founder haplotype each kid carries:  Kid1 = ", BLK),
+         (_kid_hap_label("Kid1"), R),
+         (",  Kid2 = ", BLK), (_kid_hap_label("Kid2"), R),
+         (",  Kid3 = ", BLK), (_kid_hap_label("Kid3"), R), (".", BLK)],
+    ]
+
+    algo_lines: List[List[Segment]] = [
+        [("Algorithm", BLK)],
+        [("  Enumerate the 4 ways to assign alleles (0 and 1) to dad's two haplotypes A, B and mom's two haplotypes C, D consistent with the parents' unphased genotypes. For each such assignment:", BLK)],
+        [("    1. derive each kid's expected phased genotype by reading off the alleles assigned to the two founder haplotypes it carries (e.g., A|C → dad's A allele assignment paired with mom's C allele assignment);", BLK)],
+        [("    2. for each kid, unphase the expected genotype and tick (", BLK), ("✓", G),
+         (") if it matches the kid's observed unphased genotype (from Inputs);", BLK)],
+        [("    3. count kids whose expected unphased genotype agrees with observed (# Matches).", BLK)],
+    ]
+
+    output_lines: List[List[Segment]] = [
+        [("Output", BLK)],
+        [("  The assignment with the most matches (boxed) gives the deduced phased genotypes:", BLK)],
+        [(f"    Kid1 = {deduced['K1']},  Kid2 = {deduced['K2']},  Kid3 = {deduced['K3']}.", BLK)],
+    ]
+
+    # ---- Vertical layout ----
+    line_h = 0.36
+    gap = 0.30
+    pad_top = pad_bot = 0.15
+    table_h = 7 * ROW_H  # super, group, sub, 4 body
+    fig_w = LEFT_OFFSET + sum(COL_WIDTHS) + RIGHT_PAD
+    prose_family = ["Arial", "DejaVu Sans"]
+    max_prose_w = sum(COL_WIDTHS)
+
+    def is_section_header(line):
+        return len(line) == 1 and line[0][0] in ("Inputs", "Algorithm", "Output")
+
+    # ---- Pass 1: measure on a temp figure, wrap each prose line ----
+    measure_fig = plt.figure(figsize=(fig_w, 1))
+    measure_ax = measure_fig.add_axes([0, 0, 1, 1])
+    measure_ax.set_xlim(0, fig_w)
+    measure_ax.set_ylim(0, 1)
+    measure_ax.set_axis_off()
+    measure_fig.canvas.draw()
+    m_renderer = measure_fig.canvas.get_renderer()
+
+    def _measure_inches_static(text, fontsize, family):
+        t = measure_ax.text(0, 0, text, fontsize=fontsize, family=family)
+        bbox = t.get_window_extent(renderer=m_renderer)
+        t.remove()
+        return bbox.width / measure_fig.dpi
+
+    def wrap_block(lines):
+        out = []
+        for line in lines:
+            sublines = _wrap_segments(line, max_prose_w, PROSE_FONT,
+                                      prose_family, _measure_inches_static)
+            weight = "bold" if is_section_header(line) else "normal"
+            for sub in sublines:
+                out.append((sub, weight))
+        return out
+
+    inputs_w = wrap_block(inputs_lines)
+    algo_w   = wrap_block(algo_lines)
+    output_w = wrap_block(output_lines)
+    plt.close(measure_fig)
+
+    n_top = len(inputs_w) + 1 + len(algo_w)  # blank line between Inputs and Algorithm
+    n_bot = len(output_w)
+    top_text_h = n_top * line_h
+    bot_text_h = n_bot * line_h
+    fig_h = pad_top + top_text_h + gap + table_h + gap + bot_text_h + pad_bot
 
     fig = plt.figure(figsize=(fig_w, fig_h))
-    ax = fig.add_axes([
-        left_pad / fig_w, bot_pad / fig_h,
-        (n_cols * col_w) / fig_w, ((header_rows + n_rows) * row_h) / fig_h,
-    ])
-    ax.set_xlim(0, n_cols)
-    ax.set_ylim(0, header_rows + n_rows)
+    ax = fig.add_axes([0, 0, 1, 1])
+    ax.set_xlim(0, fig_w)
+    ax.set_ylim(0, fig_h)
     ax.set_axis_off()
 
-    font_size = 14
-    group_font_size = 11
-    body_font_size = 15
+    def y_from_top(y_top): return fig_h - y_top
+    def col_x(j): return LEFT_OFFSET + sum(COL_WIDTHS[:j])
 
-    def y_for_row(idx_from_top: int) -> float:
-        return header_rows + n_rows - idx_from_top - 1
+    # ---- Helpers ----
+    # Renderer needed to measure proportional-font text widths.
+    fig.canvas.draw()
+    renderer = fig.canvas.get_renderer()
+    _inv = ax.transData.inverted()
 
-    # Group label row.
-    cursor = 0
-    for label, subs in GROUPS:
-        span = len(subs)
-        y0 = y_for_row(0)
+    def _measure_inches(text, fontsize, family):
+        t = ax.text(0, 0, text, fontsize=fontsize, family=family)
+        bbox = t.get_window_extent(renderer=renderer)
+        (x0d, _), (x1d, _) = _inv.transform([(0, 0), (bbox.width, 0)])
+        t.remove()
+        return x1d - x0d
+
+    def write_segments(x0, y_center, segments, fontsize, family="monospace", ha="left", weight="normal"):
+        """Render segments left-to-right. If ha='center', the run is centred on x0."""
+        widths = [_measure_inches(text, fontsize, family) for text, _ in segments]
+        total_w = sum(widths)
+        cur_x = x0 - total_w / 2 if ha == "center" else x0
+        for (text, color), w in zip(segments, widths):
+            ax.text(cur_x, y_center, text,
+                    fontsize=fontsize, family=family, color=color,
+                    weight=weight, ha="left", va="center")
+            cur_x += w
+
+    def write_line(segments, y_top, fontsize=PROSE_FONT,
+                   family=["Arial", "DejaVu Sans"], weight="normal"):
+        write_segments(LEFT_OFFSET, y_from_top(y_top + line_h * 0.5),
+                       segments, fontsize, family=family, ha="left", weight=weight)
+
+    def cell(x_col, y_row, w_cols, h_rows, segments, fontsize, fc="white"):
+        """Draw a rectangle and centre `segments` (list of (text,color)) inside it."""
+        x0 = col_x(x_col)
+        x1 = col_x(x_col + w_cols)
+        cell_w = x1 - x0
+        y_top = table_top + y_row * ROW_H
+        y_bot = y_top + h_rows * ROW_H
+        rect_y = y_from_top(y_bot)
         ax.add_patch(Rectangle(
-            (cursor, y0), span, 1,
-            facecolor="white", edgecolor="none",
+            (x0, rect_y), cell_w, h_rows * ROW_H,
+            facecolor=fc, edgecolor="none",
         ))
-        ax.text(
-            cursor + span / 2, y0 + 0.5, label,
-            ha="center", va="center", fontsize=group_font_size, family="monospace",
-        )
-        cursor += span
-
-    # Sub-column row.
-    for j, sub in enumerate(sub_cols):
-        y0 = y_for_row(1)
-        ax.add_patch(Rectangle(
-            (j, y0), 1, 1,
-            facecolor="#f4f4f4", edgecolor="none",
-        ))
-        if sub:
-            ax.text(
-                j + 0.5, y0 + 0.5, sub,
-                ha="center", va="center", fontsize=font_size, family="monospace",
+        if segments:
+            write_segments(
+                x0 + cell_w / 2,
+                rect_y + h_rows * ROW_H / 2,
+                segments, fontsize, ha="center",
             )
+
+    # ---- Top prose (wrapped) ----
+    y = pad_top
+    for sub, weight in inputs_w:
+        write_line(sub, y, weight=weight); y += line_h
+    y += line_h  # blank between sections
+    for sub, weight in algo_w:
+        write_line(sub, y, weight=weight); y += line_h
+
+    y += gap
+    table_top = y
+
+    # ---- Table ----
+    # Reversed shading: group row gets the lighter shade; sub-header row
+    # gets the darker shade.
+    HEADER_FC = "#f4f4f4"
+    SUB_FC    = "#e4e4e4"
+
+    # Super-header (row 0) — no shading.
+    cell(0, 0, 4, 1, [("Hap-allele assignment", BLK)], HEADER_FONT)
+    cell(4, 0, 6, 1, [("Expected kid genotypes", BLK)], HEADER_FONT)
+
+    # Group row (row 1). Dad/Mom carry their observed unphased genotype as a
+    # parenthetical (no tick column gives a redundant cue for them); kid
+    # columns rely on the tick instead.
+    groups = [
+        ([("Dad (", BLK), (obs_strs["Dad"], R), (")", BLK)], 0,  2),
+        ([("Mom (", BLK), (obs_strs["Mom"], R), (")", BLK)], 2,  4),
+        ([("Kid1", BLK)],    4,  6),
+        ([("Kid2", BLK)],    6,  8),
+        ([("Kid3", BLK)],    8, 10),
+        ([("# Matches", BLK)],10, 11),
+    ]
+    for segs, x0, x1 in groups:
+        cell(x0, 1, x1 - x0, 1, segs, HEADER_FONT, fc=HEADER_FC)
+
+    # Sub-header row (row 2) — founder-hap labels are inputs → red.
+    sub_segs = [
+        [("A", BLK)], [("B", BLK)], [("C", BLK)], [("D", BLK)],
+        [(_kid_hap_label("Kid1"), R)], [],
+        [(_kid_hap_label("Kid2"), R)], [],
+        [(_kid_hap_label("Kid3"), R)], [],
+        [],
+    ]
+    for j, segs in enumerate(sub_segs):
+        cell(j, 2, 1, 1, segs, HEADER_FONT, fc=SUB_FC)
 
     # Body rows.
-    for i, row in enumerate(rows):
-        for j, cell in enumerate(row):
-            y0 = y_for_row(header_rows + i)
-            ax.add_patch(Rectangle(
-                (j, y0), 1, 1,
-                facecolor="white", edgecolor="none",
-            ))
-            ax.text(
-                j + 0.5, y0 + 0.5, cell,
-                ha="center", va="center", fontsize=body_font_size, family="monospace",
-            )
+    for i, (founders, kids, n_mis) in enumerate(enum_rows):
+        ry = 3 + i
+        for j, val in enumerate(founders):
+            cell(j, ry, 1, 1, [(str(val), BLK)], BODY_FONT)
+        for ki, (ph, unph, match) in enumerate(kids):
+            ph_x = 4 + ki * 2
+            cell(ph_x, ry, 1, 1, [(fmt_ph(ph), BLK)], BODY_FONT)
+            # Render the unphased number always centred in its cell (so the
+            # numbers line up across rows regardless of whether a tick is
+            # present); the tick is drawn separately, larger, to its right.
+            cell(ph_x + 1, ry, 1, 1, [(fmt_unph(unph), BLK)], BODY_FONT)
+            if match:
+                # Tick sits a fixed inset from the right edge of the cell so
+                # there is whitespace between it and the vertical separator.
+                tick_x = col_x(ph_x + 2) - TICK_RIGHT_INSET
+                tick_y = y_from_top(table_top + ry * ROW_H + ROW_H / 2)
+                t = ax.text(tick_x, tick_y, "✔",
+                            fontsize=TICK_FONT, family="monospace",
+                            color=G, weight="bold", ha="center", va="center")
+                t.set_path_effects([
+                    pe.Stroke(linewidth=0.8, foreground=G),
+                    pe.Normal(),
+                ])
+        n_match = sum(1 for _, _, m in kids if m)
+        cell(10, ry, 1, 1, [(str(n_match), BLK)], BODY_FONT)
 
-    # Inner separators only (no outer table border).
+    # Separators.
     line_kw = dict(color="black", linewidth=0.5)
-    # Horizontal: only under the sub-column header row.
-    ax.plot([0, n_cols], [n_rows, n_rows], **line_kw)
-    # Vertical separators only at group boundaries (full height).
-    cursor = 0
-    boundaries = []
-    for _, subs in GROUPS:
-        cursor += len(subs)
-        boundaries.append(cursor)
-    for j in boundaries[:-1]:  # skip the rightmost (outer edge)
-        ax.plot([j, j], [0, header_rows + n_rows], **line_kw)
+    x_left = col_x(0)
+    x_right = col_x(N_COLS)
+    # Horizontal under sub-row (between sub-header and body).
+    y_hbar = y_from_top(table_top + 3 * ROW_H)
+    ax.plot([x_left, x_right], [y_hbar, y_hbar], **line_kw)
+    # Vertical separators at group boundaries. Most start below the
+    # super-header row so they do not cross the super-header text. The
+    # boundaries between super-header spans (col 4: between "Hap-allele
+    # assignment" and "Expected kid genotypes"; col 10: right edge of
+    # "Expected kid genotypes") extend up to the top of the super-header.
+    sep_top_below_super = y_from_top(table_top + 1 * ROW_H)
+    sep_top_full        = y_from_top(table_top + 0 * ROW_H)
+    sep_bottom          = y_from_top(table_top + 7 * ROW_H)
+    for xc in (2, 4, 6, 8, 10):
+        x = col_x(xc)
+        top_y = sep_top_full if xc in (4, 10) else sep_top_below_super
+        ax.plot([x, x], [top_y, sep_bottom], **line_kw)
+
+    # Box around winning row.
+    win_y_top = table_top + (3 + win_idx) * ROW_H
+    ax.add_patch(Rectangle(
+        (x_left, y_from_top(win_y_top + ROW_H)),
+        sum(COL_WIDTHS), ROW_H,
+        facecolor="none", edgecolor=BOX_COLOR, linewidth=1.8,
+    ))
+
+    # ---- Bottom prose (wrapped) ----
+    y = table_top + 7 * ROW_H + gap
+    for sub, weight in output_w:
+        write_line(sub, y, weight=weight); y += line_h
 
     out_path.parent.mkdir(parents=True, exist_ok=True)
     fig.savefig(out_path, bbox_inches="tight", pad_inches=0.05)
@@ -285,74 +491,8 @@ def _render(out_path: Path, rows: List[List[str]]) -> None:
     print(f"wrote {out_path}")
 
 
-def _ensure_wiki_on_path() -> None:
-    import sys
-    repo_root = Path(__file__).resolve().parent.parent
-    if str(repo_root) not in sys.path:
-        sys.path.insert(0, str(repo_root))
-
-
-def _render_panelB(out_path: Path) -> None:
-    """Panel B — bit-vector match cartoon. Reuses the wiki figure's
-    rendering at `wiki/.../founder_phased_methylation.py:render_match`
-    (single source of truth) but emits PDF for Illustrator."""
-    _ensure_wiki_on_path()
-    from wiki.pedigree_wise_workflow.founder_phased_methylation import (  # noqa: E402
-        founder_phased_methylation as fpm,
-    )
-    out_path.parent.mkdir(parents=True, exist_ok=True)
-    fpm.render_match(out_path=out_path)
-
-
-def _render_panelC(out_path: Path) -> None:
-    """Panel C — rebucketing cartoon. Reuses
-    `wiki/motivation/trio_discovery.py:render_rebucket_panel`."""
-    _ensure_wiki_on_path()
-    from wiki.motivation import trio_discovery  # noqa: E402
-    out_path.parent.mkdir(parents=True, exist_ok=True)
-    trio_discovery.render_rebucket_panel(
-        out_path=out_path,
-        show_title=False,
-        cell_fontsize=9,
-        trim_whitespace=True,
-    )
-
-
-def _render_panelD(out_path: Path) -> None:
-    """Panel D — de novo discovery table (moved from Fig 1D).
-    Reuses `wiki/motivation/trio_discovery.py:render_trio_denovo_meth_table`."""
-    _ensure_wiki_on_path()
-    from wiki.motivation import trio_discovery  # noqa: E402
-    out_path.parent.mkdir(parents=True, exist_ok=True)
-    trio_discovery.render_trio_denovo_meth_table(
-        out_path=out_path,
-        show_title=False,
-        col_dx=0.105,
-        cell_fontsize=9,
-        trim_whitespace=True,
-    )
-
-
-def _render_panelE(out_path: Path) -> None:
-    """Panel E — compound het discovery tables (moved from Fig 1F).
-    Reuses `wiki/motivation/trio_discovery.py:render_trio_compound_het_tables`."""
-    _ensure_wiki_on_path()
-    from wiki.motivation import trio_discovery  # noqa: E402
-    out_path.parent.mkdir(parents=True, exist_ok=True)
-    trio_discovery.render_trio_compound_het_tables(
-        out_path=out_path,
-        show_title=False,
-        trim_whitespace=True,
-    )
-
-
 def main() -> None:
-    rows = _build_rows()
-    _render(OUT / "fig3_panelA.pdf", rows)
-    _render_panelB(OUT / "fig3_panelB.pdf")
-    _render_panelC(OUT / "fig3_panelC.pdf")
-    _render_panelD(OUT / "fig3_panelD.pdf")
-    _render_panelE(OUT / "fig3_panelE.pdf")
+    _render_figure(OUT / "fig3.pdf")
 
 
 if __name__ == "__main__":
