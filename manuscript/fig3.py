@@ -25,6 +25,7 @@ Run:
 from __future__ import annotations
 
 import re
+import sys
 from pathlib import Path
 from typing import Dict, List, Sequence, Tuple
 
@@ -34,6 +35,12 @@ from matplotlib.patches import Rectangle
 
 OUT = Path(__file__).resolve().parent / "fig3"
 OUT.mkdir(parents=True, exist_ok=True)
+
+_REPO_ROOT = Path(__file__).resolve().parent.parent
+if str(_REPO_ROOT) not in sys.path:
+    sys.path.insert(0, str(_REPO_ROOT))
+
+from wiki._panel_grid import Row, draw_panel  # noqa: E402
 
 
 # Site N1 ground truth (non-informative: dad=0/1, mom=0/1).
@@ -274,6 +281,10 @@ def _render_figure(out_path: Path) -> None:
         [(f"    Kid1 = {deduced['K1']},  Kid2 = {deduced['K2']},  Kid3 = {deduced['K3']}.", BLK)],
     ]
 
+    panel_e_header_lines: List[List[Segment]] = [
+        [("Reconstructed haplotype sequences in IBD segments", BLK)],
+    ]
+
     # ---- Vertical layout ----
     line_h = 0.36
     gap = 0.30
@@ -284,7 +295,10 @@ def _render_figure(out_path: Path) -> None:
     max_prose_w = sum(COL_WIDTHS)
 
     def is_section_header(line):
-        return len(line) == 1 and line[0][0] in ("Inputs", "Algorithm", "Output")
+        return len(line) == 1 and line[0][0] in (
+            "Inputs", "Algorithm", "Output",
+            "Reconstructed haplotype sequences in IBD segments",
+        )
 
     # ---- Pass 1: measure on a temp figure, wrap each prose line ----
     measure_fig = plt.figure(figsize=(fig_w, 1))
@@ -314,13 +328,17 @@ def _render_figure(out_path: Path) -> None:
     inputs_w = wrap_block(inputs_lines)
     algo_w   = wrap_block(algo_lines)
     output_w = wrap_block(output_lines)
+    pe_header_w = wrap_block(panel_e_header_lines)
     plt.close(measure_fig)
 
     n_top = len(inputs_w) + 1 + len(algo_w)  # blank line between Inputs and Algorithm
     n_bot = len(output_w)
     top_text_h = n_top * line_h
     bot_text_h = n_bot * line_h
-    fig_h = pad_top + top_text_h + gap + table_h + gap + bot_text_h + pad_bot
+    pe_header_h = len(pe_header_w) * line_h
+    pe_h = _panel_e_height_inches()
+    fig_h = (pad_top + top_text_h + gap + table_h + gap + bot_text_h
+             + gap + pe_header_h + gap * 0.1 + pe_h + pad_bot)
 
     fig = plt.figure(figsize=(fig_w, fig_h))
     ax = fig.add_axes([0, 0, 1, 1])
@@ -345,7 +363,19 @@ def _render_figure(out_path: Path) -> None:
         return x1d - x0d
 
     def write_segments(x0, y_center, segments, fontsize, family="monospace", ha="left", weight="normal"):
-        """Render segments left-to-right. If ha='center', the run is centred on x0."""
+        """Render segments left-to-right. If ha='center', the run is centred on x0.
+
+        Consecutive same-colour segments are first merged into a single
+        run, because matplotlib's `get_window_extent` reports zero width
+        for whitespace-only strings — measuring each token separately
+        would lose all inter-word spacing."""
+        merged: List[Segment] = []
+        for text, color in segments:
+            if merged and merged[-1][1] == color:
+                merged[-1] = (merged[-1][0] + text, color)
+            else:
+                merged.append((text, color))
+        segments = merged
         widths = [_measure_inches(text, fontsize, family) for text, _ in segments]
         total_w = sum(widths)
         cur_x = x0 - total_w / 2 if ha == "center" else x0
@@ -485,10 +515,156 @@ def _render_figure(out_path: Path) -> None:
     for sub, weight in output_w:
         write_line(sub, y, weight=weight); y += line_h
 
+    # ---- Panel E: header line, then haplotype-reconstruction cartoon. ----
+    y += gap
+    for sub, weight in pe_header_w:
+        write_line(sub, y, weight=weight); y += line_h
+    pe_header_to_rows_gap = gap * 0.1
+    y += pe_header_to_rows_gap
+    # Place the panel-E sub-axes. y is "from top" in inches; convert to
+    # the matplotlib bottom-anchored figure coords used by add_axes.
+    pe_y0_in = fig_h - (y + pe_h)
+    pe_x0_in = LEFT_OFFSET
+    pe_w_in = fig_w - LEFT_OFFSET - RIGHT_PAD
+    _draw_panel_e_into_fig(fig, pe_x0_in, pe_y0_in, pe_w_in, pe_h)
+
     out_path.parent.mkdir(parents=True, exist_ok=True)
     fig.savefig(out_path, bbox_inches="tight", pad_inches=0.05)
     plt.close(fig)
     print(f"wrote {out_path}")
+
+
+# ---------------------------------------------------------------------------
+# Panel E — full-IBD-segment bitstring reconstruction (cartoon).
+# ---------------------------------------------------------------------------
+# The site-by-site enumeration shown in panels A–D, applied across every
+# site in the IBD segment, yields each kid's pat_X / mat_Y founder-hap
+# bitstring. Row labels (e.g. ``Kid1 pat_A``) match those used in Fig 4A.
+# Kids that share a paternal founder share their pat_* bitstring (Kid1 &
+# Kid3 both carry founder A); same for mat_* (Kid2 & Kid3 both carry D).
+# No recombination — BLOCK_LABELS is constant across the segment.
+
+PANEL_E_N_SITES = 5
+
+# Founder-haplotype bitstrings across the IBD segment, designed so
+# informative and non-informative sites are intermingled. The class of
+# each site is shown beneath the rows by a single letter — `I`
+# (informative; reconstruct via Fig 2) or `N` (non-informative;
+# reconstruct via Fig 3):
+#   site 0: I (dad het, mom hom)
+#   site 1: N (both het)
+#   site 2: I (dad hom, mom het)
+#   site 3: N (both het)
+#   site 4: I (dad het, mom hom)
+DAD_A = [1, 1, 0, 1, 1]
+DAD_B = [0, 0, 0, 0, 0]
+MOM_C = [1, 0, 1, 1, 0]
+MOM_D = [1, 1, 0, 0, 0]
+
+_FOUNDER_BITS: Dict[str, List[int]] = {
+    "A": DAD_A, "B": DAD_B, "C": MOM_C, "D": MOM_D,
+}
+
+
+_INFO_GLYPH = "●"      # filled dot — informative (known directly)
+_NONINFO_GLYPH = "○"   # open dot — non-informative (filled via Fig 3)
+
+
+def _site_classes() -> List[str]:
+    """Return per-site glyph based on parent zygosity."""
+    out: List[str] = []
+    for i in range(PANEL_E_N_SITES):
+        dad_het = DAD_A[i] != DAD_B[i]
+        mom_het = MOM_C[i] != MOM_D[i]
+        out.append(_NONINFO_GLYPH if (dad_het and mom_het) else _INFO_GLYPH)
+    return out
+
+
+def _panel_e_rows() -> List[Row]:
+    rows: List[Row] = []
+    for kid in ("Kid1", "Kid2", "Kid3"):
+        pat_letter, mat_letter = BLOCK_LABELS[kid]
+        for letter, side in ((pat_letter, "pat"), (mat_letter, "mat")):
+            cells = [str(v) for v in _FOUNDER_BITS[letter]]
+            rows.append((f"{kid} {side}_{letter}:", cells,
+                         [letter] * PANEL_E_N_SITES, False))
+    return rows
+
+
+PANEL_E_ROW_H_IN = 0.42    # match the panels-A–D table row height
+PANEL_E_EXTRA_ROWS = 1.0   # vertical space below rows for the marker glyphs
+PANEL_E_PITCH = 0.06       # axis-fraction column pitch
+PANEL_E_CELLS_X0 = 0.18    # axis-fraction x of the first cell (pre-centering)
+PANEL_E_FONT_SIZE = 16     # match BODY_FONT / HEADER_FONT in panels A–D
+# Horizontal offset (axis fraction) applied to BOTH the row labels and
+# cells so that the panel-E content (labels + rows + markers + legend)
+# sits centred within the panel's axes — which itself spans the same
+# horizontal extent as the panels-A–D table.
+PANEL_E_X_OFFSET = 0.085
+
+
+def _panel_e_height_inches() -> float:
+    n_rows = 6  # 3 kids × 2 rows (pat, mat)
+    return PANEL_E_ROW_H_IN * (n_rows + PANEL_E_EXTRA_ROWS)
+
+
+def _draw_panel_e_into_fig(fig, x0_in: float, y0_in: float,
+                           w_in: float, h_in: float) -> None:
+    """Render panel E (haplotype rows + dot markers + legend) into the
+    inch-rect (x0_in, y0_in)→(x0_in+w_in, y0_in+h_in) of `fig`.
+    Internal layout uses axis-fraction coords so it scales with w_in;
+    pass w_in == PANEL_E_W_IN to reproduce the standalone calibration."""
+    rows = _panel_e_rows()
+    classes = _site_classes()
+    pitch = PANEL_E_PITCH
+    cells_x0 = PANEL_E_CELLS_X0 + PANEL_E_X_OFFSET
+    label_x = PANEL_E_X_OFFSET
+    font_size = PANEL_E_FONT_SIZE
+    n_rows = len(rows)
+    extra = PANEL_E_EXTRA_ROWS
+
+    fig_w_in, fig_h_in = fig.get_size_inches()
+    data_h_frac = n_rows / (n_rows + extra)
+    data_h_in = h_in * data_h_frac
+    ann_h_in = h_in - data_h_in
+
+    data_rect = [x0_in / fig_w_in, (y0_in + ann_h_in) / fig_h_in,
+                 w_in / fig_w_in, data_h_in / fig_h_in]
+    ann_rect = [x0_in / fig_w_in, y0_in / fig_h_in,
+                w_in / fig_w_in, ann_h_in / fig_h_in]
+
+    data_ax = fig.add_axes(data_rect)
+    draw_panel(data_ax, rows, pitch=pitch, cells_x0=cells_x0,
+               font_size=font_size, label_x=label_x)
+
+    ann_ax = fig.add_axes(ann_rect)
+    ann_ax.set_axis_off()
+    ann_ax.set_xlim(0, 1)
+    ann_ax.set_ylim(0, 1)
+
+    marker_y = 0.55
+    for j, cls in enumerate(classes):
+        x = cells_x0 + j * pitch
+        ann_ax.text(x, marker_y, cls, ha="center", va="center",
+                    fontsize=font_size, family="monospace",
+                    weight="bold", color="black")
+
+    legend_x = cells_x0 + PANEL_E_N_SITES * pitch + 0.04
+    legend_dy = 1.0 / n_rows
+    legend_family = ["Arial", "DejaVu Sans"]
+    glyph_offset = 0.025
+    text_offset = 0.05
+    for dy_sign, glyph, desc in (
+        (+1, _INFO_GLYPH,    "Informative (see Fig 2)"),
+        (-1, _NONINFO_GLYPH, "Non-informative (this figure)"),
+    ):
+        y = 0.5 + dy_sign * legend_dy / 2
+        data_ax.text(legend_x + glyph_offset, y, glyph,
+                     ha="center", va="center", fontsize=font_size,
+                     family="monospace", weight="bold")
+        data_ax.text(legend_x + text_offset, y, desc,
+                     ha="left", va="center", fontsize=font_size,
+                     family=legend_family)
 
 
 def main() -> None:
