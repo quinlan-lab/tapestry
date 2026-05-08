@@ -240,7 +240,7 @@ KID_LABELS_MAP = {"Kid1": KID1_LABELS, "Kid2": KID2_LABELS, "Kid3": KID3_LABELS}
 # Sub-table builders
 # ---------------------------------------------------------------------------
 def _ground_truth_rows(sim: Dict) -> List[Row]:
-    rows: List[Row] = []
+    rows: List[Row] = [("Ground-truth haplotype sequences and transmission:", [], [], False)]
 
     def founder(label, hap_key, color_key):
         cells = [str(x) for x in sim[hap_key][:DISPLAY_SITES]]
@@ -384,7 +384,7 @@ def _compose(side: str) -> List[Row]:
     sim = _build_simulation()
     info_full = _informative_sites_dad(sim) if side == "paternal" else _informative_sites_mom(sim)
     info = [i for i in info_full if i < DISPLAY_SITES]
-    body: List[Row] = []
+    body: List[Row] = [("Input: unphased genotypes", [], [], False)]
     body += _unphased_section(sim, info)
     body.append(SPACER)
     body += _inherited_section(sim, info, side)
@@ -421,12 +421,26 @@ def _bilateral_block_rows(sim: Dict) -> List[Row]:
     mat_state = _stage(sim, info_mat, "maternal", 2)
     mat_filled = _collapse_to_blocks(mat_state, info_mat)
 
-    rows: List[Row] = []
+    # Union of segment boundaries across all kids, so Kid1/Kid2 are
+    # split into the same set of bilateral IBD segments as Kid3 even
+    # where their pat/mat letters do not change. This makes the per-
+    # segment registration explicit (every kid has the same segments
+    # of the same lengths), removing ambiguity carried into Fig 3E.
+    breaks = set()
+    for i in range(DISPLAY_SITES - 1):
+        for k in KIDS:
+            if pat_filled[k][i] != pat_filled[k][i + 1] or \
+               mat_filled[k][i] != mat_filled[k][i + 1]:
+                breaks.add(i)
+
+    rows: List[Row] = [("Output: reconstructed IBD segments", [], [], False)]
     for k in KIDS:
         pat = pat_filled[k]
         mat = mat_filled[k]
         cells = [f"{pat[i]}|{mat[i]}" for i in range(DISPLAY_SITES)]
-        rows.append((f"{k}:", cells, list(pat), True, list(mat)))
+        rows.append((
+            f"{k}:", cells, list(pat), True, list(mat), None, 11, breaks,
+        ))
     return rows
 
 

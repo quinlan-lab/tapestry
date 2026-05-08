@@ -12,6 +12,7 @@ Row tuple layout (positional, trailing fields optional):
     (..., bottom_colors)
     (..., bottom_colors, text_colors)
     (..., bottom_colors, text_colors, label_fontsize)
+    (..., bottom_colors, text_colors, label_fontsize, force_split_after)
 
 - label:           row label drawn on the left.
 - cells:           per-column string content.
@@ -27,6 +28,9 @@ Row tuple layout (positional, trailing fields optional):
 - label_fontsize:  font size for the *centered* merged-run label,
                    when the long-form label needs to fit inside a
                    small rectangle.
+- force_split_after: iterable of cell indices after which a merged
+                   run must end even if colors continue, so callers
+                   can register segment boundaries across rows.
 """
 from __future__ import annotations
 
@@ -113,11 +117,15 @@ def draw_panel(
         bottom_colors = _field(row, 4)
         text_colors = _field(row, 5)
         label_fontsize = _field(row, 6, font_size)
+        force_split_after = set(_field(row, 7) or ())
         y = 1.0 - (i + 0.5) * line_h
         if label:
+            is_header = not cells
             ax.text(
                 label_x, y, label, ha="left", va="center",
-                fontsize=font_size, family="monospace",
+                fontsize=font_size,
+                family="Arial" if is_header else "monospace",
+                weight="bold" if is_header else "normal",
             )
         if merge_runs:
             j = 0
@@ -126,7 +134,7 @@ def draw_panel(
                 while k + 1 < len(cells) and colors[k + 1] == colors[j] and (
                     bottom_colors is None
                     or bottom_colors[k + 1] == bottom_colors[j]
-                ):
+                ) and k not in force_split_after:
                     k += 1
                 run_color = colors[j]
                 if run_color is not None:
