@@ -79,15 +79,17 @@ def _render_panelA(out_path: Path) -> None:
 
 
 def _render_panelB(out_path: Path) -> None:
-    """Panel B — rebucketing cartoon. Reuses
-    `wiki/motivation/trio_discovery.py:render_rebucket_panel`."""
+    """Panel B — visual rebucketing cartoon. Two read-backed phase
+    blocks within one IBD segment; the hap1↔hap2 assignment flips
+    between the blocks. Bottom shows the same bars re-routed to
+    founder-aware tracks (pat_A / mat_C). Reuses
+    `wiki/motivation/trio_discovery.py:render_rebucket_visual`."""
     _ensure_wiki_on_path()
     from wiki.motivation import trio_discovery  # noqa: E402
     out_path.parent.mkdir(parents=True, exist_ok=True)
-    trio_discovery.render_rebucket_panel(
+    trio_discovery.render_rebucket_visual(
         out_path=out_path,
         show_title=False,
-        cell_fontsize=9,
         trim_whitespace=True,
     )
 

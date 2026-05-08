@@ -1106,6 +1106,188 @@ def render_trio_compound_het_bed(out_path: Path | None = None):
     print(f"[scratch] Wrote {out}")
 
 
+def render_rebucket_visual(out_path: Path | None = None,
+                           show_title: bool = False,
+                           trim_whitespace: bool = False) -> None:
+    """Visual rebucketing: same per-CpG methylation bars shown first
+    under hiphase's arbitrary hap1/hap2 labels (neutral grey, two
+    read-backed phase blocks inside one IBD segment, with the
+    hap1↔hap2 assignment flipping between the two phase blocks), then
+    under founder-aware labels (pat_A meth / mat_C meth). Each bar in
+    the bottom view is the SAME value as in the top view, just routed
+    to the founder-aware track determined by the per-hap-map-block
+    matching exercise from Fig 4A.
+    """
+    N_SITES = 14
+    RBP1 = (0, 5)
+    RBP2 = (8, 13)
+
+    # Canonical (founder-truth) methylation profiles. Identical biology
+    # being measured at every CpG; only the *labels* differ across the
+    # transformation. A is hypermethylated and C is hypomethylated at
+    # this locus (the founder-haplotype analogue of Fig 1B's
+    # discordant-region asymmetry), so the hap1↔hap2 flip across phase
+    # blocks is visually obvious in the top "before-rebucketing" view.
+    pat_A_meth = [0.92, 0.85, 0.95, 0.88, 0.95, 0.85, 0.0, 0.0,
+                  0.88, 0.95, 0.83, 0.92, 0.95, 0.85]
+    mat_C_meth = [0.10, 0.15, 0.05, 0.12, 0.05, 0.15, 0.0, 0.0,
+                  0.12, 0.05, 0.17, 0.08, 0.05, 0.15]
+
+    def slice_(profile, lo, hi):
+        return [(i, profile[i]) for i in range(lo, hi + 1)]
+
+    # In RBP1 hiphase happens to call hap1 = pat_A, hap2 = mat_C.
+    # In RBP2 the labels flip: hap1 = mat_C, hap2 = pat_A. Phase blocks
+    # are smaller than IBD segments, so the hap1/hap2 assignment can
+    # readily flip between neighbouring blocks within the same IBD.
+    hap1_bars = slice_(pat_A_meth, *RBP1) + slice_(mat_C_meth, *RBP2)
+    hap2_bars = slice_(mat_C_meth, *RBP1) + slice_(pat_A_meth, *RBP2)
+    patA_bars = slice_(pat_A_meth, *RBP1) + slice_(pat_A_meth, *RBP2)
+    matC_bars = slice_(mat_C_meth, *RBP1) + slice_(mat_C_meth, *RBP2)
+
+    import sys as _sys
+    _repo_root = Path(__file__).resolve().parents[2]
+    if str(_repo_root) not in _sys.path:
+        _sys.path.insert(0, str(_repo_root))
+    from wiki._panel_grid import (  # noqa: E402
+        HAP_PALETTE, draw_two_stripe_block,
+    )
+
+    NEUTRAL_TOP = HAP_PALETTE["neutral_top"]
+    NEUTRAL_BOT = HAP_PALETTE["neutral_bot"]
+    A_COLOR = HAP_PALETTE["A"]
+    C_COLOR = HAP_PALETTE["C"]
+    BAR_W = 0.7
+    PREFIX_X = -6.5
+    # Match Fig 4A: monospace 11 for row labels and the short RBP-style
+    # in-block label; 9 for the longer hap-map conclusion that has to
+    # fit inside a small rectangle.
+    LABEL_FS = 11
+    BLOCK_FS_SHORT = 11
+    BLOCK_FS_LONG = 9
+    LABEL_FAMILY = "monospace"
+
+    fig = plt.figure(figsize=(8.5, 6.0))
+    # Layout (top → bottom). Block rows use the same row pitch as Fig 4A
+    # (≈0.30 in) so the rectangles render at the same physical size; bar
+    # rows are taller because they need vertical room for the bigwig-
+    # style methylation bars.
+    #   0  RBP rectangles (two)
+    #   1  hap1 meth bars
+    #   2  hap2 meth bars
+    #   3  spacer
+    #   4  IBD segment (the founder pair A|C is constant across the
+    #      whole region; what differs between RBPs is which hiphase
+    #      slot — hap1 vs hap2 — carries the A-bearing reads)
+    #   5  hap-map blocks (RBP ∩ IBD; the slot↔founder mapping flips
+    #      between them — the rebucketing event)
+    #   6  spacer
+    #   7  pat_A meth bars
+    #   8  mat_C meth bars
+    gs = GridSpec(
+        nrows=9, ncols=1,
+        height_ratios=(0.30, 0.95, 0.95, 0.15, 0.30, 0.30, 0.15, 0.95, 0.95),
+        hspace=0.25,
+        left=0.04, right=0.98, top=0.97, bottom=0.04,
+    )
+    ax_rbp = fig.add_subplot(gs[0])
+    ax_hap1 = fig.add_subplot(gs[1], sharex=ax_rbp)
+    ax_hap2 = fig.add_subplot(gs[2], sharex=ax_rbp)
+    ax_ibd = fig.add_subplot(gs[4], sharex=ax_rbp)
+    ax_hmb = fig.add_subplot(gs[5], sharex=ax_rbp)
+    ax_patA = fig.add_subplot(gs[7], sharex=ax_rbp)
+    ax_matC = fig.add_subplot(gs[8], sharex=ax_rbp)
+
+    def setup_bar_axes(ax, color, label):
+        del color  # row label rendered in black for consistency
+        ax.set_xlim(PREFIX_X - 0.3, N_SITES - 0.5)
+        ax.set_ylim(0, 1.05)
+        ax.set_xticks([])
+        ax.set_yticks([])
+        for spine in ("top", "right", "bottom", "left"):
+            ax.spines[spine].set_visible(False)
+        ax.text(PREFIX_X, 0.5, label, ha="left", va="center",
+                fontsize=LABEL_FS, family=LABEL_FAMILY, color="black")
+
+    def draw_bars(ax, bars, color, label):
+        for i, lev in bars:
+            if lev > 0:
+                ax.bar(i, lev, width=BAR_W, color=color, edgecolor="none",
+                       alpha=1.0)
+        setup_bar_axes(ax, color, label)
+
+    # Block visual proportions match Fig 4A: rectangles fill ~85% of
+    # the row's vertical extent, drawn via the shared helper from
+    # `wiki/_panel_grid.py` so styling is identical.
+    BLOCK_H = 0.85
+    BLOCK_Y = 0.5
+
+    def block_axes(ax, prefix_label):
+        ax.text(PREFIX_X, 0.5, prefix_label, ha="left", va="center",
+                fontsize=LABEL_FS, family=LABEL_FAMILY, color="black")
+        ax.set_xlim(PREFIX_X - 0.3, N_SITES - 0.5)
+        ax.set_ylim(0, 1)
+        ax.set_axis_off()
+
+    # ---- RBP row: two neutral two-stripe rectangles (Fig 4A vocabulary).
+    for lo, hi in (RBP1, RBP2):
+        draw_two_stripe_block(
+            ax_rbp, lo - 0.5, hi + 0.5, BLOCK_Y, BLOCK_H,
+            "neutral_top", "neutral_bot",
+            label="hap1  /  hap2", label_fontsize=BLOCK_FS_SHORT,
+        )
+    block_axes(ax_rbp, "Read-backed phase blocks:")
+
+    # ---- Top tracks: hap1 / hap2 meth, coloured to match the phase
+    # block stripes (hap1 = top stripe shade, hap2 = bottom stripe
+    # shade).
+    draw_bars(ax_hap1, hap1_bars, NEUTRAL_TOP, "hap1 meth")
+    draw_bars(ax_hap2, hap2_bars, NEUTRAL_BOT, "hap2 meth")
+
+    # ---- IBD segment: founder pair A|C across the whole region.
+    # Pipe convention: left = pat (A, blue), right = mat (C, green) —
+    # consistent with Fig 2D.
+    draw_two_stripe_block(
+        ax_ibd, RBP1[0] - 0.5, RBP2[1] + 0.5, BLOCK_Y, BLOCK_H,
+        "A", "C", label="A  |  C", label_fontsize=BLOCK_FS_SHORT,
+    )
+    block_axes(ax_ibd, "IBD segment:")
+
+    # ---- Hap-map blocks: one per RBP. Both keep top = pat (A, blue)
+    # and bottom = mat (C, green); only the slot↔founder mapping
+    # changes (HMB1: hap1 = A; HMB2: hap2 = A — i.e., the A-bearing
+    # reads are called hap1 in the first phase block and hap2 in the
+    # second). Pipe convention: left = pat, right = mat, so the label
+    # ordering reflects which hiphase slot is paternal in each block.
+    draw_two_stripe_block(
+        ax_hmb, RBP1[0] - 0.5, RBP1[1] + 0.5, BLOCK_Y, BLOCK_H,
+        "A", "C", label="hap1 = A  |  hap2 = C",
+        label_fontsize=BLOCK_FS_LONG,
+    )
+    draw_two_stripe_block(
+        ax_hmb, RBP2[0] - 0.5, RBP2[1] + 0.5, BLOCK_Y, BLOCK_H,
+        "A", "C", label="hap2 = A  |  hap1 = C",
+        label_fontsize=BLOCK_FS_LONG,
+    )
+    block_axes(ax_hmb, "Hap-map blocks:")
+
+    # ---- Bottom tracks: founder-labelled (per hap-map block).
+    draw_bars(ax_patA, patA_bars, A_COLOR, "pat_A meth")
+    draw_bars(ax_matC, matC_bars, C_COLOR, "mat_C meth")
+
+    if show_title:
+        fig.suptitle("Rebucketing methylation bars by founder haplotype",
+                     fontsize=11, y=0.99)
+
+    out = out_path if out_path is not None else OUT / "rebucket_visual.png"
+    if trim_whitespace:
+        fig.savefig(out, dpi=180, bbox_inches="tight", pad_inches=0.05)
+    else:
+        fig.savefig(out, dpi=180)
+    plt.close(fig)
+    print(f"[scratch] Wrote {out}")
+
+
 def render_trio_svg(scenario, out_path: Path, kid_y_offset: int = 0) -> None:
     out_path.parent.mkdir(parents=True, exist_ok=True)
     out_path.write_text(build(scenario, kid_y_offset=kid_y_offset,
