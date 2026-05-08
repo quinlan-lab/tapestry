@@ -252,6 +252,30 @@ def _draw_read_row(ax, row_y, source, read_idx, start, end, hap_color,
 DISCORDANT_TRACK_COLOR = "#000000"   # black
 
 
+RBP_TOP_COLOR = "#c8c8c8"
+RBP_BOT_COLOR = "#969696"
+
+
+def _draw_phase_block_bar(ax, xlim_left=None):
+    """Two-stripe neutral rectangle spanning the read-backed phase block.
+    Same visual idiom as Fig 4A's RBP block: top half = hap1, bottom
+    half = hap2. The two founder identities are unassigned (hence
+    neutral grey); a single inline label combines the hap1/hap2 idiom
+    with the descriptor."""
+    x0 = -0.5
+    x1 = N_SITES - 0.5
+    y0, y1 = 0.05, 0.95
+    mid = (y0 + y1) / 2
+    ax.add_patch(Rectangle((x0, mid), x1 - x0, y1 - mid,
+                           facecolor=RBP_TOP_COLOR, edgecolor="none"))
+    ax.add_patch(Rectangle((x0, y0), x1 - x0, mid - y0,
+                           facecolor=RBP_BOT_COLOR, edgecolor="none"))
+    ax.set_xlim(PREFIX_X - 0.5 if xlim_left is None else xlim_left,
+                N_SITES - 0.5)
+    ax.set_ylim(0, 1)
+    ax.set_axis_off()
+
+
 def _draw_discordant_track(ax, label="Discordant region", xlim_left=None):
     """An IGV-style feature track: one horizontal bar spanning the
     [DISCORDANT_LO, DISCORDANT_HI] interval, with a side label."""
@@ -308,9 +332,9 @@ def _draw_count_labels(ax, levels_dict, counts_dict, color, sites=LABELED_SITES,
 
 def _draw_meth_bars(ax, levels_dict, color, track_label=None,
                     ytick_fontsize=8, xlim_left=None,
-                    ylabel=None, ylabel_fontsize=10):
+                    ylabel=None, ylabel_fontsize=10,
+                    bar_alpha=0.55):
     """Bigwig-style methylation track. No x-axis, no column annotations."""
-    BAR_ALPHA = 0.55
     for cpg_i, level in levels_dict.items():
         if level == 0:
             # Bar of height 0 is invisible; draw a short horizontal tick
@@ -319,12 +343,12 @@ def _draw_meth_bars(ax, levels_dict, color, track_label=None,
                 [cpg_i - CPG_BOX_W / 2, cpg_i + CPG_BOX_W / 2],
                 [0, 0],
                 color=color, linewidth=1.4, solid_capstyle="butt",
-                alpha=BAR_ALPHA,
+                alpha=bar_alpha,
             )
         else:
             ax.bar(
                 cpg_i, level, width=CPG_BOX_W, color=color,
-                edgecolor="none", align="center", alpha=BAR_ALPHA,
+                edgecolor="none", align="center", alpha=bar_alpha,
             )
     if track_label:
         ax.text(
@@ -416,14 +440,15 @@ def render_before_phasing(out_path: Path | None = None,
     pooled, pooled_counts = _pooled_methylation()
     xlim_left = None if show_left_labels else -1.5
     _draw_meth_bars(
-        ax_meth, pooled, COLOR_NEUTRAL,
+        ax_meth, pooled, "#000000",
         track_label="Meth level" if show_left_labels else None,
         ytick_fontsize=ytick_fontsize,
         xlim_left=xlim_left,
         ylabel=ylabel,
         ylabel_fontsize=ylabel_fontsize,
+        bar_alpha=1.0,
     )
-    _draw_count_labels(ax_meth, pooled, pooled_counts, COLOR_NEUTRAL,
+    _draw_count_labels(ax_meth, pooled, pooled_counts, "#000000",
                        force_outside=True)
     _draw_discordant_track(
         ax_discordant,
@@ -466,41 +491,47 @@ def render_after_phasing(out_path: Path | None = None,
                          pat_ylabel: str | None = None,
                          mat_ylabel: str | None = None,
                          ylabel_fontsize: int = 10):
-    fig = plt.figure(figsize=(5.5, 6.7))
-    # gs[1] is an empty spacer row that widens the visible gap between the
-    # pat and mat methylation tracks without affecting the other gaps.
+    fig = plt.figure(figsize=(5.5, 7.1))
+    # gs[1] is a spacer row widening the visible gap between the hap1
+    # and hap2 methylation tracks. The read-backed phase-block bar
+    # (gs[5]) sits *below* the read pile-up so the reader meets the
+    # phase-block idiom after seeing what got phased.
     gs = GridSpec(
-        nrows=5, ncols=1,
-        height_ratios=(0.85, 0.3, 0.85, 0.25, 4.5),
+        nrows=6, ncols=1,
+        height_ratios=(0.85, 0.3, 0.85, 0.25, 4.5, 0.45),
         hspace=0.18,
-        left=0.04, right=0.98, top=0.93, bottom=0.04,
+        left=0.04, right=0.98, top=0.94, bottom=0.04,
     )
     ax_pat = fig.add_subplot(gs[0])
     ax_mat = fig.add_subplot(gs[2], sharex=ax_pat)
     ax_discordant = fig.add_subplot(gs[3], sharex=ax_pat)
     ax_reads = fig.add_subplot(gs[4], sharex=ax_pat)
+    ax_rbp = fig.add_subplot(gs[5], sharex=ax_pat)
 
     xlim_left = None if show_left_labels else -1.5
     phased, phased_counts = _phased_methylation()
     _draw_meth_bars(
-        ax_pat, phased["pat"], COLOR_NEUTRAL,
-        track_label="Pat meth" if show_left_labels else None,
+        ax_pat, phased["pat"], RBP_TOP_COLOR,
+        track_label="hap1 meth" if show_left_labels else None,
         ytick_fontsize=ytick_fontsize, xlim_left=xlim_left,
         ylabel=pat_ylabel, ylabel_fontsize=ylabel_fontsize,
+        bar_alpha=1.0,
     )
-    _draw_count_labels(ax_pat, phased["pat"], phased_counts["pat"], COLOR_NEUTRAL)
+    _draw_count_labels(ax_pat, phased["pat"], phased_counts["pat"], RBP_TOP_COLOR)
     _draw_meth_bars(
-        ax_mat, phased["mat"], COLOR_NEUTRAL,
-        track_label="Mat meth" if show_left_labels else None,
+        ax_mat, phased["mat"], RBP_BOT_COLOR,
+        track_label="hap2 meth" if show_left_labels else None,
         ytick_fontsize=ytick_fontsize, xlim_left=xlim_left,
         ylabel=mat_ylabel, ylabel_fontsize=ylabel_fontsize,
+        bar_alpha=1.0,
     )
-    _draw_count_labels(ax_mat, phased["mat"], phased_counts["mat"], COLOR_NEUTRAL)
+    _draw_count_labels(ax_mat, phased["mat"], phased_counts["mat"], RBP_BOT_COLOR)
     _draw_discordant_track(
         ax_discordant,
         label="Discordant region" if show_left_labels else None,
         xlim_left=xlim_left,
     )
+    _draw_phase_block_bar(ax_rbp, xlim_left=xlim_left)
 
     n_pat = len(READS_BY_SOURCE["pat"])
     GROUP_GAP = 1.2  # vertical space between the pat and mat groups
@@ -521,7 +552,7 @@ def render_after_phasing(out_path: Path | None = None,
     pat_center = (n_pat - 1) / 2.0
     mat_center = n_pat + GROUP_GAP + (n_mat - 1) / 2.0
     if show_left_labels:
-        for y, label in ((pat_center, "Pat hap"), (mat_center, "Mat hap")):
+        for y, label in ((pat_center, "hap1"), (mat_center, "hap2")):
             ax_reads.text(
                 PREFIX_X, y, label,
                 ha="left", va="center", fontsize=PREFIX_FONTSIZE,
