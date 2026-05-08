@@ -1,0 +1,11 @@
+# Introduction
+
+## Motivation: rare-disease phenotypes invisible to sequencing alone
+
+The two scenarios in Fig 1C and Fig 1D are not theoretical edge cases; each maps onto a class of rare disease whose causal lesion is invisible — or systematically mis-interpreted — by sequencing-only diagnostic pipelines.
+
+**De novo epimutations (Fig 1C).** A single-meiosis change in CpG methylation, with no underlying sequence change, is the causal lesion in imprinting disorders such as Beckwith-Wiedemann syndrome (loss of methylation at the *KCNQ1OT1* or *H19/IGF2* imprinting control regions), Silver-Russell syndrome, and Prader-Willi / Angelman syndromes. The same mechanism — a de novo gain of methylation at a tumor-suppressor promoter — underlies sequencing-negative Lynch syndrome, where germline epimutation of *MLH1* silences mismatch-repair without any coding-sequence variant to find. Detecting these events requires comparing per-haplotype methylation in the proband against the same physical haplotype in the transmitting parent — exactly the comparison that founder-phased methylation makes possible.
+
+**Compound genetic-epigenetic heterozygotes (Fig 1D).** The Knudson two-hit paradigm classically requires two coding hits in trans on a tumor-suppressor gene; substantial evidence now shows that the second hit can be epigenetic. *MLH1* and *MSH2* in Lynch syndrome, and *BRCA1* in hereditary breast and ovarian cancer, present clinically as compound heterozygotes in which one allele carries a germline loss-of-function variant and the other allele is silenced by promoter hypermethylation. The same logic generalizes beyond cancer predisposition: any autosomal-recessive disease whose proband carries a single coding loss-of-function will be missed by sequencing-only screens if the second functional allele is silenced epigenetically rather than mutated. Surfacing such cases requires phasing both the genotype call and the methylation call to a parent of origin, and asking whether the two hits sit in trans — again, what founder-phased methylation provides.
+
+Tapestry is the workflow that produces this founder-phased methylation table from a sequenced pedigree, enabling both classes of discovery in a single pipeline.
