@@ -31,10 +31,21 @@ Run:
 """
 from __future__ import annotations
 
+import sys
 from pathlib import Path
 from typing import Dict, List, Optional, Tuple
 
-import matplotlib.pyplot as plt
+_REPO_ROOT = Path(__file__).resolve().parent.parent
+if str(_REPO_ROOT) not in sys.path:
+    sys.path.insert(0, str(_REPO_ROOT))
+
+from wiki._panel_grid import (  # noqa: E402,F401
+    HAP_PALETTE,
+    Row,
+    SPACER,
+    plain as _plain,
+    render_combined_pdf as _render_combined_pdf,
+)
 
 OUT = Path(__file__).resolve().parent / "fig2"
 OUT.mkdir(parents=True, exist_ok=True)
@@ -210,9 +221,8 @@ def _flip_only(
 
 
 # ---------------------------------------------------------------------------
-# Rendering — single-page PDF with per-cell text and optional palette fill.
-# Vector text survives placement in Illustrator so collaborators can edit
-# labels; per-cell fills make haplotype provenance visible at a glance.
+# Rendering uses the shared `wiki/_panel_grid.py` row-tuple model.
+# This file only constructs Row tuples and delegates layout/drawing.
 # ---------------------------------------------------------------------------
 KIDS = ["Kid1", "Kid2", "Kid3"]
 KID_PHASED_KEY = {"Kid1": "kid1_phased", "Kid2": "kid2_phased", "Kid3": "kid3_phased"}
@@ -222,155 +232,8 @@ KID_UNPHASED_KEY = {
     "Kid3": "kid3_unphased",
 }
 
-HAP_PALETTE = {
-    "A": "#a6cee3",  # light blue   — dad hap1
-    "B": "#fdbf6f",  # light orange — dad hap2
-    "C": "#b2df8a",  # light green  — mom hap1
-    "D": "#fb9a99",  # light pink   — mom hap2
-}
 _GREEK_TO_LETTER = {"α": "A", "β": "B", "γ": "C", "δ": "D"}
 KID_LABELS_MAP = {"Kid1": KID1_LABELS, "Kid2": KID2_LABELS, "Kid3": KID3_LABELS}
-
-# Row = (label, cells, colors, merge_runs[, bottom_colors]).
-#   colors[i] is a palette key or None.
-#   merge_runs=True draws one rectangle per run of identical colors with a
-#   single centered letter, instead of one rectangle+glyph per cell.
-#   bottom_colors (optional 5th element) — when supplied alongside
-#   merge_runs=True, each merged rectangle is split horizontally: top half
-#   uses colors[j], bottom half uses bottom_colors[j], and a run extends
-#   only while *both* colour streams stay constant. Used by panel D
-#   (bilateral IBD blocks).
-Row = Tuple
-SPACER: Row = ("", [], [], False)
-
-
-def _plain(label: str, cells: List[str]) -> Row:
-    return (label, cells, [None] * len(cells), False)
-
-
-def _draw_panel(
-    ax,
-    rows: List[Row],
-    pitch: float,
-    cells_x0: float,
-) -> None:
-    n = max(len(rows), 1)
-    ax.set_axis_off()
-    ax.set_xlim(0, 1)
-    ax.set_ylim(0, 1)
-
-    line_h = 1.0 / n
-    font_size = 11
-    label_x = 0.02
-    cell_w = pitch
-    cell_h = line_h * 0.85
-
-    for i, row in enumerate(rows):
-        label, cells, colors, merge_runs = row[:4]
-        bottom_colors = row[4] if len(row) > 4 else None
-        y = 1.0 - (i + 0.5) * line_h
-        if label:
-            ax.text(
-                label_x, y, label, ha="left", va="center",
-                fontsize=font_size, family="monospace",
-            )
-        if merge_runs:
-            j = 0
-            while j < len(cells):
-                k = j
-                while k + 1 < len(cells) and colors[k + 1] == colors[j] and (
-                    bottom_colors is None
-                    or bottom_colors[k + 1] == bottom_colors[j]
-                ):
-                    k += 1
-                run_color = colors[j]
-                if run_color is not None:
-                    x_left = cells_x0 + j * pitch - cell_w / 2
-                    width = (k - j) * pitch + cell_w
-                    if bottom_colors is None:
-                        ax.add_patch(plt.Rectangle(
-                            (x_left, y - cell_h / 2),
-                            width, cell_h,
-                            facecolor=HAP_PALETTE[run_color],
-                            edgecolor="none", zorder=1,
-                        ))
-                    else:
-                        # Split top/bottom: top half = paternal colour,
-                        # bottom half = maternal colour. Letter centred on
-                        # the rectangle's mid-line. Where another bilateral
-                        # block follows (or precedes), inset the rectangle
-                        # by half a gap on the boundary-facing side so the
-                        # whitespace straddles the true boundary rather
-                        # than sitting entirely on one side.
-                        half_gap = pitch * 0.10
-                        gap_left  = half_gap if j > 0                 else 0.0
-                        gap_right = half_gap if k + 1 < len(cells)    else 0.0
-                        rect_x = x_left + gap_left
-                        rect_w = width - gap_left - gap_right
-                        ax.add_patch(plt.Rectangle(
-                            (rect_x, y),
-                            rect_w, cell_h / 2,
-                            facecolor=HAP_PALETTE[run_color],
-                            edgecolor="none", zorder=1,
-                        ))
-                        ax.add_patch(plt.Rectangle(
-                            (rect_x, y - cell_h / 2),
-                            rect_w, cell_h / 2,
-                            facecolor=HAP_PALETTE[bottom_colors[j]],
-                            edgecolor="none", zorder=1,
-                        ))
-                    cx = cells_x0 + (j + k) * pitch / 2
-                    ax.text(
-                        cx, y, cells[j], ha="center", va="center",
-                        fontsize=font_size, family="monospace",
-                        color="black", zorder=2,
-                    )
-                j = k + 1
-            continue
-        for j, (c, color_key) in enumerate(zip(cells, colors)):
-            x = cells_x0 + j * pitch
-            if color_key is not None:
-                ax.add_patch(plt.Rectangle(
-                    (x - cell_w / 2, y - cell_h / 2),
-                    cell_w, cell_h,
-                    facecolor=HAP_PALETTE[color_key],
-                    edgecolor="none", zorder=1,
-                ))
-            ax.text(
-                x, y, c, ha="center", va="center",
-                fontsize=font_size, family="monospace",
-                color="black", zorder=2,
-            )
-
-
-def _render_combined_pdf(
-    panels: List[List[Row]],
-    out_path: Path,
-    fig_w: float = 5.5,
-    pitch: float = 0.105,
-    cells_x0: float = 0.22,
-    row_height_in: float = 0.30,
-    panel_gap_rows: float = 1.5,
-) -> None:
-    """Stack multiple panels in one figure, sharing x layout so columns
-    align across panels. Each panel's vertical extent is proportional to
-    its row count, giving every line the same physical height."""
-    counts = [max(len(p), 1) for p in panels]
-    total_rows = sum(counts)
-    fig_h = row_height_in * total_rows + row_height_in * panel_gap_rows * (len(panels) - 1) + 0.3
-    fig, axes = plt.subplots(
-        nrows=len(panels), ncols=1,
-        figsize=(fig_w, fig_h),
-        gridspec_kw={"height_ratios": counts, "hspace": panel_gap_rows / (total_rows / len(panels))},
-    )
-    if len(panels) == 1:
-        axes = [axes]
-    for ax, rows in zip(axes, panels):
-        _draw_panel(ax, rows, pitch=pitch, cells_x0=cells_x0)
-    out_path.parent.mkdir(parents=True, exist_ok=True)
-    fig.savefig(out_path, bbox_inches="tight", pad_inches=0.1)
-    plt.close(fig)
-    print(f"wrote {out_path}")
 
 
 # ---------------------------------------------------------------------------
