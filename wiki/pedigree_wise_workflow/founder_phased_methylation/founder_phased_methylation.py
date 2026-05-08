@@ -133,8 +133,8 @@ def render_match(out_path: Path | None = None) -> Path:
         _bit_row("mat_C:", MAT, "C", *LNK_RANGE),
         _TICK_ROW,
         SPACER,
-        _block_row("Hap-map block:", *INT_RANGE,
-                   "A", "C", "hap1=A  |  hap2=C", in_label_fs=9),
+        _block_row("Deduced hap-map block:", *INT_RANGE,
+                   "A", "C", "hap1 → A  |  hap2 → C", in_label_fs=9),
     ]
 
     # Match Fig 2's row pitch (0.30 in/row → cell_h ≈ 0.255 in at the

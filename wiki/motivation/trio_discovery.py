@@ -1188,7 +1188,7 @@ def render_panel_AB_combined(out_path: Path | None = None,
     BAR_H_IN = 0.95
     SPACER_S = 0.15
     SPACER_M = 0.30
-    SPACER_BETWEEN_PANELS = 0.50
+    SPACER_BETWEEN_PANELS = 1.10
 
     rows = []
 
@@ -1230,8 +1230,9 @@ def render_panel_AB_combined(out_path: Path | None = None,
     }))
     rows.append(("spacer", SPACER_M, None))
     rows.append(("block", BLOCK_H_IN, {
-        "label": "Hap-map block:",
-        "blocks": [(A_INT, "A", "C", "hap1=A  |  hap2=C")],
+        "label": "Deduced hap-map block:",
+        "label_bold": True,
+        "blocks": [(A_INT, "A", "C", "hap1 → A  |  hap2 → C")],
     }))
 
     rows.append(("spacer", SPACER_BETWEEN_PANELS, None))
@@ -1245,6 +1246,7 @@ def render_panel_AB_combined(out_path: Path | None = None,
     rows.append(("bars", BAR_H_IN, {
         "label": "hap1 meth", "bars": hap1_bars, "color": NEUTRAL_TOP,
     }))
+    rows.append(("spacer", SPACER_S, None))
     rows.append(("bars", BAR_H_IN, {
         "label": "hap2 meth", "bars": hap2_bars, "color": NEUTRAL_BOT,
     }))
@@ -1255,13 +1257,14 @@ def render_panel_AB_combined(out_path: Path | None = None,
     }))
     rows.append(("block", BLOCK_H_IN, {
         "label": "Hap-map blocks (Fig 4A):",
-        "blocks": [(B_RBP1, "A", "C", "hap1=A  |  hap2=C"),
-                   (B_RBP2, "A", "C", "hap2=A  |  hap1=C")],
+        "blocks": [(B_RBP1, "A", "C", "hap1 → A  |  hap2 → C"),
+                   (B_RBP2, "A", "C", "hap2 → A  |  hap1 → C")],
     }))
     rows.append(("spacer", SPACER_S, None))
     rows.append(("bars", BAR_H_IN, {
         "label": "pat_A meth", "bars": patA_bars, "color": A_COLOR,
     }))
+    rows.append(("spacer", SPACER_S, None))
     rows.append(("bars", BAR_H_IN, {
         "label": "mat_C meth", "bars": matC_bars, "color": C_COLOR,
     }))
@@ -1294,7 +1297,8 @@ def render_panel_AB_combined(out_path: Path | None = None,
         if kind == "block":
             ax.text(PREFIX_X, 0.5, payload["label"],
                     ha="left", va="center",
-                    fontsize=LABEL_FS, family="monospace")
+                    fontsize=LABEL_FS, family="monospace",
+                    weight="bold" if payload.get("label_bold") else "normal")
             for (lo, hi), top_key, bot_key, in_label in payload["blocks"]:
                 draw_two_stripe_block(
                     ax, lo - 0.5, hi + 0.5, 0.5, BLOCK_H,
@@ -1340,6 +1344,19 @@ def render_panel_AB_combined(out_path: Path | None = None,
                 ])
 
         elif kind == "bars":
+            # Re-enable left spine for the y-axis (overrides set_axis_off
+            # above); style matches the bigwig-style methylation tracks
+            # in Fig 1A/B (yticks at 0 and 1, spine just left of col 0).
+            ax.set_axis_on()
+            for spine in ("top", "right", "bottom"):
+                ax.spines[spine].set_visible(False)
+            ax.spines["left"].set_visible(True)
+            ax.spines["left"].set_position(("data", -0.8))
+            ax.spines["left"].set_bounds(0, 1)
+            ax.set_xticks([])
+            ax.set_yticks([0, 1])
+            ax.set_yticklabels(["0", "1"], fontsize=14)
+            ax.tick_params(axis="y", length=2, labelsize=14)
             ax.text(PREFIX_X, 0.5, payload["label"],
                     ha="left", va="center",
                     fontsize=LABEL_FS, family="monospace")
