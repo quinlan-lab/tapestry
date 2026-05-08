@@ -5,26 +5,19 @@ discovery tables. These panels were previously B–E of Fig 3 and have
 been relettered A–D for Fig 4. The exhaustive-enumeration table at
 clean site N1 remains in Fig 3 (panel A there).
 
-Panel A — `manuscript/fig4/fig4_panelA.pdf`
-    The bit-vector match cartoon (hap1 vs pat/mat over a hap-map block).
-    Wiki source:
-      `wiki/pedigree_wise_workflow/founder_phased_methylation/founder_phased_methylation.md`
-      section "Bit-vector match", which embeds `bit_vector_match.png`.
-    Rendering is delegated to that wiki page's own generator
-    (`wiki/.../founder_phased_methylation.py:render_match`), so panel A
-    is byte-equivalent to the wiki figure modulo the PDF container.
-
-Panel B — `manuscript/fig4/fig4_panelB.pdf`
-    The rebucketing moment: the same per-CpG methylation values for one
-    kid (Kid1) shown first under hiphase's arbitrary hap1/hap2 labels,
-    then relabelled to founder-aware (pat/mat + founder letter) labels.
-    The two sub-tables share their numerical content; only the column
-    names change — this is the literal "relabel, don't recompute"
-    message of the wiki section.
-    Wiki source:
-      `wiki/pedigree_wise_workflow/founder_phased_methylation/founder_phased_methylation.md`
-      section "Relabelling per-CpG methylation".
-    Rendered by `wiki/motivation/trio_discovery.py:render_rebucket_panel`.
+Panels A + B — `manuscript/fig4/fig4_panelAB.pdf`
+    Combined into one PDF so row labels and rectangle left edges are
+    vertically registered across both panels (no Illustrator-side
+    margin / font tweaks needed). Panel A is the bit-vector match
+    cartoon (hap1 vs pat/mat over a hap-map block); Panel B is the
+    rebucketing cartoon — two read-backed phase blocks inside one IBD
+    segment, the hap1↔hap2 assignment flipping between blocks, with
+    bars re-routed to founder-aware tracks below.
+    Source data for Panel A's bit vectors and ranges is imported from
+    the wiki cartoon's module
+    (`wiki/.../founder_phased_methylation.py`), so this PDF and the
+    wiki PNG share one source of truth.
+    Rendered by `wiki/motivation/trio_discovery.py:render_panel_AB_combined`.
 
 Panel C — `manuscript/fig4/fig4_panelC.pdf`
     De novo gain-of-methylation discovery table (use case 1). Moved from
@@ -66,34 +59,6 @@ def _ensure_wiki_on_path() -> None:
         sys.path.insert(0, str(repo_root))
 
 
-def _render_panelA(out_path: Path) -> None:
-    """Panel A — bit-vector match cartoon. Reuses the wiki figure's
-    rendering at `wiki/.../founder_phased_methylation.py:render_match`
-    (single source of truth) but emits PDF for Illustrator."""
-    _ensure_wiki_on_path()
-    from wiki.pedigree_wise_workflow.founder_phased_methylation import (  # noqa: E402
-        founder_phased_methylation as fpm,
-    )
-    out_path.parent.mkdir(parents=True, exist_ok=True)
-    fpm.render_match(out_path=out_path)
-
-
-def _render_panelB(out_path: Path) -> None:
-    """Panel B — visual rebucketing cartoon. Two read-backed phase
-    blocks within one IBD segment; the hap1↔hap2 assignment flips
-    between the blocks. Bottom shows the same bars re-routed to
-    founder-aware tracks (pat_A / mat_C). Reuses
-    `wiki/motivation/trio_discovery.py:render_rebucket_visual`."""
-    _ensure_wiki_on_path()
-    from wiki.motivation import trio_discovery  # noqa: E402
-    out_path.parent.mkdir(parents=True, exist_ok=True)
-    trio_discovery.render_rebucket_visual(
-        out_path=out_path,
-        show_title=False,
-        trim_whitespace=True,
-    )
-
-
 def _render_panelC(out_path: Path) -> None:
     """Panel C — de novo discovery table (moved from Fig 1D).
     Reuses `wiki/motivation/trio_discovery.py:render_trio_denovo_meth_table`."""
@@ -122,9 +87,22 @@ def _render_panelD(out_path: Path) -> None:
     )
 
 
+def _render_panelAB(out_path: Path) -> None:
+    """Combined Panels A+B as one PDF with row labels and rectangle
+    left edges vertically registered across both panels — so the
+    manuscript figure can drop in one PDF instead of stitching A and B
+    separately and tweaking font sizes / margins in Illustrator."""
+    _ensure_wiki_on_path()
+    from wiki.motivation import trio_discovery  # noqa: E402
+    out_path.parent.mkdir(parents=True, exist_ok=True)
+    trio_discovery.render_panel_AB_combined(
+        out_path=out_path,
+        trim_whitespace=True,
+    )
+
+
 def main() -> None:
-    _render_panelA(OUT / "fig4_panelA.pdf")
-    _render_panelB(OUT / "fig4_panelB.pdf")
+    _render_panelAB(OUT / "fig4_panelAB.pdf")
     _render_panelC(OUT / "fig4_panelC.pdf")
     _render_panelD(OUT / "fig4_panelD.pdf")
 
