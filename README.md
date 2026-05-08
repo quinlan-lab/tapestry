@@ -262,3 +262,5 @@ To run the trio workflow on the dev data, pass `--dev-dir trio_dev_data` to each
 ## TODO
 
 - [ ] Convert manual workflow into a Snakemake workflow (see `Snakefile` for early version of this)
+- [ ] https://quinlangroup.slack.com/archives/C09MHJSPPEE/p1770676950847639 
+- [ ] https://quinlangroup.slack.com/archives/C09MHJSPPEE/p1770676759903709
