@@ -2,6 +2,8 @@
 .vscode
 __pycache__
 .trash
+.DS_Store
+~ai-*.tmp
 
 control_intervals_methylation.csv
 recomb_blocks_methylation.csv

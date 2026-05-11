@@ -1,0 +1,57 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="220 125 880 335" font-family="Arial, sans-serif" font-size="14"><rect x="220" y="125" width="880" height="335" fill="white"/>
+<circle cx="560" cy="190" r="50.0" fill="white" stroke="black" stroke-width="1.8"/>
+<rect x="750.0" y="140.0" width="100" height="100" fill="none" stroke="black" stroke-width="1.8" rx="0"/>
+<rect x="240" y="180" width="184.0" height="8" fill="#b2df8a"/>
+<text x="434.0" y="189" text-anchor="start" font-family="Arial, sans-serif" font-size="16">C</text>
+<line x1="256.0" y1="180" x2="256.0" y2="156" stroke="black" stroke-width="1.2"/>
+<circle cx="256.0" cy="151" r="7" fill="black" stroke="black" stroke-width="1.2"/>
+<line x1="276.0" y1="180" x2="276.0" y2="156" stroke="black" stroke-width="1.2"/>
+<circle cx="276.0" cy="151" r="7" fill="black" stroke="black" stroke-width="1.2"/>
+<line x1="296.0" y1="180" x2="296.0" y2="156" stroke="black" stroke-width="1.2"/>
+<circle cx="296.0" cy="151" r="7" fill="black" stroke="black" stroke-width="1.2"/>
+<rect x="240" y="230" width="184.0" height="8" fill="#fb9a99"/>
+<text x="434.0" y="239" text-anchor="start" font-family="Arial, sans-serif" font-size="16">D</text>
+<line x1="256.0" y1="230" x2="256.0" y2="206" stroke="black" stroke-width="1.2"/>
+<circle cx="256.0" cy="201" r="7" fill="white" stroke="black" stroke-width="1.2"/>
+<line x1="276.0" y1="230" x2="276.0" y2="206" stroke="black" stroke-width="1.2"/>
+<circle cx="276.0" cy="201" r="7" fill="white" stroke="black" stroke-width="1.2"/>
+<line x1="296.0" y1="230" x2="296.0" y2="206" stroke="black" stroke-width="1.2"/>
+<circle cx="296.0" cy="201" r="7" fill="white" stroke="black" stroke-width="1.2"/>
+<rect x="890" y="180" width="184.0" height="8" fill="#a6cee3"/>
+<text x="880" y="189" text-anchor="end" font-family="Arial, sans-serif" font-size="16">A</text>
+<line x1="906.0" y1="180" x2="906.0" y2="156" stroke="black" stroke-width="1.2"/>
+<circle cx="906.0" cy="151" r="7" fill="white" stroke="black" stroke-width="1.2"/>
+<line x1="926.0" y1="180" x2="926.0" y2="156" stroke="black" stroke-width="1.2"/>
+<circle cx="926.0" cy="151" r="7" fill="white" stroke="black" stroke-width="1.2"/>
+<line x1="946.0" y1="180" x2="946.0" y2="156" stroke="black" stroke-width="1.2"/>
+<circle cx="946.0" cy="151" r="7" fill="white" stroke="black" stroke-width="1.2"/>
+<polygon points="1050.00,172.00 1053.17,179.63 1061.41,180.29 1055.14,185.67 1057.05,193.71 1050.00,189.40 1042.95,193.71 1044.86,185.67 1038.59,180.29 1046.83,179.63" fill="#d62728" stroke="black" stroke-width="1.0"/>
+<rect x="890" y="230" width="184.0" height="8" fill="#fdbf6f"/>
+<text x="880" y="239" text-anchor="end" font-family="Arial, sans-serif" font-size="16">B</text>
+<line x1="906.0" y1="230" x2="906.0" y2="206" stroke="black" stroke-width="1.2"/>
+<circle cx="906.0" cy="201" r="7" fill="white" stroke="black" stroke-width="1.2"/>
+<line x1="926.0" y1="230" x2="926.0" y2="206" stroke="black" stroke-width="1.2"/>
+<circle cx="926.0" cy="201" r="7" fill="white" stroke="black" stroke-width="1.2"/>
+<line x1="946.0" y1="230" x2="946.0" y2="206" stroke="black" stroke-width="1.2"/>
+<circle cx="946.0" cy="201" r="7" fill="white" stroke="black" stroke-width="1.2"/>
+<line x1="610" y1="190" x2="750" y2="190" stroke="black" stroke-width="1.5"/>
+<line x1="680.0" y1="190" x2="680" y2="350" stroke="black" stroke-width="1.5"/>
+<rect x="630.0" y="350.0" width="100" height="100" fill="none" stroke="black" stroke-width="1.8" rx="0"/>
+<rect x="380" y="390" width="184.0" height="8" fill="#a6cee3"/>
+<text x="574.0" y="399" text-anchor="start" font-family="Arial, sans-serif" font-size="16">A</text>
+<line x1="400.0" y1="390" x2="400.0" y2="366" stroke="black" stroke-width="1.2"/>
+<circle cx="400.0" cy="361" r="7" fill="white" stroke="black" stroke-width="1.2"/>
+<line x1="420.0" y1="390" x2="420.0" y2="366" stroke="black" stroke-width="1.2"/>
+<circle cx="420.0" cy="361" r="7" fill="white" stroke="black" stroke-width="1.2"/>
+<line x1="440.0" y1="390" x2="440.0" y2="366" stroke="black" stroke-width="1.2"/>
+<circle cx="440.0" cy="361" r="7" fill="white" stroke="black" stroke-width="1.2"/>
+<polygon points="544.00,382.00 547.17,389.63 555.41,390.29 549.14,395.67 551.05,403.71 544.00,399.40 536.95,403.71 538.86,395.67 532.59,390.29 540.83,389.63" fill="#d62728" stroke="black" stroke-width="1.0"/>
+<rect x="380" y="440" width="184.0" height="8" fill="#b2df8a"/>
+<text x="574.0" y="449" text-anchor="start" font-family="Arial, sans-serif" font-size="16">C</text>
+<line x1="400.0" y1="440" x2="400.0" y2="416" stroke="black" stroke-width="1.2"/>
+<circle cx="400.0" cy="411" r="7" fill="black" stroke="black" stroke-width="1.2"/>
+<line x1="420.0" y1="440" x2="420.0" y2="416" stroke="black" stroke-width="1.2"/>
+<circle cx="420.0" cy="411" r="7" fill="black" stroke="black" stroke-width="1.2"/>
+<line x1="440.0" y1="440" x2="440.0" y2="416" stroke="black" stroke-width="1.2"/>
+<circle cx="440.0" cy="411" r="7" fill="black" stroke="black" stroke-width="1.2"/>
+</svg>
