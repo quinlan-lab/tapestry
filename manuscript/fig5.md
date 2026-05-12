@@ -2,7 +2,7 @@
 
 **Figure 5. Correlation between methylation and founder haplotypes at known meQTLs (methylation QTLs) in pedigree K1463 validates tapestry's founder-phasing method.** 
 
-**(A)** Illustration of how the allele at a meQTL covaries with phased methylation, as a function of host haplotype, across two parents. If tapestry correctly assigns methylation to founder haplotypes across all descendents of these parents, then it ought to recover these allele-methylation correlations. 
+**(A)** Illustration of how the allele at a meQTL covaries with phased methylation, as a function of the haplotype hosting the allele, across two parents. If tapestry correctly assigns methylation to founder haplotypes across all descendents of these parents, then it ought to (1) map similar methylation levels to a given founder haplotype for all individuals who harbor that haplotype; and (2) recover meQTL correlations of the type shown here. 
 
 **(B)** Rosenski et al. 2025 ([doi:10.1038/s41467-025-57433-1](https://doi.org/10.1038/s41467-025-57433-1)) report that the allele at rs9330298 covaries with local methylation. In particular, they found that haplotypes carrying the C allele at that SNP are unmethylated while those carrying the A allele are methylated. Consistent with this, we show that methylation across the pedigree K1463, phased by tapestry and averaged over a small interval containing this SNP (chr1:153617695-153617953, hg38), does indeed covary with the founder haplotypes that tapestry assigns, when they are grouped by the allele at the SNP. 
 
