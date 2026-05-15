@@ -14,7 +14,7 @@ stacks three panels with aligned columns:
      perform_flips_in_place step (fig4_1), which is a no-op on the
      maternal side and so is omitted there. A bottom track shows the
      ground-truth paternal haplotype (A/B); Kid3's row switches from A
-     (blue) to B (orange) at the paternal recombination.
+     (dark blue) to B (light blue) at the paternal recombination.
 
 Informative sites for each panel are the columns whose top-row cells
 are non-`.`. The trailing simulated site is dropped. PDFs are kept as
