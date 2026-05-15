@@ -40,13 +40,19 @@ from typing import List, Tuple
 import matplotlib.pyplot as plt
 
 HAP_PALETTE = {
-    "A": "#a6cee3",  # light blue   — dad hap1
-    "B": "#fdbf6f",  # light orange — dad hap2
-    "C": "#b2df8a",  # light green  — mom hap1
-    "D": "#fb9a99",  # light pink   — mom hap2
+    "A": "#6baed6",  # medium blue  — dad hap1
+    "B": "#c6dbef",  # light blue   — dad hap2
+    "C": "#fd8d3c",  # medium orange — mom hap1
+    "D": "#fdd0a2",  # light orange  — mom hap2
     "neutral_top": "#c8c8c8",
     "neutral_bot": "#969696",
 }
+
+
+def _text_color_for(color_key) -> str:
+    if color_key == "neutral_top":
+        return "white"
+    return "black"
 
 Row = Tuple
 SPACER: Row = ("", [], [], False)
@@ -79,7 +85,8 @@ def draw_two_stripe_block(ax, x0, x1, y_center, height,
     if label:
         ax.text((x0 + x1) / 2, y_center, label,
                 ha="center", va="center", fontsize=label_fontsize,
-                family="monospace", color="black", zorder=2)
+                family="monospace",
+                color=_text_color_for(top_key), zorder=2)
 
 
 def draw_block(ax, x0, x1, y_center, height, color_key,
@@ -92,7 +99,8 @@ def draw_block(ax, x0, x1, y_center, height, color_key,
     if label:
         ax.text((x0 + x1) / 2, y_center, label,
                 ha="center", va="center", fontsize=label_fontsize,
-                family="monospace", color="black", zorder=2)
+                family="monospace",
+                color=_text_color_for(color_key), zorder=2)
 
 
 def draw_panel(
@@ -167,7 +175,10 @@ def draw_panel(
                     facecolor=HAP_PALETTE[color_key],
                     edgecolor="none", zorder=1,
                 ))
-            tcol = text_colors[j] if text_colors is not None and text_colors[j] else "black"
+            tcol = (
+                text_colors[j] if text_colors is not None and text_colors[j]
+                else _text_color_for(color_key)
+            )
             ax.text(
                 x, y, c, ha="center", va="center",
                 fontsize=font_size, family="monospace",

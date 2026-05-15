@@ -33,12 +33,14 @@ def _trio_svg_to_pdf(scenario, out_path: Path, label_fontsize: int = 16,
                      vertical_haps: bool = False,
                      highlight_denovo: bool = False,
                      highlight_compound: bool = False,
+                     highlight_lom: bool = False,
                      kid_y_offset: int = 0) -> None:
     svg = trio_discovery.build(scenario, label_fontsize=label_fontsize,
                                 swap_parents=swap_parents,
                                 vertical_haps=vertical_haps,
                                 highlight_denovo=highlight_denovo,
                                 highlight_compound=highlight_compound,
+                                highlight_lom=highlight_lom,
                                 kid_y_offset=kid_y_offset)
     cairosvg.svg2pdf(
         bytestring=svg.encode("utf-8"),
@@ -69,14 +71,14 @@ def panel_B() -> None:
     )
 
 
-# Panel C — trio cartoon for de novo epimutation.
+# Panel C — trio cartoon for maternal LOM at an imprinted ICR.
 def panel_C() -> None:
     _trio_svg_to_pdf(
-        trio_discovery.SCENARIO_DENOVO,
-        out_path=OUT / "panel_C_trio_denovo.pdf",
+        trio_discovery.SCENARIO_MAT_LOM,
+        out_path=OUT / "panel_C_trio_mat_lom.pdf",
         label_fontsize=28,
         swap_parents=True,
-        highlight_denovo=True,
+        highlight_lom=True,
         kid_y_offset=40,
     )
 

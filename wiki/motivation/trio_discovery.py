@@ -155,14 +155,19 @@ UNMETH5 = [(r, False) for r in RELS]
 
 KID_RELS = [0.10, 0.20, 0.30, 0.55, 0.65]
 
+# Uniformly-spaced CpGs (single cluster, no left/right grouping) for
+# scenarios where the cluster structure is not meaningful.
+RELS_UNIFORM = [0.08, 0.18, 0.28]
+KID_RELS_UNIFORM = [0.10, 0.20, 0.30]
+
 
 # ---------- scenarios ----------
 
 SCENARIO_DENOVO = Scenario(
-    mom_top=HapData(METH5, '#b2df8a', label='C'),
-    mom_bot=HapData(UNMETH5, '#fb9a99', label='D'),
-    dad_top=HapData(UNMETH5, '#a6cee3', label='A'),
-    dad_bot=HapData(METH5, '#fdbf6f', label='B'),
+    mom_top=HapData(METH5, '#fd8d3c', label='C'),
+    mom_bot=HapData(UNMETH5, '#fdd0a2', label='D'),
+    dad_top=HapData(UNMETH5, '#6baed6', label='A'),
+    dad_bot=HapData(METH5, '#c6dbef', label='B'),
     # Kid pat = dad A; kid mat = mom C. Two de novo events both sit at
     # the right CpG cluster (positions KID_RELS[3:]). Paternal A inherits
     # dad's unmethylated state at the left cluster but is methylated at
@@ -170,9 +175,26 @@ SCENARIO_DENOVO = Scenario(
     # methylated state at the left cluster but is unmethylated at the
     # right cluster (de novo loss).
     kid_top=HapData([(r, m) for r, m in zip(KID_RELS, [False, False, False, True, True])],
-                    '#a6cee3', label='A'),
+                    '#6baed6', label='A'),
     kid_bot=HapData([(r, m) for r, m in zip(KID_RELS, [True, True, True, False, False])],
-                    '#b2df8a', label='C'),
+                    '#fd8d3c', label='C'),
+)
+
+# Maternal loss of methylation (LOM) at an imprinted ICR.
+# Convention: maternally-methylated ICR (e.g., SNRPN/KCNQ1OT1 type).
+# Each parent has normal imprinting — one homolog methylated, one not.
+#   Dad : A (paternal-origin, blue)  = unmethylated; B (maternal-origin, orange) = methylated.
+#   Mom : C (maternal-origin, green) = methylated;   D (paternal-origin, pink)   = unmethylated.
+# Kid inherits A from dad (unmethylated, correct) and C from mom — but
+# the kid's C is UNMETHYLATED rather than methylated: a maternal LOM
+# lesion on the ICR. Both of the kid's homologs are now unmethylated.
+SCENARIO_MAT_LOM = Scenario(
+    mom_top=HapData([(r, True)  for r in RELS_UNIFORM], '#fd8d3c', label='C'),
+    mom_bot=HapData([(r, False) for r in RELS_UNIFORM], '#fdd0a2', label='D'),
+    dad_top=HapData([(r, False) for r in RELS_UNIFORM], '#6baed6', label='A'),
+    dad_bot=HapData([(r, True)  for r in RELS_UNIFORM], '#c6dbef', label='B'),
+    kid_top=HapData([(r, False) for r in KID_RELS_UNIFORM], '#6baed6', label='A'),
+    kid_bot=HapData([(r, False) for r in KID_RELS_UNIFORM], '#fd8d3c', label='C'),
 )
 
 # Compound genetic-epigenetic heterozygote:
@@ -182,17 +204,17 @@ SCENARIO_DENOVO = Scenario(
 SCENARIO_COMPOUND = Scenario(
     # Mom: C = hyper-methylated carrier; D = normal unmethylated
     mom_top=HapData([(r, True) for r in RELS[:3]],
-                    '#b2df8a', label='C'),
-    mom_bot=HapData([(r, False) for r in RELS[:3]], '#fb9a99', label='D'),
+                    '#fd8d3c', label='C'),
+    mom_bot=HapData([(r, False) for r in RELS[:3]], '#fdd0a2', label='D'),
     # Dad: A = genetic-variant carrier; B = normal
-    dad_top=HapData([(r, False) for r in RELS[:3]], '#a6cee3',
+    dad_top=HapData([(r, False) for r in RELS[:3]], '#6baed6',
                     variants=(0.80,), label='A'),
-    dad_bot=HapData([(r, False) for r in RELS[:3]], '#fdbf6f', label='B'),
+    dad_bot=HapData([(r, False) for r in RELS[:3]], '#c6dbef', label='B'),
     # Kid: paternal = A (variant); maternal = C (aberrant meth) — compound het in trans
-    kid_top=HapData([(r, False) for r in KID_RELS[:3]], '#a6cee3',
+    kid_top=HapData([(r, False) for r in KID_RELS[:3]], '#6baed6',
                     variants=(0.82,), label='A'),
     kid_bot=HapData([(r, True) for r in KID_RELS[:3]],
-                   '#b2df8a', label='C'),
+                   '#fd8d3c', label='C'),
 )
 
 
@@ -319,11 +341,27 @@ def _denovo_highlight_box(bar_x0, bar_y, w, cpgs):
                 fill='none', stroke='black', sw=2.0, dash='6,4', rx=0)
 
 
+def _lom_highlight_box(bar_x0, bar_y, w, cpgs):
+    """Dashed rectangle around all CpGs on a haplotype bar (used to mark
+    the affected ICR as a whole)."""
+    rels = sorted(r for r, _ in cpgs)
+    pad_x = 12
+    pad_top = 6
+    pad_bot = 4
+    x_left = bar_x0 + rels[0] * w - pad_x
+    x_right = bar_x0 + rels[-1] * w + pad_x
+    y_top = bar_y - 42 - pad_top
+    y_bot = bar_y - 4 - pad_bot
+    return rect(x_left, y_top, x_right - x_left, y_bot - y_top,
+                fill='none', stroke='black', sw=2.0, dash='6,4', rx=0)
+
+
 def build(scenario: Scenario, label_fontsize: int = 16,
           swap_parents: bool = False,
           vertical_haps: bool = False,
           highlight_denovo: bool = False,
           highlight_compound: bool = False,
+          highlight_lom: bool = False,
           kid_y_offset: int = 0,
           uniform_bars: bool = False) -> str:
     if vertical_haps:
@@ -361,7 +399,13 @@ def build(scenario: Scenario, label_fontsize: int = 16,
     # overlap the parent/kid shapes, even when one hap carries a variant
     # at a large rel offset (~0.80). The unified pixel length is the
     # max natural extent across the six haps under that w.
-    w_left, w_right, w_kid = (200, 200, 200) if uniform_bars else (340, 280, 280)
+    # LOM layout: equal-width compact bars (matching Fig 1D's bar width),
+    # so 3 CpGs at fig1d-matching spacing fill the bar with minimal padding
+    # and bars sit adjacent to the parent/kid shapes without overlap.
+    if highlight_lom:
+        w_left, w_right, w_kid = 280, 280, 280
+    else:
+        w_left, w_right, w_kid = (200, 200, 200) if uniform_bars else (340, 280, 280)
     def _natural_len(h, w):
         rels = [r for r, _ in h.cpgs] + list(h.variants)
         return (max(rels) + min(rels)) * w
@@ -370,22 +414,27 @@ def build(scenario: Scenario, label_fontsize: int = 16,
         _natural_len(right_top, w_right), _natural_len(right_bot, w_right),
         _natural_len(scenario.kid_top, w_kid), _natural_len(scenario.kid_bot, w_kid),
     ) if uniform_bars else None
-    parts.append(haplotype(240, 184, w_left, left_top.color,
+    # In LOM layout the bars are short (~100 px) — shift the left-parent
+    # bars right and keep right-parent bars in place so each bar sits just
+    # next to its parent shape with a small gap and no overlap.
+    left_x = 370 if highlight_lom else 240
+    right_x = 890
+    parts.append(haplotype(left_x, 184, w_left, left_top.color,
                            left_top.cpgs, left_top.variants,
                            label=left_top.label,
                            label_fontsize=label_fontsize,
                            bar_length=bar_len))
-    parts.append(haplotype(240, 234, w_left, left_bot.color,
+    parts.append(haplotype(left_x, 234, w_left, left_bot.color,
                            left_bot.cpgs, left_bot.variants,
                            label=left_bot.label,
                            label_fontsize=label_fontsize,
                            bar_length=bar_len))
-    parts.append(haplotype(890, 184, w_right, right_top.color,
+    parts.append(haplotype(right_x, 184, w_right, right_top.color,
                            right_top.cpgs, right_top.variants,
                            label=right_top.label, label_at_start=True,
                            label_fontsize=label_fontsize,
                            bar_length=bar_len))
-    parts.append(haplotype(890, 234, w_right, right_bot.color,
+    parts.append(haplotype(right_x, 234, w_right, right_bot.color,
                            right_bot.cpgs, right_bot.variants,
                            label=right_bot.label, label_at_start=True,
                            label_fontsize=label_fontsize,
@@ -397,12 +446,14 @@ def build(scenario: Scenario, label_fontsize: int = 16,
     parts.append(line(midx, left_pos[1], son[0], son[1] - 50))
     parts.append(person(*son, 'M'))
 
-    parts.append(haplotype(380, 394 + kid_y_offset, w_kid, scenario.kid_top.color,
+    # Kid bar x: shifted right under LOM to sit adjacent to kid shape.
+    kid_x = 475 if highlight_lom else 380
+    parts.append(haplotype(kid_x, 394 + kid_y_offset, w_kid, scenario.kid_top.color,
                            scenario.kid_top.cpgs, scenario.kid_top.variants,
                            label=scenario.kid_top.label,
                            label_fontsize=label_fontsize,
                            bar_length=bar_len))
-    parts.append(haplotype(380, 444 + kid_y_offset, w_kid, scenario.kid_bot.color,
+    parts.append(haplotype(kid_x, 444 + kid_y_offset, w_kid, scenario.kid_bot.color,
                            scenario.kid_bot.cpgs, scenario.kid_bot.variants,
                            label=scenario.kid_bot.label,
                            label_fontsize=label_fontsize,
@@ -414,6 +465,14 @@ def build(scenario: Scenario, label_fontsize: int = 16,
         # marking where the de novo gain of methylation arises.
         parts.append(_denovo_highlight_box(240, 184, 340, left_top.cpgs))
         parts.append(_denovo_highlight_box(380, 394 + kid_y_offset, 280, scenario.kid_top.cpgs))
+
+    if highlight_lom:
+        # Maternal LOM: box mom's hap C (right_top, the methylated maternal
+        # ICR — normal imprinting) and the kid's maternal hap C (kid_bot,
+        # which should be methylated but isn't). The contrast between the
+        # two boxes is the lesion.
+        parts.append(_lom_highlight_box(right_x, 184, w_right, right_top.cpgs))
+        parts.append(_lom_highlight_box(kid_x, 444 + kid_y_offset, w_kid, scenario.kid_bot.cpgs))
 
     parts.append(SVG_TAIL)
     return '\n'.join(parts)
@@ -1151,18 +1210,18 @@ def render_panel_AB_combined(out_path: Path | None = None,
     # ---- Panel B data ----
     B_RBP1 = (0, 5)
     B_RBP2 = (8, 13)
-    pat_A_meth = [0.92, 0.85, 0.95, 0.88, 0.95, 0.85, 0.0, 0.0,
+    pat_B_meth = [0.92, 0.85, 0.95, 0.88, 0.95, 0.85, 0.0, 0.0,
                   0.88, 0.95, 0.83, 0.92, 0.95, 0.85]
-    mat_C_meth = [0.10, 0.15, 0.05, 0.12, 0.05, 0.15, 0.0, 0.0,
+    mat_D_meth = [0.10, 0.15, 0.05, 0.12, 0.05, 0.15, 0.0, 0.0,
                   0.12, 0.05, 0.17, 0.08, 0.05, 0.15]
 
     def _slice(profile, lo, hi):
         return [(i, profile[i]) for i in range(lo, hi + 1)]
 
-    hap1_bars = _slice(pat_A_meth, *B_RBP1) + _slice(mat_C_meth, *B_RBP2)
-    hap2_bars = _slice(mat_C_meth, *B_RBP1) + _slice(pat_A_meth, *B_RBP2)
-    patA_bars = _slice(pat_A_meth, *B_RBP1) + _slice(pat_A_meth, *B_RBP2)
-    matC_bars = _slice(mat_C_meth, *B_RBP1) + _slice(mat_C_meth, *B_RBP2)
+    hap1_bars = _slice(pat_B_meth, *B_RBP1) + _slice(mat_D_meth, *B_RBP2)
+    hap2_bars = _slice(mat_D_meth, *B_RBP1) + _slice(pat_B_meth, *B_RBP2)
+    patB_bars = _slice(pat_B_meth, *B_RBP1) + _slice(pat_B_meth, *B_RBP2)
+    matD_bars = _slice(mat_D_meth, *B_RBP1) + _slice(mat_D_meth, *B_RBP2)
 
     # ---- Layout ----
     PREFIX_X = -6.5
@@ -1174,8 +1233,8 @@ def render_panel_AB_combined(out_path: Path | None = None,
     TICK_NO = "#c0392b"
     BLOCK_H = 0.85
 
-    A_COLOR = HAP_PALETTE["A"]
-    C_COLOR = HAP_PALETTE["C"]
+    B_COLOR = HAP_PALETTE["B"]
+    D_COLOR = HAP_PALETTE["D"]
     NEUTRAL_TOP = HAP_PALETTE["neutral_top"]
     NEUTRAL_BOT = HAP_PALETTE["neutral_bot"]
 
@@ -1199,7 +1258,7 @@ def render_panel_AB_combined(out_path: Path | None = None,
     }))
     rows.append(("block", BLOCK_H_IN, {
         "label": "IBD segment (Fig 2D):",
-        "blocks": [(A_LNK, "A", "C", "A  |  C")],
+        "blocks": [(A_LNK, "B", "D", "B  |  D")],
     }))
     rows.append(("spacer", SPACER_M, None))
     rows.append(("bits", BIT_H_IN, {
@@ -1207,9 +1266,9 @@ def render_panel_AB_combined(out_path: Path | None = None,
         "color_range": A_RBP,
     }))
     rows.append(("bits", BIT_H_IN, {
-        "label": "pat_A:", "items": PAT, "color_key": "A",
+        "label": "pat_B:", "items": PAT, "color_key": "B",
         "color_range": A_LNK,
-        "concord": f"concord(pat_A, hap1) = {nA_pat}/{nA_total}",
+        "concord": f"concord(pat_B, hap1) = {nA_pat}/{nA_total}",
     }))
     rows.append(("ticks", TICK_H_IN, {
         "spec": [(i, "✔" if HAP1[i] == PAT[i] else "✘",
@@ -1218,9 +1277,9 @@ def render_panel_AB_combined(out_path: Path | None = None,
                  if HAP1[i] != "." and PAT[i] != "."],
     }))
     rows.append(("bits", BIT_H_IN, {
-        "label": "mat_C:", "items": MAT, "color_key": "C",
+        "label": "mat_D:", "items": MAT, "color_key": "D",
         "color_range": A_LNK,
-        "concord": f"concord(mat_C, hap1) = {nA_mat}/{nA_total}",
+        "concord": f"concord(mat_D, hap1) = {nA_mat}/{nA_total}",
     }))
     rows.append(("ticks", TICK_H_IN, {
         "spec": [(i, "✔" if HAP1[i] == MAT[i] else "✘",
@@ -1232,7 +1291,7 @@ def render_panel_AB_combined(out_path: Path | None = None,
     rows.append(("block", BLOCK_H_IN, {
         "label": "Deduced hap-map block:",
         "label_bold": True,
-        "blocks": [(A_INT, "A", "C", "hap1 → A  |  hap2 → C")],
+        "blocks": [(A_INT, "B", "D", "hap1 → B  |  hap2 → D")],
     }))
 
     rows.append(("spacer", SPACER_BETWEEN_PANELS, None))
@@ -1253,20 +1312,20 @@ def render_panel_AB_combined(out_path: Path | None = None,
     rows.append(("spacer", SPACER_S, None))
     rows.append(("block", BLOCK_H_IN, {
         "label": "IBD segment:",
-        "blocks": [((B_RBP1[0], B_RBP2[1]), "A", "C", "A  |  C")],
+        "blocks": [((B_RBP1[0], B_RBP2[1]), "B", "D", "B  |  D")],
     }))
     rows.append(("block", BLOCK_H_IN, {
         "label": "Hap-map blocks (Fig 4A):",
-        "blocks": [(B_RBP1, "A", "C", "hap1 → A  |  hap2 → C"),
-                   (B_RBP2, "A", "C", "hap2 → A  |  hap1 → C")],
+        "blocks": [(B_RBP1, "B", "D", "hap1 → B  |  hap2 → D"),
+                   (B_RBP2, "B", "D", "hap2 → B  |  hap1 → D")],
     }))
     rows.append(("spacer", SPACER_S, None))
     rows.append(("bars", BAR_H_IN, {
-        "label": "pat_A meth", "bars": patA_bars, "color": A_COLOR,
+        "label": "pat_B meth", "bars": patB_bars, "color": B_COLOR,
     }))
     rows.append(("spacer", SPACER_S, None))
     rows.append(("bars", BAR_H_IN, {
-        "label": "mat_C meth", "bars": matC_bars, "color": C_COLOR,
+        "label": "mat_D meth", "bars": matD_bars, "color": D_COLOR,
     }))
 
     # ---- Build figure ----
