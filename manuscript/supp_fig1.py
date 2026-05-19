@@ -1,6 +1,7 @@
 """Render Supporting Figure 1 panels for the tapestry manuscript.
 
-Panel A: polars discovery snippet for the de novo scenario.
+Panel A: polars discovery snippet for the homolog-specific LOM
+scenario (maternal LOM at an imprinted locus; Fig 1C).
 Panel B: polars discovery snippet for the compound genetic-epigenetic
 heterozygote scenario.
 
@@ -24,10 +25,10 @@ OUT = Path(__file__).resolve().parent / "supp_fig1"
 OUT.mkdir(parents=True, exist_ok=True)
 
 
-# Panel A — polars discovery snippet (de novo scenario).
+# Panel A — polars discovery snippet (homolog-specific LOM scenario).
 def panel_A() -> None:
-    trio_discovery.render_trio_denovo_polars_code(
-        out_path=OUT / "panel_A_trio_denovo_polars_code.pdf",
+    trio_discovery.render_trio_lom_polars_code(
+        out_path=OUT / "panel_A_trio_lom_polars_code.pdf",
         show_title=False,
         trim_whitespace=True,
     )
