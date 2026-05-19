@@ -522,6 +522,110 @@ DENOVO_CODE = (
 )
 
 
+# ---------- LOM (homolog-specific loss of methylation) panel ----------
+# Maternal LOM at an imprinted locus methylated on the maternal allele:
+# mom's hap C is methylated (the normal imprint), but in the kid that
+# same hap C is unmethylated — a loss of methylation confined to the
+# maternally transmitted homolog. Mirrors DENOVO_TABLE_* in shape so the
+# manuscript table looks the same; only the side (maternal vs paternal)
+# and direction (loss vs gain) differ.
+LOM_TABLE_TITLE = "Haplotype-specific methylation levels"
+LOM_TABLE_COLS = ("chrom", "start", "kid_mat", "mat_hap", "mom_C")
+LOM_TABLE_ROWS = [
+    ("chr1", "1400", "0.94", "C", "0.96"),
+    ("chr1", "1450", "0.95", "C", "0.94"),
+    ("chr1", "1550", "0.06", "C", "0.95"),
+    ("chr1", "1650", "0.04", "C", "0.96"),
+    ("chr1", "1700", "0.93", "C", "0.95"),
+    ("chr1", "1800", "0.95", "C", "0.94"),
+]
+LOM_TABLE_HIGHLIGHT = {2, 3}
+LOM_CODE_TITLE = "Discover homolog-specific LOM on maternally transmitted homolog"
+LOM_CODE = (
+    '# Pick the mom haplotype that was transmitted to the kid.\n'
+    'df_meth = df_meth.with_columns(\n'
+    '    mom_transmitted = pl.when(pl.col("mat_hap") == "C")\n'
+    '        .then(pl.col("mom_C"))\n'
+    '        .otherwise(pl.col("mom_D"))\n'
+    ')\n'
+    '\n'
+    '# Find runs of consecutive CpGs where the kid_mat is unmethylated\n'
+    '# but the mom-transmitted haplotype is methylated — i.e., a\n'
+    '# *loss* of methylation confined to the maternally transmitted\n'
+    '# homolog (the canonical case at maternally methylated imprinting\n'
+    '# control regions).\n'
+    'WINDOW = 2\n'
+    'df_lom_mat = (\n'
+    '    df_meth.with_columns(\n'
+    '        delta = pl.col("kid_mat") - pl.col("mom_transmitted"),\n'
+    '    )\n'
+    '    .with_columns(\n'
+    '        mean_delta = pl.col("delta").rolling_mean(WINDOW),\n'
+    '    )\n'
+    '    .filter(pl.col("mean_delta") < -0.5)\n'
+    ')\n'
+)
+
+
+def render_trio_lom_meth_table(out_path: Path | None = None,
+                                show_title: bool = True,
+                                fig_width: float = 8.0,
+                                col_dx: float = 0.085,
+                                cell_fontsize: float = 10.5,
+                                trim_whitespace: bool = False):
+    """LOM analog of render_trio_denovo_meth_table."""
+    fig_h = 2.6 if show_title else 2.2
+    fig = plt.figure(figsize=(fig_width, fig_h))
+    ax = fig.add_axes([0.04, 0.05, 0.94, 0.9])
+    _draw_simple_table(
+        ax, LOM_TABLE_COLS, LOM_TABLE_ROWS,
+        title=LOM_TABLE_TITLE if show_title else "",
+        highlight_rows=LOM_TABLE_HIGHLIGHT,
+        bottom_rule=False,
+        col_dx=col_dx,
+        cell_fontsize=cell_fontsize,
+        highlight_color="#e5e5e5",
+    )
+    out = out_path if out_path is not None else OUT / "trio_lom_meth_table.png"
+    _save_fig(fig, out, trim_whitespace=trim_whitespace)
+    plt.close(fig)
+    print(f"[scratch] Wrote {out}")
+
+
+def render_trio_lom_polars_code(out_path: Path | None = None,
+                                 show_title: bool = True,
+                                 trim_whitespace: bool = False):
+    """LOM analog of render_trio_denovo_polars_code."""
+    fig_h = 5.5 if show_title else 5.0
+    fig = plt.figure(figsize=(12.0, fig_h))
+    ax = fig.add_axes([0.04, 0.04, 0.94, 0.92])
+    ax.set_xlim(0, 1)
+    ax.set_ylim(0, 1)
+    ax.set_axis_off()
+    ax.patch.set_visible(False)
+
+    if show_title:
+        ax.text(
+            0.0, 0.97, LOM_CODE_TITLE,
+            ha="left", va="top", fontsize=12, fontweight="bold",
+            transform=ax.transAxes,
+        )
+        code_y = 0.85
+    else:
+        code_y = 0.97
+    ax.text(
+        0.0, code_y, LOM_CODE,
+        ha="left", va="top", fontsize=10.5,
+        family="Menlo", color=COLOR_NEUTRAL,
+        transform=ax.transAxes,
+    )
+
+    out = out_path if out_path is not None else OUT / "trio_lom_polars_code.png"
+    _save_fig(fig, out, trim_whitespace=trim_whitespace)
+    plt.close(fig)
+    print(f"[scratch] Wrote {out}")
+
+
 def render_trio_denovo_meth_table(out_path: Path | None = None,
                                    show_title: bool = True,
                                    fig_width: float = 8.0,

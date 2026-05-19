@@ -20,16 +20,16 @@ Panels A + B — `manuscript/fig4/fig4_panelAB.pdf`
     Rendered by `wiki/motivation/trio_discovery.py:render_panel_AB_combined`.
 
 Panel C — `manuscript/fig4/fig4_panelC.pdf`
-    De novo gain-of-methylation discovery table (use case 1). Moved from
-    Fig 1D so the reader sees it after the rebucketing machinery has been
-    introduced. Trio context (parental cartoon) remains in Fig 1C.
+    Homolog-specific LOM discovery table (use case 1): the canonical
+    maternal-LOM case at an imprinted locus, where the kid's methylation
+    on the maternally transmitted founder (kid_mat) drops sharply below
+    mom's methylation on the same founder (mom_C). Trio context
+    (parental cartoon) remains in Fig 1C.
     Wiki source: this is the manuscript-side table, simulated in
-    `wiki/motivation/trio_discovery.py` (DENOVO_TABLE_*); the polars-query
-    discovery code lives alongside (DENOVO_CODE) and is rendered into
+    `wiki/motivation/trio_discovery.py` (LOM_TABLE_*); the polars-query
+    discovery code lives alongside (LOM_CODE) and is rendered into
     Supp Fig 1.
-    Rendered by `wiki/motivation/trio_discovery.py:render_trio_denovo_meth_table`.
-    The row data was extended (10 CpGs, 2 highlighted) so highlighted
-    rows read as a discovery rather than as the entire region.
+    Rendered by `wiki/motivation/trio_discovery.py:render_trio_lom_meth_table`.
 
 Panel D — `manuscript/fig4/fig4_panelD.pdf`
     Compound genetic-epigenetic heterozygote discovery tables (use case
@@ -60,12 +60,12 @@ def _ensure_wiki_on_path() -> None:
 
 
 def _render_panelC(out_path: Path) -> None:
-    """Panel C — de novo discovery table (moved from Fig 1D).
-    Reuses `wiki/motivation/trio_discovery.py:render_trio_denovo_meth_table`."""
+    """Panel C — homolog-specific LOM discovery table (Fig 1C scenario).
+    Reuses `wiki/motivation/trio_discovery.py:render_trio_lom_meth_table`."""
     _ensure_wiki_on_path()
     from wiki.motivation import trio_discovery  # noqa: E402
     out_path.parent.mkdir(parents=True, exist_ok=True)
-    trio_discovery.render_trio_denovo_meth_table(
+    trio_discovery.render_trio_lom_meth_table(
         out_path=out_path,
         show_title=False,
         col_dx=0.105,
