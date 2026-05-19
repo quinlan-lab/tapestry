@@ -1,6 +1,5 @@
 Read-backed phasing of long reads splits methylation into two
-haplotype-specific tracks (`hap1` / `hap2`; Fig 1B), but the labels
-are anonymous: they carry no founder identity, flip independently
+tracks, for each each read-backed label (`hap1` / `hap2`; Fig 1B). But read-backed labels are limited: they carry no founder identity, flip independently
 between adjacent read-backed phase blocks, and cannot be aligned
 across generations. To 
 support the parent-of-origin queries
@@ -23,13 +22,20 @@ Intersecting the paternal and maternal haplotype segments gives *IBD segments*
 (Fig 2D).
 The same machinery generalises to a multi-generation
 pedigree, labelling each descendant's homologs by the *root* founders'
-homologs. 
+homologs. Fig 2 thus attaches *founder labels* (A-D in a trio; A–H in a
+four-grandparent pedigree) to each descendant's two homologs within
+an IBD segment. To map read-backed labels (`hap1`/`hap2`; Fig 1B) onto these founder labels, we will shortly match their *allele sequences*. The allele sequences corresponding to each read-backed label come from the phased
+VCF emitted by the read-backed phasing software, but the allele sequences corresponding to each founder label
+remain to be
+reconstructed. We now turn to that task.
 
-At
-*non-informative* sites (both parents heterozygous), the founder
-labels combined with a short enumeration over the four possible
-parent-side phasings recover the bit on each transmitted homolog
-(Fig 3), yielding a full per-founder bitstring across the IBD segment.
+Though the alleles at *informative* sites were deduced in the process of
+assigning founder labels, such a deduction is not possible at a
+*non-informative* site as both parents are heterozygous. However, 
+in IBD segments, we do know each kid's two founder labels — one paternal, one maternal. Fig 3A–D shows that information is enough to phase an uninformative site by enumerating all ways to assign parental alleles (0/1) to founder labels (A/B and C/D), followed by scoring each assignment against the kids' observed genotypes. Applying this phasing algorithm to every non-informative
+site and composing with the informative-site deduction in Fig 2 yields,
+for each kid, the full allele sequence corresponding to each founder
+label that the kid carries (Fig 3E).
 
 The conceptual centre of the workflow is the *hap-map block*
 (Fig 4A): the intersection of a read-backed phase block (which
