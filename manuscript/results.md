@@ -62,7 +62,7 @@ labels, and per-CpG QC flags. Tapestry also writes founder-phased
 methylation bigwig tracks and haplotagged BAMs for IGV inspection.
 
 With a BED of founder-phased methylation in hand, the two discovery scenarios
-described in the introduction reduce to short queries against this
+described in the introduction become short queries against this
 BED (Supp Fig 1) — and, because the BED reports every CpG covered by
 the HiFi reads, both queries run genome-wide rather than at a
 pre-selected list of loci. A homolog-specific LOM
@@ -79,19 +79,15 @@ the other — restricted to loci where the founder labels place the
 two hits in trans (Fig 4D).
 
 To validate tapestry's founder labels we turned to *methylation
-QTLs* (meQTLs) — loci where methylation tracks the local SNP
-allele, so methylation is expected to differ between haplotypes
-carrying different alleles at the QTL site (Fig 5A). If the founder
-labels are correct, two predictions follow at such a locus.
-First, methylation assigned to a given founder homolog should be
-*similar across every descendant* that carries that homolog. Second, founder-grouped
-methylation should split between the two alleles at the QTL site in
-the direction reported for the meQTL. We tested both in the
-four-generation CEPH1463 pedigree (K1463) at three published meQTLs (Fig 5B-D). 
-At all three loci the methylation
+QTLs* (meQTLs). If the founder
+labels are correct, we expect methylation at such loci to differ only between haplotypes
+carrying different alleles at the QTL site, and to otherwise be independent of haplotype, all regardless of who carries the haplotypes (Fig 5A). 
+We tested these expectations in the
+four-generation CEPH K1463 pedigree at three published meQTLs (Fig 5B-D). 
+At all three loci, the methylation
 levels that tapestry assigns to each of the eight founder homologs
-across the pedigree group tightly within a homolog (prediction 1),
-split cleanly between the two alleles at the meQTL (prediction 2),
-and recover the published direction of the methylation–allele
+across the pedigree (i) group tightly within a homolog,
+(ii) split cleanly between two classes of homologs depending on the meQTL allele they harbor,
+and (iii) recover the published direction of the methylation–allele
 association (e.g. C-allele homologs hypo-methylated and A-allele
-homologs hyper-methylated at rs9330298). 
+homologs hyper-methylated at rs9330298). These results support the correctness of tapestry's founder-phasing of methylation levels. 
