@@ -6,7 +6,7 @@ support the parent-of-origin queries
 that motivate this work, we must route methylation to founder haplotypes, 
 viz., identify, at every position, which of each founder's two
 homologs every descendant carries (Fig 2A).
-Tapestry recovers this purely from inheritance structure, 
+Tapestry recovers this haplotype transmission purely from inheritance structure, 
 using unphased joint-called variants (not reads). 
 At *mom-informative* sites
 (mom heterozygous, dad homozygous) the maternally
@@ -37,26 +37,46 @@ site and composing with the informative-site deduction in Fig 2 yields,
 for each kid, the full allele sequence corresponding to each founder
 label that the kid carries (Fig 3E).
 
-The conceptual centre of the workflow is the *hap-map block*
-(Fig 4A): the intersection of a read-backed phase block (which
-defines `hap1`/`hap2` contiguously, but without founder identity)
-with an inheritance-based linkage block (which defines the founder
-labels, but says nothing about which reads belong to which homolog).
-Inside a hap-map block, both pieces of information are simultaneously
-defined, and a single bit-vector concordance — the per-site agreement
-between `hap1`'s allele sequence and each founder's reconstructed
-bitstring at heterozygous sites in the block — decides which of
-`hap1` and `hap2` descends from which founder. Per-CpG methylation
-values are then *relabelled* (not recomputed) by routing each
-`hap1`/`hap2` track into its founder-labelled track within each
-hap-map block (Fig 4B). The relabelling is what removes the
-apparent block-to-block flips in the raw per-haplotype tracks: the
-`hap1`/`hap2` ↔ founder mapping can swap between adjacent read-backed
-phase blocks inside the same IBD segment, and a consistent
-biological pattern (here founder `A` hyper-methylated, founder `C`
-hypo-methylated) only emerges after the relabelling. The
-concordance value is retained alongside each block as a per-block
-quality score.
+Having reconstructed haplotype sequences in IBD segments, 
+we can finally route methylation to founder haplotypes in two steps, both operating
+on the *hap-map block* (Fig 4A), defined as the intersection of a read-backed
+phase block (Fig 1B) with an IBD segment (Fig 2D). Inside hap-map blocks, the
+allele sequences are known for both the read-backed
+labels (from the phased VCF) and the founder labels (from Fig 3).
+**Step 1: map read-backed labels to founder labels (Fig 4A).** At
+the heterozygous sites of the block, `hap1`'s allele sequence is
+compared with that of the founder labels. The founder
+whose sequence agrees with `hap1`'s more often is declared `hap1`'s
+founder, and the larger concordance is retained as a per-block
+quality score in tapestry's output. **Step 2: rebucket methylation from read-backed labels
+to founder labels (Fig 4B).** Per-CpG methylation levels stratified
+by read-backed labels are *rebucketed* in each hap-map block onto
+founder-labelled tracks. Rebucketing can absorb meaningless block-to-block
+flips in the raw read-backed tracks, exposing true biological
+pattern across an IBD segment. The result — *founder-phased
+methylation*, tapestry's primary product — is emitted as a per-CpG
+BED (full column schema in repository's README) with per-founder read counts and
+methylation levels,
+hap-map block coordinates and allele-sequence concordance, founder
+labels, and per-CpG QC flags. Tapestry also writes founder-phased
+methylation bigwig tracks and haplotagged BAMs for IGV inspection.
+
+With a BED of founder-phased methylation in hand, the two discovery scenarios
+described in the introduction reduce to short queries against this
+BED (Supp Fig 1) — and, because the BED reports every CpG covered by
+the HiFi reads, both queries run genome-wide rather than at a
+pre-selected list of loci. A homolog-specific LOM
+at an imprinted locus surfaces as a contiguous run of CpGs at which
+a kid's methylation on one transmitted founder haplotype falls sharply below
+the level seen on the *same* founder haploptype in the transmitting parent
+(Fig 4C). Restricting the genome-wide scan to kids who share the disease
+phenotype, and to a parent of origin consistent with the locus's
+imprint, should recover the segregation pattern expected for an imprinting
+disorder. A compound genetic-epigenetic heterozygote surfaces as the
+inner join of two outlier queries — a methylation outlier on one
+parental founder and a coding loss-of-function variant outlier on
+the other — restricted to loci where the founder labels place the
+two hits in trans (Fig 4D).
 
 If tapestry's founder labels are correct, two predictions follow.
 First, methylation assigned to a given founder homolog should be
@@ -79,42 +99,3 @@ homologs hypo-methylated and A-allele homologs hyper-methylated at
 rs9330298). The clean within-homolog clustering across multiple
 descendants is the stronger of the two checks: it would not appear
 under any mislabelling of homolog identity.
-
-The two scenarios that motivate the workflow reduce to short queries
-against the per-CpG haplotype-resolved BED that tapestry emits
-(Supp Fig 1), and — because the BED reports every CpG covered by
-the HiFi reads — both queries run genome-wide rather than at a
-pre-selected list of loci. A homolog-specific LOM at an imprinted
-locus surfaces as a contiguous run of CpGs at which a kid's
-methylation on one transmitted founder departs sharply from the
-level seen on the *same* founder in the transmitting parent
-(Fig 4C); restricting the run to kids who share the disease
-phenotype, and to a parent of origin consistent with the
-locus's imprint, recovers the segregation pattern expected for
-an imprinting disorder. A compound genetic-epigenetic
-heterozygote surfaces as the inner join of two outlier queries — a
-methylation outlier on one parental founder and a deleterious-variant
-outlier on the other — restricted to loci where the founder labels
-place the two hits in trans (Fig 4D).
-
-The primary output of each workflow is a per-CpG BED file with a
-self-describing header (run metadata, full column schema; see
-README for the exact columns). For each CpG site it reports total
-and per-founder read counts, count-based and model-based methylation
-levels on each founder homolog
-([pb-CpG-tools](https://github.com/PacificBiosciences/pb-CpG-tools),
-[doi placeholder](https://doi.org/PLACEHOLDER)), the enclosing
-hap-map block coordinates with its bit-vector concordance and
-heterozygous-SNV count, and the founder labels themselves. The
-workflow also emits a small set of per-CpG QC flags — proximity to
-sites where read-backed and inheritance-based bit vectors disagree
-(a local phasing-disagreement marker), overlap with SNVs, and
-whether the CpG is *allele-specific* (present in the reads of only
-one homolog, e.g. created or destroyed by a heterozygous variant) —
-and summary statistics over the run (e.g. the fraction of CpGs
-successfully phased to at least one founder, and the fraction within
-50 bp of a bit-vector-mismatch site). Alongside the BED, the
-workflow writes a small set of files for downstream inspection in
-IGV: per-founder methylation bigwig tracks, BED files of hap-map
-block boundaries and of bit-vector-mismatch sites, and the
-haplotagged BAMs they overlay.
