@@ -7,15 +7,19 @@ that motivate this work, we must route methylation to founder haplotypes,
 viz., identify, at every position, which of each founder's two
 homologs every descendant carries (Fig 2A).
 Tapestry recovers this haplotype transmission purely from inheritance structure, 
-using unphased joint-called variants (not reads). 
+using unphased joint-called variants (not reads) — an instance of *genetic phasing*, 
+the assignment of alleles to haplotypes from the Mendelian transmission pattern in a 
+family ([Roach et al. 2011, Am J Hum Genet](https://doi.org/10.1016/j.ajhg.2011.07.023)). 
 At *mom-informative* sites
 (mom heterozygous, dad homozygous) the maternally
 transmitted allele is deduced from each kid's genotype, and, strung together along the chromosome,
 these alleles reveal each kid's
 maternal haplotype (Fig 2B). The same procedure on the
 paternal side produces, in this particular case, putative crossovers co-located
-across independent meioses (Fig 2C iii) — vanishingly unlikely at
-the per-meiosis crossover rate of ≪1/Mb. We resolve this 
+across independent meioses (Fig 2C iii). Since that is vanishingly unlikely at
+the per-meiosis crossover rate of ≪1/Mb, these are "switch errors". As is standard in pedigree 
+haplotyping, we favour the reconstruction implying the fewest recombinants 
+([Abecasis et al. 2002, Nat Genet](https://doi.org/10.1038/ng786)), which we enforce  
 by swapping the conflicting labels (Fig 2C iv), yielding 
 the far more likely event of a single crossover (Fig 2C v).
 Intersecting the paternal and maternal haplotype segments gives *IBD segments*
@@ -59,7 +63,7 @@ methylation levels,
 hap-map block coordinates and allele-sequence concordance, founder
 labels, and per-CpG QC flags. Tapestry also writes founder-phased
 methylation bigwig tracks and haplotagged BAMs for IGV inspection.
-Typically Tapestry phases ~95% of CpG sites to founder haplotypes, with <2% of CpG sites lying within 50bp of a discordant heterozygous site (c.f., Fig 4A). 
+In the four-generation CEPH K1463 pedigree, Tapestry phases ~95% of CpG sites to founder haplotypes, with <2% of CpG sites lying within 50bp of a discordant heterozygous site (c.f., Fig 4A), consistent with the finding that family-based genetic phasing approaches completeness once three or more children are available ([Roach et al. 2011, Am J Hum Genet](https://doi.org/10.1016/j.ajhg.2011.07.023)). 
 
 With a BED of founder-phased methylation in hand, the two discovery scenarios
 described in the introduction become short queries against this
