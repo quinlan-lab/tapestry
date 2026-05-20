@@ -41,8 +41,12 @@ site and composing with the informative-site deduction in Fig 2 yields,
 for each kid, the full allele sequence corresponding to each founder
 label that the kid carries (Fig 3E).
 
-Having reconstructed haplotype sequences in IBD segments, 
-we can finally route methylation to founder haplotypes in two steps, both operating
+The steps so far — genetic phasing (Fig 2) and the reconstruction of 
+founder allele sequences (Fig 3) — adapt established pedigree-phasing 
+methodology. We now turn to the unsolved problem of 
+routing methylation onto those founder haplotypes. 
+
+Phasing methylation proceeds in two steps, both operating
 on the *hap-map block* (Fig 4A), defined as the intersection of a read-backed
 phase block (Fig 1B) with an IBD segment (Fig 2D). Inside hap-map blocks, the
 allele sequences are known for both the read-backed
