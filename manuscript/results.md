@@ -78,24 +78,20 @@ parental founder and a coding loss-of-function variant outlier on
 the other — restricted to loci where the founder labels place the
 two hits in trans (Fig 4D).
 
-If tapestry's founder labels are correct, two predictions follow.
+To validate tapestry's founder labels we turned to *methylation
+QTLs* (meQTLs) — loci where methylation tracks the local SNP
+allele, so methylation is expected to differ between haplotypes
+carrying different alleles at the QTL site (Fig 5A). If the founder
+labels are correct, two predictions follow at such a locus.
 First, methylation assigned to a given founder homolog should be
-*similar across every descendant* that carries that homolog —
-identity-by-descent of the homolog implies identity of its
-methylation state up to measurement noise. Second, at a *methylation
-QTL* (meQTL), founder-grouped methylation should track the founder's
-allele at the QTL site (Fig 5A). We tested both predictions in the
-four-generation CEPH1463 pedigree (K1463) at three meQTLs reported
-by Rosenski et al. 2025
-([doi:10.1038/s41467-025-57433-1](https://doi.org/10.1038/s41467-025-57433-1),
-[doi:10.1101/2025.09.15.675351](https://doi.org/10.1101/2025.09.15.675351)).
-At all three loci — rs9330298 (Fig 5B), rs12499263 (Fig 5C), and
-rs12636296 at the *ALG1L* promoter (Fig 5D) — the methylation
+*similar across every descendant* that carries that homolog. Second, founder-grouped
+methylation should split between the two alleles at the QTL site in
+the direction reported for the meQTL. We tested both in the
+four-generation CEPH1463 pedigree (K1463) at three published meQTLs (Fig 5B-D). 
+At all three loci the methylation
 levels that tapestry assigns to each of the eight founder homologs
-across the pedigree group tightly within a homolog, split cleanly
-between the two alleles at the meQTL, and recover the published
-direction of the methylation–allele association (e.g. C-allele
-homologs hypo-methylated and A-allele homologs hyper-methylated at
-rs9330298). The clean within-homolog clustering across multiple
-descendants is the stronger of the two checks: it would not appear
-under any mislabelling of homolog identity.
+across the pedigree group tightly within a homolog (prediction 1),
+split cleanly between the two alleles at the meQTL (prediction 2),
+and recover the published direction of the methylation–allele
+association (e.g. C-allele homologs hypo-methylated and A-allele
+homologs hyper-methylated at rs9330298). 
