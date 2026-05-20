@@ -29,7 +29,7 @@ VCF emitted by the read-backed phasing software, but the allele sequences corres
 remain to be
 reconstructed. We now turn to that task.
 
-Though the alleles at *informative* sites were deduced in the process of
+Though the alleles at *informative* sites are deduced in the process of
 assigning founder labels, such a deduction is not possible at a
 *non-informative* site as both parents are heterozygous. However, 
 in IBD segments, we do know each kid's two founder labels — one paternal, one maternal — from Fig 2. Fig 3A–D shows that information is enough to phase an uninformative site by enumerating all ways to assign parental alleles (0/1) to founder labels (A/B and C/D), followed by scoring each assignment against the kids' observed genotypes. Applying this phasing algorithm to every non-informative
