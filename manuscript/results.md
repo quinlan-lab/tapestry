@@ -43,23 +43,23 @@ on the *hap-map block* (Fig 4A), defined as the intersection of a read-backed
 phase block (Fig 1B) with an IBD segment (Fig 2D). Inside hap-map blocks, the
 allele sequences are known for both the read-backed
 labels (from the phased VCF) and the founder labels (from Fig 3).
-**Step 1: map read-backed labels to founder labels (Fig 4A).** At
+Step 1 is to map read-backed labels to founder labels. At
 the heterozygous sites of the block, `hap1`'s allele sequence is
-compared with that of the founder labels. The founder
+compared with that of the founder labels (Fig 4A). The founder
 whose sequence agrees with `hap1`'s more often is declared `hap1`'s
 founder, and the larger concordance is retained as a per-block
-quality score in tapestry's output. **Step 2: rebucket methylation from read-backed labels
-to founder labels (Fig 4B).** Per-CpG methylation levels stratified
+quality score in tapestry's output. In step 2, per-CpG methylation levels stratified
 by read-backed labels are *rebucketed* in each hap-map block onto
-founder-labelled tracks. Rebucketing can absorb meaningless block-to-block
+founder-labelled tracks (Fig 4B). Rebucketing can absorb meaningless block-to-block
 flips in the raw read-backed tracks, exposing true biological
-pattern across an IBD segment. The result — *founder-phased
+pattern across an IBD segment (Fig 4B). The result — *founder-phased
 methylation*, tapestry's primary product — is emitted as a per-CpG
 BED (full column schema in repository's README) with per-founder read counts and
 methylation levels,
 hap-map block coordinates and allele-sequence concordance, founder
 labels, and per-CpG QC flags. Tapestry also writes founder-phased
 methylation bigwig tracks and haplotagged BAMs for IGV inspection.
+Typically Tapestry phases ~95% of CpG sites to founder haplotypes, with <2% of CpG sites lying within 50bp of a discordant heterozygous site (c.f., Fig 4A). 
 
 With a BED of founder-phased methylation in hand, the two discovery scenarios
 described in the introduction become short queries against this
