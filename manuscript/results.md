@@ -42,7 +42,7 @@ for each kid, the full allele sequence corresponding to each founder
 label that the kid carries (Fig 3E).
 
 The steps so far — genetic phasing (Fig 2) and the reconstruction of 
-founder allele sequences (Fig 3) — adapt established pedigree-phasing 
+founder allele sequences (Fig 3) — adapt established genetic-phasing 
 methodology. We now turn to the unsolved problem of 
 routing methylation onto those founder haplotypes. 
 
@@ -67,7 +67,7 @@ methylation levels,
 hap-map block coordinates and allele-sequence concordance, founder
 labels, and per-CpG QC flags. Tapestry also writes founder-phased
 methylation bigwig tracks and haplotagged BAMs for IGV inspection.
-In the four-generation CEPH K1463 pedigree, Tapestry phases ~95% of CpG sites to founder haplotypes, with <2% of CpG sites lying within 50bp of a discordant heterozygous site (c.f., Fig 4A), consistent with the finding that family-based genetic phasing approaches completeness once three or more children are available ([Roach et al. 2011, Am J Hum Genet](https://doi.org/10.1016/j.ajhg.2011.07.023)). 
+In the four-generation CEPH K1463 pedigree, Tapestry phases ~95% of CpG sites to founder haplotypes, with <2% of CpG sites lying within 50bp of a discordant heterozygous site (c.f., Fig 4A), consistent with the finding that genetic phasing approaches completeness once three or more children are available ([Roach et al. 2011, Am J Hum Genet](https://doi.org/10.1016/j.ajhg.2011.07.023)). 
 
 With a BED of founder-phased methylation in hand, the two discovery scenarios
 described in the introduction become short queries against this
