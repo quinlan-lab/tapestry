@@ -1,12 +1,16 @@
 #!/bin/bash
 
 # Usage:
-#   Production:  ./phase_meth_to_parent_haps.sh
-#   Dev mode:    ./phase_meth_to_parent_haps.sh --dev-dir trio_dev_data
+#   Production:        ./phase_meth_to_parent_haps.sh
+#   Dev mode:          ./phase_meth_to_parent_haps.sh --dev-dir trio_dev_data
+#   Skip methylation:  ./phase_meth_to_parent_haps.sh --skip-methylation
+#     (produce only hap-map blocks and bit-vector mismatch sites from the
+#      WhatsHap output; does not need aligned_bam_to_cpg_scores.sh to have run)
 
 source src/util/logging.sh
 
 DEV_DIR=""
+SKIP_METHYLATION=""
 
 # --- Argument Parsing ---
 while [[ "$#" -gt 0 ]]; do
@@ -15,9 +19,13 @@ while [[ "$#" -gt 0 ]]; do
             DEV_DIR="${2%/}"
             shift 2
             ;;
+        --skip-methylation)
+            SKIP_METHYLATION="--skip-methylation"
+            shift
+            ;;
         *)
             echo "Error: Unknown parameter: $1"
-            echo "Usage: $0 [--dev-dir <DEV_DATA_DIR>]"
+            echo "Usage: $0 [--dev-dir <DEV_DATA_DIR>] [--skip-methylation]"
             exit 1
             ;;
     esac
@@ -93,6 +101,7 @@ PYTHONPATH=src:src/util .venv/bin/python src/phase_meth_to_parent_haps.py \
     --bed_meth_count_hap2_mom "$(meth_bed count "$mom_id" hap2)" \
     --bed_meth_model_hap1_mom "$(meth_bed model "$mom_id" hap1)" \
     --bed_meth_model_hap2_mom "$(meth_bed model "$mom_id" hap2)" \
-    --output_dir "$output_dir"
+    --output_dir "$output_dir" \
+    ${SKIP_METHYLATION}
 
 log_info "Done phasing methylation to parent haplotypes"

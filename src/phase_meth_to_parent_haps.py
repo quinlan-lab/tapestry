@@ -319,26 +319,56 @@ def main():
     parser.add_argument('--blocks_tsv_dad', required=True, help='WhatsHap blocks TSV for father')
     parser.add_argument('--blocks_tsv_mom', required=True, help='WhatsHap blocks TSV for mother')
 
-    # Methylation BEDs for kid
-    parser.add_argument('--bed_meth_count_hap1_kid', required=True)
-    parser.add_argument('--bed_meth_count_hap2_kid', required=True)
-    parser.add_argument('--bed_meth_model_hap1_kid', required=True)
-    parser.add_argument('--bed_meth_model_hap2_kid', required=True)
+    # Methylation BEDs (from aligned_bam_to_cpg_scores.sh). Optional: not needed
+    # when --skip-methylation is set, in which case only the hap-map blocks and
+    # bit-vector mismatch sites are produced (steps 1-3).
+    # Kid
+    parser.add_argument('--bed_meth_count_hap1_kid')
+    parser.add_argument('--bed_meth_count_hap2_kid')
+    parser.add_argument('--bed_meth_model_hap1_kid')
+    parser.add_argument('--bed_meth_model_hap2_kid')
 
-    # Methylation BEDs for dad
-    parser.add_argument('--bed_meth_count_hap1_dad', required=True)
-    parser.add_argument('--bed_meth_count_hap2_dad', required=True)
-    parser.add_argument('--bed_meth_model_hap1_dad', required=True)
-    parser.add_argument('--bed_meth_model_hap2_dad', required=True)
+    # Dad
+    parser.add_argument('--bed_meth_count_hap1_dad')
+    parser.add_argument('--bed_meth_count_hap2_dad')
+    parser.add_argument('--bed_meth_model_hap1_dad')
+    parser.add_argument('--bed_meth_model_hap2_dad')
 
-    # Methylation BEDs for mom
-    parser.add_argument('--bed_meth_count_hap1_mom', required=True)
-    parser.add_argument('--bed_meth_count_hap2_mom', required=True)
-    parser.add_argument('--bed_meth_model_hap1_mom', required=True)
-    parser.add_argument('--bed_meth_model_hap2_mom', required=True)
+    # Mom
+    parser.add_argument('--bed_meth_count_hap1_mom')
+    parser.add_argument('--bed_meth_count_hap2_mom')
+    parser.add_argument('--bed_meth_model_hap1_mom')
+    parser.add_argument('--bed_meth_model_hap2_mom')
 
     parser.add_argument('--output_dir', required=True, help='Output directory')
+    parser.add_argument(
+        '--skip-methylation', action='store_true',
+        help=(
+            'Produce only the hap-map blocks and bit-vector mismatch sites '
+            '(steps 1-3) from the WhatsHap pedmec-phased VCF and blocks, and '
+            'skip reading methylation and all downstream methylation phasing '
+            'and bigwig output (steps 4-7). Lets you scan for recombinations '
+            'without first running aligned_bam_to_cpg_scores.sh.'
+        ),
+    )
     args = parser.parse_args()
+
+    # When not skipping methylation, all per-haplotype methylation BEDs are required.
+    if not args.skip_methylation:
+        meth_bed_args = [
+            'bed_meth_count_hap1_kid', 'bed_meth_count_hap2_kid',
+            'bed_meth_model_hap1_kid', 'bed_meth_model_hap2_kid',
+            'bed_meth_count_hap1_dad', 'bed_meth_count_hap2_dad',
+            'bed_meth_model_hap1_dad', 'bed_meth_model_hap2_dad',
+            'bed_meth_count_hap1_mom', 'bed_meth_count_hap2_mom',
+            'bed_meth_model_hap1_mom', 'bed_meth_model_hap2_mom',
+        ]
+        missing = [f'--{a}' for a in meth_bed_args if getattr(args, a) is None]
+        if missing:
+            parser.error(
+                'the following arguments are required unless --skip-methylation '
+                'is set: ' + ', '.join(missing)
+            )
 
     logging.basicConfig(
         level=logging.INFO,
@@ -386,6 +416,14 @@ def main():
     write_bit_vector_mismatches_bed(args.output_dir, df_mismatch_mat, logger, uid=kid_id, parental="maternal")
     write_bit_vector_mismatches_vcf(args.output_dir, df_mismatch_pat, logger, uid=kid_id, parental="paternal")
     write_bit_vector_mismatches_vcf(args.output_dir, df_mismatch_mat, logger, uid=kid_id, parental="maternal")
+
+    if args.skip_methylation:
+        logger.info(
+            "--skip-methylation set: produced hap-map blocks and bit-vector "
+            "mismatch sites only; skipping methylation phasing (steps 4-7)."
+        )
+        logger.info(f"Done running '{__file__}'")
+        return
 
     # Step 4: Get HiFi DNA methylation levels (both count-based and model-based)
     # in kid, dad, and mom at CpG sites phased to hap1/hap2
