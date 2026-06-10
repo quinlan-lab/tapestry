@@ -101,12 +101,40 @@ def write_igv_batch(df_all, path, snapshot_dir=None):
 
 def main():
     parser = argparse.ArgumentParser(
+        formatter_class=argparse.RawDescriptionHelpFormatter,
         description=(
             "Scan hap-map-blocks BED(s) for blocks whose concordance is below a "
             "threshold. Low concordance flags a likely recombination within the "
             "block. Input BEDs are produced by phase_meth_to_parent_haps.py, e.g. "
             "NA12878.hap-map-blocks.paternal.sorted.bed.gz"
-        )
+        ),
+        epilog=(
+            "IGV workflow for localizing a crossover:\n"
+            "  1. Generate a navigation track and load it in IGV alongside the\n"
+            "     bit-vector-sites-mismatches.{paternal,maternal}.vcf.gz tracks:\n"
+            "       --igv-bed candidates.igv.bed\n"
+            "     Select the track and use Ctrl-F / Ctrl-B to step through the\n"
+            "     candidates in genomic order (or --igv-batch for scripted goto/\n"
+            "     snapshot stepping).\n"
+            "  2. The mismatch VCF holds the het sites where the kid disagrees\n"
+            "     with the haplotype assigned to the whole (chromosome-spanning)\n"
+            "     block. A single crossover therefore shows up not as scattered\n"
+            "     noise but as a SHARP TRANSITION from sparse mismatch ticks\n"
+            "     (the majority segment, where the kid agrees) to a dense\n"
+            "     contiguous run extending to the block edge (the minority\n"
+            "     segment, past the crossover). That transition edge is the\n"
+            "     breakpoint; zoom in to read the flanking het-SNV coordinates,\n"
+            "     which bound the breakpoint interval.\n"
+            "  3. Confirm it is a true meiotic crossover, not a phasing artifact:\n"
+            "     compare the paternal vs maternal mismatch tracks. A real\n"
+            "     crossover flips only ONE parent's transmitted haplotype, so the\n"
+            "     density transition appears in only one track. A kid phase-switch\n"
+            "     error flips both at the SAME kid coordinate. Prefer candidates\n"
+            "     where only one track transitions.\n"
+            "\n"
+            "The num_het_SNVs field weights the concordance: a low value over\n"
+            "many SNVs is far more convincing than the same value over a handful."
+        ),
     )
     parser.add_argument(
         "beds",
