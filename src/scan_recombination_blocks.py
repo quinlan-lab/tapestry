@@ -48,6 +48,57 @@ def scan_blocks(bed_gz, threshold):
     return df
 
 
+def write_igv_bed(df_all, path):
+    """Write candidate blocks as a BED navigation track for IGV.
+
+    Load this track in IGV, click to select it, then use Ctrl-F / Ctrl-B
+    (next/previous feature) to step through candidate blocks in genomic order
+    without copy-pasting coordinates. The feature name carries the same
+    "<hap>,<concordance>,<num_het_SNVs>" label as the source hap-map-blocks
+    BED, plus the source file, so you can tell paternal from maternal at a
+    glance. The track is sorted by position (BED feature navigation walks
+    genomic order regardless of input order).
+    """
+    df_bed = (
+        df_all
+        .with_columns(
+            name=pl.col("haplotype")
+            + pl.lit(",")
+            + pl.col("concordance").cast(pl.String)
+            + pl.lit(",")
+            + pl.col("num_het_SNVs").cast(pl.String)
+            + pl.lit("[")
+            + pl.col("source").str.replace(".hap-map-blocks.", ".").str.replace(".sorted.bed.gz", "")
+            + pl.lit("]"),
+        )
+        .select(["chrom", "start", "end", "name"])
+        .sort(["chrom", "start", "end"])
+    )
+    df_bed.write_csv(path, separator="\t", include_header=False)
+
+
+def write_igv_batch(df_all, path, snapshot_dir=None):
+    """Write an IGV batch script that visits each candidate block in turn.
+
+    Run via IGV's Tools > Run Batch Script, or `igv.sh -b <path>`. Each
+    candidate produces a `goto` to the block interval (chromosome-spanning for
+    pedMEC blocks, so this positions the chromosome with whatever mismatch/
+    block tracks you already have loaded). If snapshot_dir is given, a PNG is
+    written per candidate so you can review them outside IGV. Candidates are
+    ordered most-discordant-first to match the scan's ranking.
+    """
+    lines = []
+    if snapshot_dir:
+        lines.append(f"snapshotDirectory {snapshot_dir}")
+    for row in df_all.iter_rows(named=True):
+        lines.append(f"goto {row['chrom']}:{row['start']}-{row['end']}")
+        if snapshot_dir:
+            tag = row["source"].replace(".hap-map-blocks.", ".").replace(".sorted.bed.gz", "")
+            lines.append(f"snapshot {tag}.{row['chrom']}_{row['start']}_{row['end']}.png")
+    with open(path, "w") as f:
+        f.write("\n".join(lines) + "\n")
+
+
 def main():
     parser = argparse.ArgumentParser(
         description=(
@@ -72,6 +123,32 @@ def main():
         "--out",
         default=None,
         help="Optional TSV path to write the combined results to (in addition to logging)",
+    )
+    parser.add_argument(
+        "--igv-bed",
+        default=None,
+        help=(
+            "Optional BED path to write candidate blocks as an IGV navigation "
+            "track. Load it in IGV and use Ctrl-F/Ctrl-B to step through "
+            "candidates in genomic order."
+        ),
+    )
+    parser.add_argument(
+        "--igv-batch",
+        default=None,
+        help=(
+            "Optional IGV batch-script path with a `goto` per candidate "
+            "(most-discordant-first). Run via Tools > Run Batch Script or "
+            "`igv.sh -b <path>`."
+        ),
+    )
+    parser.add_argument(
+        "--snapshot-dir",
+        default=None,
+        help=(
+            "If set with --igv-batch, the batch script also snapshots a PNG per "
+            "candidate into this directory."
+        ),
     )
     args = parser.parse_args()
 
@@ -98,6 +175,14 @@ def main():
     if args.out and len(df_all):
         df_all.write_csv(args.out, separator="\t")
         logger.info(f"Wrote candidate blocks to '{args.out}'")
+
+    if args.igv_bed and len(df_all):
+        write_igv_bed(df_all, args.igv_bed)
+        logger.info(f"Wrote IGV navigation track to '{args.igv_bed}'")
+
+    if args.igv_batch and len(df_all):
+        write_igv_batch(df_all, args.igv_batch, snapshot_dir=args.snapshot_dir)
+        logger.info(f"Wrote IGV batch script to '{args.igv_batch}'")
 
 
 if __name__ == "__main__":
