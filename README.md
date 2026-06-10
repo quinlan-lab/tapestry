@@ -250,14 +250,22 @@ File | Description
 `trio_dev_data_serve.py` | HTTP server with range-request support for serving the `trio_dev_data/` directory to IGV. Start with `.venv/bin/python trio_dev_data_serve.py` (default port 8000).
 `trio_dev_data_igv_session.xml` | IGV session file that loads the dev data (haplotagged BAMs, phased VCFs, phase blocks, methylation bigwigs, and mismatch-site VCFs) from the local server. Open in IGV via File > Open Session after starting the server.
 
-To run the trio workflow on the dev data, pass `--dev-dir trio_dev_data` to each pipeline script, e.g.:
+**The trio dev run must be performed on CHPC, not on a local machine.** Although the dev data subset (`trio_dev_data/input/`) is small enough to commit and copy around, `aligned_bam_to_cpg_scores.sh` invokes the pb-CpG-tools binary from a CHPC-only path (`/uufs/chpc.utah.edu/common/HIPAA/u6018199/pb-CpG-tools-v3.0.0-x86_64-unknown-linux-gnu/bin`), which is not available locally. Because every later step consumes its output, the entire dev chain (and therefore `phase_meth_to_parent_haps.sh`) has to be run on CHPC.
+
+To run the trio workflow on the dev data, on CHPC:
 
 ```
+# One-time setup: download the dev-region reference FASTA (see trio_dev_data_get_ref.sh above)
+./trio_dev_data_get_ref.sh trio_dev_data
+
+# Pipeline (pass --dev-dir trio_dev_data to each step):
 ./run-whatshap.sh --dev-dir trio_dev_data
-./aligned_bam_to_cpg_scores.sh --dev-dir trio_dev_data
+./aligned_bam_to_cpg_scores.sh -t NA12878 NA12891 NA12892 --dev-dir trio_dev_data
 ./phase_meth_to_parent_haps.sh --dev-dir trio_dev_data
 ./expand_to_all_cpgs.trio.sh --dev-dir trio_dev_data
 ```
+
+All output is written under `trio_dev_data/output/`. To inspect results locally (e.g. in IGV), copy that directory back from CHPC and use `trio_dev_data_serve.py` / `trio_dev_data_igv_session.xml`.
 
 ## TODO
 

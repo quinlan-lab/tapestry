@@ -10,13 +10,34 @@ def extract_bit_vector(l):
 
 
 def write_hap_map_blocks(df_hap_map, uid, parental, output_dir):
-    """Write hap-map blocks BED for IGV visualization."""
-    df_blocks = df_hap_map.select([
-        pl.col("chrom"),
-        pl.col("start"),
-        pl.col("end"),
-        pl.col(f"{parental}_haplotype"),
-    ])
+    """Write hap-map blocks BED for IGV visualization.
+
+    The name column combines the assigned haplotype, the block's concordance,
+    and the number of het SNVs in the block, e.g. "B,0.87,30". Concordance is
+    the fraction of het SNVs in the block whose kid/parent bit-vector entries
+    agree with the assigned haplotype. A block-wide concordance well below 1.0
+    flags a likely recombination within the block (the kid switches parental
+    haplotype partway through), which is expected when pedMEC phase blocks span
+    an entire chromosome (~1 recombination per chromosome). The SNV count gives
+    the weight behind that concordance: a low concordance over many SNVs is far
+    more convincing than the same value over a handful.
+    """
+    df_blocks = (
+        df_hap_map
+        .with_columns(
+            name=pl.col(f"{parental}_haplotype")
+            + pl.lit(",")
+            + pl.col("haplotype_concordance").round(2).cast(pl.String)
+            + pl.lit(",")
+            + pl.col("num_het_SNVs_in_parent").cast(pl.String),
+        )
+        .select([
+            pl.col("chrom"),
+            pl.col("start"),
+            pl.col("end"),
+            pl.col("name"),
+        ])
+    )
     write_bed(output_dir, df_blocks, f"{uid}.hap-map-blocks.{parental}")
 
     cmd = (
