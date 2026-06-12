@@ -1,136 +1,122 @@
 """
-HTTP server with range-request support for serving genomic files to IGV.
+aiohttp server that serves genomic data files for IGV to consume.
 
-Roots an HTTP server at --data-dir and serves its files (with the Range support
-and CORS headers IGV needs) at http://localhost:PORT/<relative-path>. Defaults
-to trio_dev_data for the dev workflow; point --data-dir at the production tree
-(e.g. /scratch/ucgd/lustre-labs/quinlan/data-shared) to inspect genome-wide
-output such as a candidate crossover. Pair with an IGV session whose Resource
-paths are http://localhost:PORT/<relative-path> under that root, and tunnel from
-your laptop with `ssh -L PORT:localhost:PORT <host>`.
+Serves files under --data-dir over http://localhost:PORT/<relative-path> with
+the byte-range support IGV needs. Robust by design (this is why it replaced the
+stdlib http.server version, archived in .trash/serve_data_for_igv_stdlib.py):
+
+  * A whole-file GET of a DATA file (BAM / bgzipped VCF / BED) returns 400.
+    IGV must instead fetch the file's index (.bai/.tbi) and issue byte-Range
+    requests for just the visible window. This makes it impossible to
+    accidentally stream a genome-wide file in full -- the failure mode that
+    saturated the SSH tunnel and corrupted concurrent track loads with the
+    stdlib server.
+  * Only index files and small text annotations (.bai/.tbi/.csi/.crai/.fai/
+    .idx/.gtf/.gff/.gff3/.bed/.bedgraph) are returned whole.
+  * Range responses stream in 1 MB chunks (bounded memory, clean EOF).
+
+Pair with an IGV session whose Resource paths are
+http://localhost:PORT/<relative-path> under DIR, and tunnel from your laptop
+with `ssh -L PORT:localhost:PORT <host>`.
 
 Usage:
     .venv/bin/python serve_data_for_igv.py [--port PORT] [--data-dir DIR]
 """
 
 import argparse
-import mimetypes
 import os
-from functools import partial
-from http.server import ThreadingHTTPServer, SimpleHTTPRequestHandler
+
+from aiohttp import web
+
+CHUNK = 1024 * 1024  # 1 MB
+
+# Files IGV legitimately fetches whole: indexes and small text annotations.
+# Everything else (BAM, *.vcf.gz, *.bed.gz) must be range-requested via its index.
+WHOLE_FILE_SUFFIXES = (
+    ".bai", ".tbi", ".csi", ".crai", ".fai", ".idx",
+    ".gtf", ".gff", ".gff3", ".bed", ".bedgraph",
+)
 
 DEFAULT_DATA_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "trio_dev_data")
 
-# Register MIME types for genomic file formats so IGV gets proper Content-Type
-# headers, including for index files (.bai, .tbi, .csi, .fai).
-GENOMIC_MIME_TYPES = {
-    ".bam": "application/octet-stream",
-    ".bai": "application/octet-stream",
-    ".vcf": "text/plain",
-    ".gz": "application/gzip",
-    ".tbi": "application/octet-stream",
-    ".csi": "application/octet-stream",
-    ".fa": "text/plain",
-    ".fasta": "text/plain",
-    ".fai": "text/plain",
-    ".bed": "text/plain",
-    ".bw": "application/octet-stream",
-    ".bigwig": "application/octet-stream",
-    ".ped": "text/plain",
-}
-for ext, mime in GENOMIC_MIME_TYPES.items():
-    mimetypes.add_type(mime, ext)
+
+def _resolve(data_dir, filename):
+    """Resolve a request path under data_dir, rejecting path traversal."""
+    path = os.path.normpath(os.path.join(data_dir, filename))
+    if path != data_dir and not path.startswith(data_dir + os.sep):
+        return None
+    return path
 
 
-class RangeRequestHandler(SimpleHTTPRequestHandler):
-    """HTTP handler that supports Range requests (required by IGV for BAM/VCF/etc).
+async def handle(request):
+    data_dir = request.app["data_dir"]
+    filename = request.match_info.get("filename", "")
+    path = _resolve(data_dir, filename)
+    if path is None or not os.path.isfile(path):
+        return web.Response(status=404, text=f"{filename} not found")
 
-    The served root is supplied via the base class `directory` kwarg (bound with
-    functools.partial in main()), so the handler is not tied to any one dataset.
-    """
+    file_size = os.path.getsize(path)
+    range_header = request.headers.get("Range")
 
-    def end_headers(self):
-        self.send_header("Access-Control-Allow-Origin", "*")
-        self.send_header("Access-Control-Allow-Headers", "Range")
-        self.send_header("Access-Control-Expose-Headers", "Content-Length, Content-Range, Accept-Ranges")
-        self.send_header("Accept-Ranges", "bytes")
-        super().end_headers()
-
-    def do_OPTIONS(self):
-        self.send_response(200)
-        self.end_headers()
-
-    def do_GET(self):
-        range_header = self.headers.get("Range")
-        if range_header is None:
-            super().do_GET()
-            return
-
-        path = self.translate_path(self.path)
-        if not os.path.isfile(path):
-            self.send_error(404)
-            return
-
-        file_size = os.path.getsize(path)
-
-        # Parse "bytes=start-end"
+    if range_header:
         try:
-            range_spec = range_header.replace("bytes=", "")
-            parts = range_spec.split("-")
-            start = int(parts[0]) if parts[0] else 0
-            end = int(parts[1]) if parts[1] else file_size - 1
-        except (ValueError, IndexError):
-            self.send_error(416, "Invalid range")
-            return
-
-        if start > end or start >= file_size:
-            self.send_error(416, "Range not satisfiable")
-            return
-
+            byte_range = range_header.strip().split("=")[1]
+            start_s, end_s = byte_range.split("-")
+            start = int(start_s) if start_s else 0
+            end = int(end_s) if end_s else file_size - 1
+        except (IndexError, ValueError):
+            return web.Response(status=416, text="Invalid Range")
         end = min(end, file_size - 1)
-        length = end - start + 1
+        if start >= file_size or start > end:
+            return web.Response(status=416, text="Requested Range Not Satisfiable")
 
-        self.send_response(206)
-        content_type = self.guess_type(path)
-        self.send_header("Content-Type", content_type)
-        self.send_header("Content-Range", f"bytes {start}-{end}/{file_size}")
-        self.send_header("Content-Length", str(length))
-        self.send_header("Accept-Ranges", "bytes")
-        self.end_headers()
-
+        response = web.StreamResponse(status=206, headers={
+            "Content-Type": "application/octet-stream",
+            "Content-Range": f"bytes {start}-{end}/{file_size}",
+            "Content-Length": str(end - start + 1),
+            "Accept-Ranges": "bytes",
+        })
+        await response.prepare(request)
         with open(path, "rb") as f:
             f.seek(start)
-            self.wfile.write(f.read(length))
+            remaining = end - start + 1
+            while remaining > 0:
+                chunk = f.read(min(CHUNK, remaining))
+                if not chunk:
+                    break
+                await response.write(chunk)
+                remaining -= len(chunk)
+        await response.write_eof()
+        return response
 
-    def do_HEAD(self):
-        path = self.translate_path(self.path)
-        if os.path.isfile(path):
-            file_size = os.path.getsize(path)
-            self.send_response(200)
-            self.send_header("Content-Type", self.guess_type(path))
-            self.send_header("Content-Length", str(file_size))
-            self.send_header("Accept-Ranges", "bytes")
-            self.end_headers()
-        else:
-            super().do_HEAD()
+    if filename.endswith(WHOLE_FILE_SUFFIXES):
+        with open(path, "rb") as f:
+            body = f.read()
+        return web.Response(status=200, body=body, headers={
+            "Content-Type": "application/octet-stream",
+            "Content-Length": str(file_size),
+            "Accept-Ranges": "bytes",
+        })
+
+    return web.Response(status=400, text=(
+        "For range requests, please use the Range header.\n"
+        "Only index/annotation files are served whole.\n"))
 
 
 def main():
-    parser = argparse.ArgumentParser(description="Serve genomic files with range request support for IGV")
+    parser = argparse.ArgumentParser(description="Serve genomic data files for IGV to consume")
     parser.add_argument("--port", type=int, default=8000)
     parser.add_argument("--data-dir", default=DEFAULT_DATA_DIR,
                         help="Directory to serve as the HTTP root (default: trio_dev_data)")
     args = parser.parse_args()
 
     data_dir = os.path.abspath(args.data_dir)
-    handler = partial(RangeRequestHandler, directory=data_dir)
-    server = ThreadingHTTPServer(("localhost", args.port), handler)
+    app = web.Application()
+    app["data_dir"] = data_dir
+    app.router.add_get("/{filename:.*}", handle)
     print(f"Serving {data_dir} on http://localhost:{args.port}")
     print("Press Ctrl+C to stop")
-    try:
-        server.serve_forever()
-    except KeyboardInterrupt:
-        print("\nStopped.")
+    web.run_app(app, host="localhost", port=args.port, print=None)
 
 
 if __name__ == "__main__":
