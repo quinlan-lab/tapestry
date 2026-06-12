@@ -38,6 +38,8 @@ def main():
     parser.add_argument("--sample", required=True, help="Sample id to check (e.g. NA12878)")
     parser.add_argument("--max_report", type=int, default=20,
                         help="Max number of offending sites to print (default: 20)")
+    parser.add_argument("--progress_every", type=int, default=1_000_000,
+                        help="Log progress every N variants scanned (default: 1,000,000)")
     args = parser.parse_args()
 
     logging.basicConfig(level=logging.INFO,
@@ -64,7 +66,20 @@ def main():
     examples_no_ps = []
     examples_unmatched = []
 
+    n_total = 0
+    last_chrom = None
     for variant in vcf:
+        # Progress: cyvcf2 streams the whole VCF, so this loop is the slow part.
+        # Log every args.progress_every variants and on each new contig.
+        n_total += 1
+        if variant.CHROM != last_chrom:
+            last_chrom = variant.CHROM
+            logger.info(f"... {variant.CHROM} (variants seen: {n_total:,}; "
+                        f"phased het: {n_phased_het:,})")
+        elif n_total % args.progress_every == 0:
+            logger.info(f"... {variant.CHROM}:{variant.POS} (variants seen: "
+                        f"{n_total:,}; phased het: {n_phased_het:,})")
+
         if not variant.is_snp or len(variant.ALT) != 1:
             continue
         if not is_snv_het(variant, si):
