@@ -47,6 +47,11 @@ at the same kid coordinate. When both tracks have a clean breakpoint within
 kid phase-switch error, and the candidate is flagged (prefer single-parent
 flips for a dev crossover).
 
+Sex chromosomes and chrM are excluded by default (--exclude-chroms
+chrX,chrY,chrM): for a female proband there is no chrY, and the paternal chrX
+is transmitted without meiotic recombination outside the PARs, so candidates
+there are artifacts. Pass --exclude-chroms '' to keep all chromosomes.
+
 IGV confirmation workflow
 -------------------------
 --igv-bed writes a navigation track of the candidate breakpoint intervals
@@ -191,11 +196,14 @@ def write_igv_batch(df, path, window, snapshot_dir=None):
         f.write("\n".join(lines) + "\n")
 
 
-def _analyze_track(blocks_bed, mismatch_bed, parent, min_num_het, max_concordance):
+def _analyze_track(blocks_bed, mismatch_bed, parent, min_num_het, max_concordance,
+                   exclude_chroms):
     blocks = _load_blocks(blocks_bed)
     mism = _load_mismatch(mismatch_bed)
     rows = []
     for block in blocks.iter_rows(named=True):
+        if block["chrom"] in exclude_chroms:
+            continue
         if block["num_het_SNVs"] < min_num_het or block["concordance"] >= max_concordance:
             continue
         mm_pos = (
@@ -237,6 +245,12 @@ def main():
                              "breakpoint within this many kb (default: 500)")
     parser.add_argument("--top", type=int, default=10,
                         help="Print this many cleanest candidates (default: 10)")
+    parser.add_argument("--exclude-chroms", default="chrX,chrY,chrM",
+                        help="Comma-separated chromosomes to skip. Default 'chrX,chrY,chrM' "
+                             "drops sex-chromosome and mitochondrial artifacts, which is "
+                             "correct for a female proband (no chrY; the paternal chrX is "
+                             "transmitted without meiotic recombination outside the PARs). "
+                             "Pass '' to keep all chromosomes.")
     parser.add_argument("--out", default=None,
                         help="Optional TSV path for the full ranked candidate table")
     parser.add_argument("--igv-bed", default=None,
@@ -257,11 +271,14 @@ def main():
                         datefmt="%Y-%m-%d %H:%M:%S")
     logger = logging.getLogger(__name__)
 
+    exclude_chroms = {c for c in args.exclude_chroms.split(",") if c}
+    if exclude_chroms:
+        logger.info(f"Excluding chromosomes: {', '.join(sorted(exclude_chroms))}")
     rows = (
         _analyze_track(args.paternal_blocks, args.paternal_mismatch, "paternal",
-                       args.min_num_het, args.max_concordance)
+                       args.min_num_het, args.max_concordance, exclude_chroms)
         + _analyze_track(args.maternal_blocks, args.maternal_mismatch, "maternal",
-                         args.min_num_het, args.max_concordance)
+                         args.min_num_het, args.max_concordance, exclude_chroms)
     )
     if not rows:
         logger.info("No candidate blocks passed the filters.")
