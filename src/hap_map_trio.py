@@ -8,6 +8,7 @@ from hap_map import extract_bit_vector
 
 
 def _build_hap_map(df, kid_allele_col, parent_allele_col,
+                   phase_block_kid_id_col, phase_block_parent_id_col,
                    phase_block_kid_cols, phase_block_parent_cols,
                    hap_labels, hap_col_name):
     """
@@ -16,10 +17,19 @@ def _build_hap_map(df, kid_allele_col, parent_allele_col,
     Groups SNVs by the intersection of kid's and parent's phase blocks,
     compares bit vectors, and assigns haplotype labels.
 
+    Blocks are keyed by phase-set identity (the PS-derived phase_block_id),
+    not by their genomic start/end span: distinct phase sets can share a span
+    after nesting, so grouping on (kid_phase_set, parent_phase_set) is the only
+    key that maps each SNV to exactly one hap-map block. The block's start/end
+    are carried along (identical within a phase-set group) to compute the
+    intersection interval for output.
+
     Args:
         df: DataFrame from get_all_phasing (df_kid_dad or df_kid_mom)
         kid_allele_col: column name for kid's allele (e.g. "kid_allele_pat")
         parent_allele_col: column name for parent's hap1 allele (e.g. "dad_allele_A")
+        phase_block_kid_id_col: phase-set id column for the kid (e.g. "phase_block_id_kid")
+        phase_block_parent_id_col: phase-set id column for the parent (e.g. "phase_block_id_dad")
         phase_block_kid_cols: [start_col, end_col] for kid's phase block
         phase_block_parent_cols: [start_col, end_col] for parent's phase block
         hap_labels: (match_label, mismatch_label) e.g. ("A", "B")
@@ -29,16 +39,19 @@ def _build_hap_map(df, kid_allele_col, parent_allele_col,
         df_hap_map: DataFrame with chrom, start, end, haplotype, concordance, num_het_SNVs
         df_mismatch: DataFrame of mismatch sites with chrom, start, end, REF, ALT
     """
-    group_cols = ["chrom"] + phase_block_kid_cols + phase_block_parent_cols
+    group_cols = ["chrom", phase_block_kid_id_col, phase_block_parent_id_col]
+    span_cols = phase_block_kid_cols + phase_block_parent_cols
 
-    # Group SNVs by (chrom, kid_phase_block, parent_phase_block),
-    # which implicitly finds the intersection of these two types of blocks,
-    # and compute the kid's and parent's allele bit vectors in those intersections. 
-    # Assumes SNVs are phased in kid and parent. 
+    # Group SNVs by (chrom, kid_phase_set, parent_phase_set), which finds the
+    # intersection of these two phase blocks, and compute the kid's and parent's
+    # allele bit vectors in those intersections. The block start/end are
+    # constant within a phase-set group, so .first() recovers them.
+    # Assumes SNVs are phased in kid and parent.
     df_grouped = (
         df
         .group_by(group_cols)
         .agg([
+            *[pl.col(c).first().alias(c) for c in span_cols],
             pl.col("start").alias("start_seq"),
             pl.col("end").alias("end_seq"),
             pl.col(kid_allele_col).alias("kid_allele_seq"),
@@ -78,6 +91,8 @@ def _build_hap_map(df, kid_allele_col, parent_allele_col,
             mismatch_mask = ~mismatch
 
         record = {col: row[col] for col in group_cols}
+        for col in span_cols:
+            record[col] = row[col]
         record[hap_col_name] = haplotype
         record["haplotype_concordance"] = concordance
         record["num_het_SNVs_in_parent"] = n
@@ -135,6 +150,7 @@ def get_hap_map(df_kid_dad, df_kid_mom):
     """
     df_pat, df_mismatch_pat = _build_hap_map(
         df_kid_dad, "kid_allele_pat", "dad_allele_A",
+        "phase_block_id_kid", "phase_block_id_dad",
         ["start_phase_block_kid", "end_phase_block_kid"],
         ["start_phase_block_dad", "end_phase_block_dad"],
         ("A", "B"), "paternal_haplotype",
@@ -142,6 +158,7 @@ def get_hap_map(df_kid_dad, df_kid_mom):
 
     df_mat, df_mismatch_mat = _build_hap_map(
         df_kid_mom, "kid_allele_mat", "mom_allele_C",
+        "phase_block_id_kid", "phase_block_id_mom",
         ["start_phase_block_kid", "end_phase_block_kid"],
         ["start_phase_block_mom", "end_phase_block_mom"],
         ("C", "D"), "maternal_haplotype",

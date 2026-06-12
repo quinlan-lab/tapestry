@@ -1,8 +1,30 @@
+import logging
+
 from cyvcf2 import VCF  # type: ignore
 import bioframe as bf
 import polars as pl
 
 from phasing import is_snv_het
+
+logger = logging.getLogger(__name__)
+
+
+def _read_ps(ps_all, si):
+    """Read one sample's phase-set (PS) id from a cyvcf2 format('PS') array.
+
+    Returns the PS as a string (to match phase_block_id in the blocks TSV), or
+    None when the sample has no PS at this site (unphased / homozygous). cyvcf2
+    encodes a missing integer as a large negative sentinel, so we treat any
+    negative value as missing; a real PS is a 1-based position and always > 0.
+    """
+    if ps_all is None:
+        return None
+    val = ps_all[si]
+    try:
+        v = int(val[0]) if hasattr(val, "__len__") else int(val)
+    except (TypeError, ValueError):
+        return None
+    return None if v < 0 else str(v)
 
 def get_phase_blocks(blocks_tsv: str, uid: str) -> pl.DataFrame:
     """
@@ -29,11 +51,34 @@ def get_phase_blocks(blocks_tsv: str, uid: str) -> pl.DataFrame:
 
 
 def _annotate_phase_blocks(df_snvs, df_blocks, label):
-    """Annotate phased SNVs with the phase block they fall in for a given individual."""
+    """Attach each SNV's phase block for one individual, resolving overlaps by
+    phase-set identity.
+
+    bf.overlap matches a SNV to EVERY phase block whose [start, end) span
+    contains it. WhatsHap blocks can nest — a short read-backed phase set sits
+    inside the genomic span of a chromosome-spanning pedMEC set — so a single
+    SNV can overlap several blocks. Assigning it to all of them fans the row
+    out, and once the kid and parent annotations are combined a SNV multiplies
+    into duplicate (and nested) hap-map blocks. We therefore keep exactly one
+    block per SNV:
+
+      * het + phased sites carry a PS (phase-set) tag in ``ps_{label}``; we keep
+        the overlapping block whose id equals that PS — the phase set the SNV
+        was actually phased in.
+      * homozygous sites (kid only; the parent is always het at these sites)
+        have no PS. Their transmitted allele is phase-independent, so we attach
+        them to the largest-span overlapping block (the chromosome-spanning
+        pedMEC block) rather than to an incidental nested block.
+
+    The ``ps_{label}`` column on ``df_snvs`` is dropped on the way out; the
+    chosen block's id is kept as ``phase_block_id_{label}`` for grouping in
+    _build_hap_map.
+    """
+    ps_col = f"ps_{label}"
     df = pl.from_pandas(bf.overlap(
         df_snvs.to_pandas(),
-        df_blocks.select(["chrom", "start", "end"]).to_pandas(),
-        how='inner', # restrict to phased SNVs
+        df_blocks.select(["chrom", "start", "end", "phase_block_id"]).to_pandas(),
+        how='inner',  # restrict to phased SNVs (those overlapping a block)
         suffixes=('', f'_{label}'),
     ))
     return (
@@ -43,6 +88,18 @@ def _annotate_phase_blocks(df_snvs, df_blocks, label):
             f"end_{label}": f"end_phase_block_{label}",
         })
         .drop(f"chrom_{label}")
+        .with_columns(
+            _is_ps_match=(
+                pl.col(ps_col).is_not_null()
+                & (pl.col(f"phase_block_id_{label}").cast(pl.String) == pl.col(ps_col))
+            ),
+            _span=pl.col(f"end_phase_block_{label}") - pl.col(f"start_phase_block_{label}"),
+        )
+        # keep one block per SNV: PS-matching block first, else widest span
+        .sort(["_is_ps_match", "_span"], descending=[True, True])
+        .unique(subset=["chrom", "start", "end"], keep="first", maintain_order=True)
+        .drop(["_is_ps_match", "_span", ps_col])
+        .sort(["chrom", "start", "end"])
     )
 
 def get_all_phasing(
@@ -91,6 +148,21 @@ def get_all_phasing(
     si_dad = samples.index(dad_id)
     si_mom = samples.index(mom_id)
 
+    # The nested-block disambiguation relies on the per-sample PS (phase-set)
+    # FORMAT tag. If the VCF does not declare PS, every het site falls back to
+    # span-based assignment and nested phase blocks would re-duplicate, so warn.
+    try:
+        vcf_reader.get_header_type('PS')
+        ps_in_header = True
+    except KeyError:
+        ps_in_header = False
+        logger.warning(
+            "No 'PS' FORMAT tag declared in %s; phase-set disambiguation will "
+            "fall back to widest-span assignment and may produce duplicate or "
+            "nested hap-map blocks. Verify the pedmec-phased VCF carries PS.",
+            vcf_path,
+        )
+
     for variant in vcf_reader:
         if not variant.is_snp:
             continue
@@ -105,9 +177,11 @@ def get_all_phasing(
         ALT = variant.ALT[0]
 
         genotype_all = variant.genotypes
+        ps_all = variant.format('PS') if ps_in_header else None
         gt_kid = genotype_all[si_kid]
         kid_phased = gt_kid[2]
         kid_is_hom = (gt_kid[0] == gt_kid[1])
+        ps_kid = _read_ps(ps_all, si_kid)
 
         # Dad-het sites → paternal allele in kid
         if is_snv_het(variant, si_dad):
@@ -123,6 +197,8 @@ def get_all_phasing(
                         "kid_allele_pat": str(gt_kid[0]) if gt_kid[0] != -1 else '.',
                         "dad_allele_A": str(gt_dad[0]),
                         "dad_allele_B": str(gt_dad[1]),
+                        "ps_kid": ps_kid,
+                        "ps_dad": _read_ps(ps_all, si_dad),
                     })
 
         # Mom-het sites → maternal allele in kid
@@ -139,6 +215,8 @@ def get_all_phasing(
                         "kid_allele_mat": str(gt_kid[1]) if gt_kid[1] != -1 else '.',
                         "mom_allele_C": str(gt_mom[0]),
                         "mom_allele_D": str(gt_mom[1]),
+                        "ps_kid": ps_kid,
+                        "ps_mom": _read_ps(ps_all, si_mom),
                     })
 
     vcf_reader.close()
