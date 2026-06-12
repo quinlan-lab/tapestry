@@ -17,22 +17,26 @@
 -->
 <Session genome="hg38" locus="chr20:36,644,733-36,744,733" version="8">
     <Resources>
-        <!-- PedMEC-phasing: phased VCF -->
-        <Resource path="http://localhost:8000/pedmec-phasing/CEPH-1463.joint.GRCh38.deepvariant.glnexus.phased.vcf.gz" type="vcf"/>
-        <!-- PedMEC-phasing: phase blocks (GTF) -->
+        <!-- PedMEC-phasing: phased VCF (tabix .tbi so IGV range-requests the window
+             instead of downloading the genome-wide file) -->
+        <Resource path="http://localhost:8000/pedmec-phasing/CEPH-1463.joint.GRCh38.deepvariant.glnexus.phased.vcf.gz" index="http://localhost:8000/pedmec-phasing/CEPH-1463.joint.GRCh38.deepvariant.glnexus.phased.vcf.gz.tbi" type="vcf"/>
+        <!-- PedMEC-phasing: phase blocks (GTF). No index: pedMEC blocks are few
+             (KB-sized genome-wide), so IGV builds an in-memory index from the
+             whole file. The pipeline does not produce a .gtf.idx, and pointing
+             at a non-existent one makes IGV fail instead of falling back. -->
         <Resource path="http://localhost:8000/pedmec-phasing/CEPH-1463.joint.GRCh38.deepvariant.glnexus.phased.NA12878.blocks.gtf" type="gtf"/>
         <Resource path="http://localhost:8000/pedmec-phasing/CEPH-1463.joint.GRCh38.deepvariant.glnexus.phased.NA12891.blocks.gtf" type="gtf"/>
         <Resource path="http://localhost:8000/pedmec-phasing/CEPH-1463.joint.GRCh38.deepvariant.glnexus.phased.NA12892.blocks.gtf" type="gtf"/>
-        <!-- PedMEC-phasing: haplotagged BAMs -->
-        <Resource path="http://localhost:8000/pedmec-phasing/NA12878.GRCh38.haplotagged.bam" type="bam"/>
-        <Resource path="http://localhost:8000/pedmec-phasing/NA12891.GRCh38.haplotagged.bam" type="bam"/>
-        <Resource path="http://localhost:8000/pedmec-phasing/NA12892.GRCh38.haplotagged.bam" type="bam"/>
-        <!-- Parent-phased: kid hap-map blocks -->
-        <Resource path="http://localhost:8000/dna-methylation/CEPH1463.GRCh38.hifi.parent-phased/NA12878.hap-map-blocks.paternal.sorted.bed.gz"/>
-        <Resource path="http://localhost:8000/dna-methylation/CEPH1463.GRCh38.hifi.parent-phased/NA12878.hap-map-blocks.maternal.sorted.bed.gz"/>
-        <!-- Parent-phased: kid bit-vector mismatch sites -->
-        <Resource path="http://localhost:8000/dna-methylation/CEPH1463.GRCh38.hifi.parent-phased/NA12878.bit-vector-sites-mismatches.paternal.vcf.gz" type="vcf"/>
-        <Resource path="http://localhost:8000/dna-methylation/CEPH1463.GRCh38.hifi.parent-phased/NA12878.bit-vector-sites-mismatches.maternal.vcf.gz" type="vcf"/>
+        <!-- PedMEC-phasing: haplotagged BAMs (.bai) -->
+        <Resource path="http://localhost:8000/pedmec-phasing/NA12878.GRCh38.haplotagged.bam" index="http://localhost:8000/pedmec-phasing/NA12878.GRCh38.haplotagged.bam.bai" type="bam"/>
+        <Resource path="http://localhost:8000/pedmec-phasing/NA12891.GRCh38.haplotagged.bam" index="http://localhost:8000/pedmec-phasing/NA12891.GRCh38.haplotagged.bam.bai" type="bam"/>
+        <Resource path="http://localhost:8000/pedmec-phasing/NA12892.GRCh38.haplotagged.bam" index="http://localhost:8000/pedmec-phasing/NA12892.GRCh38.haplotagged.bam.bai" type="bam"/>
+        <!-- Parent-phased: kid hap-map blocks (bgzipped + tabix .tbi) -->
+        <Resource path="http://localhost:8000/dna-methylation/CEPH1463.GRCh38.hifi.parent-phased/NA12878.hap-map-blocks.paternal.sorted.bed.gz" index="http://localhost:8000/dna-methylation/CEPH1463.GRCh38.hifi.parent-phased/NA12878.hap-map-blocks.paternal.sorted.bed.gz.tbi"/>
+        <Resource path="http://localhost:8000/dna-methylation/CEPH1463.GRCh38.hifi.parent-phased/NA12878.hap-map-blocks.maternal.sorted.bed.gz" index="http://localhost:8000/dna-methylation/CEPH1463.GRCh38.hifi.parent-phased/NA12878.hap-map-blocks.maternal.sorted.bed.gz.tbi"/>
+        <!-- Parent-phased: kid bit-vector mismatch sites (tabix .tbi) -->
+        <Resource path="http://localhost:8000/dna-methylation/CEPH1463.GRCh38.hifi.parent-phased/NA12878.bit-vector-sites-mismatches.paternal.vcf.gz" index="http://localhost:8000/dna-methylation/CEPH1463.GRCh38.hifi.parent-phased/NA12878.bit-vector-sites-mismatches.paternal.vcf.gz.tbi" type="vcf"/>
+        <Resource path="http://localhost:8000/dna-methylation/CEPH1463.GRCh38.hifi.parent-phased/NA12878.bit-vector-sites-mismatches.maternal.vcf.gz" index="http://localhost:8000/dna-methylation/CEPH1463.GRCh38.hifi.parent-phased/NA12878.bit-vector-sites-mismatches.maternal.vcf.gz.tbi" type="vcf"/>
     </Resources>
     <!-- Phased VCF -->
     <Panel height="150" name="DataPanel" width="2163">
