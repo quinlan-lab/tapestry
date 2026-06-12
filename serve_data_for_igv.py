@@ -1,18 +1,25 @@
 """
-HTTP server with range-request support for serving trio_dev_data to IGV.
+HTTP server with range-request support for serving genomic files to IGV.
+
+Roots an HTTP server at --data-dir and serves its files (with the Range support
+and CORS headers IGV needs) at http://localhost:PORT/<relative-path>. Defaults
+to trio_dev_data for the dev workflow; point --data-dir at the production tree
+(e.g. /scratch/ucgd/lustre-labs/quinlan/data-shared) to inspect genome-wide
+output such as a candidate crossover. Pair with an IGV session whose Resource
+paths are http://localhost:PORT/<relative-path> under that root, and tunnel from
+your laptop with `ssh -L PORT:localhost:PORT <host>`.
 
 Usage:
-    .venv/bin/python serve_trio_dev_data.py [--port PORT]
-
-Then point IGV at e.g. http://localhost:8000/input/NA12878.GRCh38.haplotagged.bam
+    .venv/bin/python serve_data_for_igv.py [--port PORT] [--data-dir DIR]
 """
 
 import argparse
 import mimetypes
 import os
+from functools import partial
 from http.server import ThreadingHTTPServer, SimpleHTTPRequestHandler
 
-DATA_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "trio_dev_data")
+DEFAULT_DATA_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "trio_dev_data")
 
 # Register MIME types for genomic file formats so IGV gets proper Content-Type
 # headers, including for index files (.bai, .tbi, .csi, .fai).
@@ -36,10 +43,11 @@ for ext, mime in GENOMIC_MIME_TYPES.items():
 
 
 class RangeRequestHandler(SimpleHTTPRequestHandler):
-    """HTTP handler that supports Range requests (required by IGV for BAM/VCF/etc)."""
+    """HTTP handler that supports Range requests (required by IGV for BAM/VCF/etc).
 
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, directory=DATA_DIR, **kwargs)
+    The served root is supplied via the base class `directory` kwarg (bound with
+    functools.partial in main()), so the handler is not tied to any one dataset.
+    """
 
     def end_headers(self):
         self.send_header("Access-Control-Allow-Origin", "*")
@@ -108,12 +116,16 @@ class RangeRequestHandler(SimpleHTTPRequestHandler):
 
 
 def main():
-    parser = argparse.ArgumentParser(description="Serve trio_dev_data with range request support for IGV")
+    parser = argparse.ArgumentParser(description="Serve genomic files with range request support for IGV")
     parser.add_argument("--port", type=int, default=8000)
+    parser.add_argument("--data-dir", default=DEFAULT_DATA_DIR,
+                        help="Directory to serve as the HTTP root (default: trio_dev_data)")
     args = parser.parse_args()
 
-    server = ThreadingHTTPServer(("localhost", args.port), RangeRequestHandler)
-    print(f"Serving {DATA_DIR} on http://localhost:{args.port}")
+    data_dir = os.path.abspath(args.data_dir)
+    handler = partial(RangeRequestHandler, directory=data_dir)
+    server = ThreadingHTTPServer(("localhost", args.port), handler)
+    print(f"Serving {data_dir} on http://localhost:{args.port}")
     print("Press Ctrl+C to stop")
     try:
         server.serve_forever()
