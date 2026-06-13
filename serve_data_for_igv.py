@@ -24,6 +24,7 @@ Usage:
 """
 
 import argparse
+import logging
 import os
 
 from aiohttp import web
@@ -110,13 +111,20 @@ def main():
                         help="Directory to serve as the HTTP root (default: trio_dev_data)")
     args = parser.parse_args()
 
+    # Configure logging so aiohttp's access logger (INFO) actually emits a line
+    # per request; without a handler it is silent. Status codes show too, so a
+    # refused whole-file data GET (400) or a range read (206) is visible.
+    logging.basicConfig(level=logging.INFO, format="%(asctime)s %(message)s",
+                        datefmt="%Y-%m-%d %H:%M:%S")
+
     data_dir = os.path.abspath(args.data_dir)
     app = web.Application()
     app["data_dir"] = data_dir
     app.router.add_get("/{filename:.*}", handle)
     print(f"Serving {data_dir} on http://localhost:{args.port}")
     print("Press Ctrl+C to stop")
-    web.run_app(app, host="localhost", port=args.port, print=None)
+    web.run_app(app, host="localhost", port=args.port, print=None,
+                access_log_format='%a "%r" %s %b')
 
 
 if __name__ == "__main__":
