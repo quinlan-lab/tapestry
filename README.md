@@ -248,7 +248,7 @@ File | Description
 `trio_dev_data_create.sh` | Creates the dev dataset by subsetting the production VCF and BAM files to the dev region. Run on a machine with access to the production data: `./trio_dev_data_create.sh trio_dev_data`.
 `trio_dev_data_get_ref.sh` | Downloads the reference FASTA for the dev region chromosome from UCSC. Only needs to be run once: `./trio_dev_data_get_ref.sh trio_dev_data`.
 `serve_data_for_igv.py` | HTTP server with range-request support for serving genomic data files for IGV to consume. Roots at `--data-dir` (default `trio_dev_data/`); point it at the production tree to inspect genome-wide output. Start with `.venv/bin/python serve_data_for_igv.py` (default port 8000).
-`trio_dev_data_igv_session.xml` | IGV session file that loads the dev data (haplotagged BAMs, phased VCFs, phase blocks, methylation bigwigs, and mismatch-site VCFs) from the local server. Open in IGV via File > Open Session after starting the server.
+`trio_dev_data_igv_session.xml` | IGV session file that loads the dev data (haplotagged BAMs, phased VCFs, phase blocks, methylation bigwigs, and mismatch-site VCFs) over HTTP from `serve_data_for_igv.py`. The Resource paths point at `http://localhost:PORT/...`, so the server can run either locally on your laptop or remotely on CHPC (in which case tunnel with `ssh -L PORT:localhost:PORT <host>`). Open in IGV via File > Open Session after starting the server.
 
 **The trio dev run must be performed on CHPC, not on a local machine.** Although the dev data subset (`trio_dev_data/input/`) is small enough to commit and copy around, `aligned_bam_to_cpg_scores.sh` invokes the pb-CpG-tools binary from a CHPC-only path (`/uufs/chpc.utah.edu/common/HIPAA/u6018199/pb-CpG-tools-v3.0.0-x86_64-unknown-linux-gnu/bin`), which is not available locally. Because every later step consumes its output, the entire dev chain (and therefore `phase_meth_to_parent_haps.sh`) has to be run on CHPC.
 
@@ -265,7 +265,7 @@ To run the trio workflow on the dev data, on CHPC:
 ./expand_to_all_cpgs.trio.sh --dev-dir trio_dev_data
 ```
 
-All output is written under `trio_dev_data/output/`. To inspect results locally (e.g. in IGV), copy that directory back from CHPC and use `serve_data_for_igv.py` / `trio_dev_data_igv_session.xml`.
+All output is written under `trio_dev_data/output/`. To inspect results in IGV, run `serve_data_for_igv.py` / `trio_dev_data_igv_session.xml` either directly on CHPC (tunnelling the port back to your laptop, as described above) or locally after copying `trio_dev_data/output/` back from CHPC. Running parts of the workflow locally on the truncated dev dataset is also useful for quick iteration, though steps that depend on the CHPC-only pb-CpG-tools binary (see above) must still be run on CHPC.
 
 ## TODO
 
