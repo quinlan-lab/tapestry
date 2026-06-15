@@ -137,6 +137,18 @@ def _score_block(block, mm_pos):
         break_pos = start + round(f * L)
         inner = max((p for p, x in zip(mm_pos, u) if x < f), default=break_pos)
 
+    # frac has two reference values, both following from uniform het-SNV density:
+    #   * Random scatter (phase-switch noise) -> frac ~= f. Uniformly scattered
+    #     mismatches fill any sub-interval in proportion to its length, and both
+    #     predicted sides have length f ((c, 1] and [0, f)), so neither side is
+    #     favoured: frac = max(f, f) ~= f.
+    #   * Perfectly clean crossover -> frac ~= 1. All mismatches lie in the one
+    #     true minority segment, which IS one of those two intervals, so that
+    #     side captures ~all of them: frac = max(...) ~= 1.
+    # Rescaling maps f -> 0 and 1 -> 1; subtracting f removes the baseline a
+    # length-f interval picks up by chance, so the score measures concentration
+    # BEYOND random scatter (low-concordance blocks, with larger f, must clear a
+    # larger baseline).
     cleanliness = max(0.0, min(1.0, (frac - f) / (1.0 - f)))
     lo, hi = sorted((break_pos, inner))
     return {
