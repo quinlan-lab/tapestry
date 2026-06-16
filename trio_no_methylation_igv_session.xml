@@ -1,21 +1,28 @@
 <?xml version="1.0" encoding="UTF-8" standalone="no"?>
 <!--
-  IGV session for confirming the candidate maternal crossover at
-  chr20:~36,694,733 (NA12878, production genome-wide output).
+  IGV session for inspecting trio phasing: the joint phased VCF, the
+  haplotagged BAMs and pedMEC phase blocks for the trio (NA12878 kid,
+  NA12891 dad, NA12892 mom), plus the kid's parent-phased hap-map blocks
+  and bit-vector mismatch sites. DNA methylation tracks are intentionally
+  omitted.
 
-  Serve the production tree, then tunnel from your laptop. On CHPC run
-  serve_data_for_igv.py with port 8000 and data-dir
-  /scratch/ucgd/lustre-labs/quinlan/data-shared; on your laptop run
-  ssh -L 8000:localhost:8000 to that host; then File then Open Session
-  and pick this file.
+  Serve the data, then tunnel from your laptop. On the host holding the
+  data, run serve_data_for_igv.py with port 8000 and the data-dir flag
+  pointing at the directory that contains pedmec-phasing/ and
+  dna-methylation/ (dev or production: the session does not care which,
+  it only sees the served paths); on your laptop run
+  ssh -L 8000:localhost:8000 to that host; then File then Open Session and
+  pick this file.
 
-  Confirm: a SHARP sparse-to-dense mismatch transition at ~36.695 Mb in the
-  MATERNAL bit-vector mismatch track, with the PATERNAL track FLAT across the
-  same spot (a true maternal meiotic crossover, not a kid phase-switch, which
-  would transition in BOTH tracks at the same coordinate). Methylation bigwigs
-  are intentionally omitted (the regression run skipped methylation).
+  Example use, confirm a candidate meiotic crossover: navigate to the
+  candidate site and look for a SHARP sparse-to-dense transition in ONE of
+  the kid's bit-vector mismatch tracks (paternal or maternal) while the
+  OTHER stays FLAT across the same spot (a true parental crossover, not a
+  kid phase-switch, which would transition in BOTH tracks at the same
+  coordinate). The session opens at chr14:~16.09 Mb (NA12878), where the
+  pedMEC phase blocks show interleaved/nested phase sets; navigate anywhere.
 -->
-<Session genome="hg38" locus="chr20:36,644,733-36,744,733" version="8">
+<Session genome="hg38" locus="chr14:16,060,275-16,117,246" version="8">
     <Resources>
         <!-- PedMEC-phasing: phased VCF (tabix .tbi so IGV range-requests the window
              instead of downloading the genome-wide file) -->
@@ -39,8 +46,8 @@
         <Resource path="http://localhost:8000/dna-methylation/CEPH1463.GRCh38.hifi.parent-phased/NA12878.bit-vector-sites-mismatches.maternal.vcf.gz" index="http://localhost:8000/dna-methylation/CEPH1463.GRCh38.hifi.parent-phased/NA12878.bit-vector-sites-mismatches.maternal.vcf.gz.tbi" type="vcf"/>
     </Resources>
     <!-- Phased VCF -->
-    <Panel height="150" name="DataPanel" width="2163">
-        <Track attributeKey="CEPH-1463.joint.GRCh38.deepvariant.glnexus.phased.vcf.gz" clazz="org.broad.igv.variant.VariantTrack" displayMode="EXPANDED" fontSize="10" id="http://localhost:8000/pedmec-phasing/CEPH-1463.joint.GRCh38.deepvariant.glnexus.phased.vcf.gz" name="CEPH-1463.joint.GRCh38.deepvariant.glnexus.phased.vcf.gz" siteColorMode="ALLELE_FREQUENCY" visible="true"/>
+    <Panel height="80" name="DataPanel" width="2163">
+        <Track attributeKey="CEPH-1463.joint.GRCh38.deepvariant.glnexus.phased.vcf.gz" clazz="org.broad.igv.variant.VariantTrack" displayMode="EXPANDED" fontSize="10" height="60" id="http://localhost:8000/pedmec-phasing/CEPH-1463.joint.GRCh38.deepvariant.glnexus.phased.vcf.gz" name="CEPH-1463.joint.GRCh38.deepvariant.glnexus.phased.vcf.gz" siteColorMode="ALLELE_FREQUENCY" visible="true"/>
     </Panel>
     <!-- Kid (NA12878): BAM + hap-map blocks + bit-vector mismatch tracks -->
     <Panel height="500" name="PanelKid" width="2163">
@@ -48,8 +55,8 @@
         <Track attributeKey="NA12878.GRCh38.haplotagged.bam" clazz="org.broad.igv.sam.AlignmentTrack" color="185,185,185" displayMode="SQUISHED" experimentType="THIRD_GEN" fontSize="10" height="150" id="http://localhost:8000/pedmec-phasing/NA12878.GRCh38.haplotagged.bam" name="NA12878 BAM" visible="true">
             <RenderOptions colorByTag="PS" colorOption="TAG" groupByOption="PHASE" hideSmallIndels="true" smallIndelThreshold="100"/>
         </Track>
-        <Track attributeKey="NA12878.hap-map-blocks.paternal.sorted.bed.gz" clazz="org.broad.igv.track.FeatureTrack" fontSize="10" id="http://localhost:8000/dna-methylation/CEPH1463.GRCh38.hifi.parent-phased/NA12878.hap-map-blocks.paternal.sorted.bed.gz" name="NA12878 hap-map blks pat" visible="true"/>
-        <Track attributeKey="NA12878.hap-map-blocks.maternal.sorted.bed.gz" clazz="org.broad.igv.track.FeatureTrack" fontSize="10" id="http://localhost:8000/dna-methylation/CEPH1463.GRCh38.hifi.parent-phased/NA12878.hap-map-blocks.maternal.sorted.bed.gz" name="NA12878 hap-map blks mat" visible="true"/>
+        <Track attributeKey="NA12878.hap-map-blocks.paternal.sorted.bed.gz" clazz="org.broad.igv.track.FeatureTrack" displayMode="EXPANDED" fontSize="10" id="http://localhost:8000/dna-methylation/CEPH1463.GRCh38.hifi.parent-phased/NA12878.hap-map-blocks.paternal.sorted.bed.gz" name="NA12878 hap-map blks pat" visible="true"/>
+        <Track attributeKey="NA12878.hap-map-blocks.maternal.sorted.bed.gz" clazz="org.broad.igv.track.FeatureTrack" displayMode="EXPANDED" fontSize="10" id="http://localhost:8000/dna-methylation/CEPH1463.GRCh38.hifi.parent-phased/NA12878.hap-map-blocks.maternal.sorted.bed.gz" name="NA12878 hap-map blks mat" visible="true"/>
         <Track attributeKey="NA12878.bit-vector-sites-mismatches.paternal.vcf.gz" clazz="org.broad.igv.variant.VariantTrack" displayMode="COLLAPSED" fontSize="10" id="http://localhost:8000/dna-methylation/CEPH1463.GRCh38.hifi.parent-phased/NA12878.bit-vector-sites-mismatches.paternal.vcf.gz" name="NA12878 bitvec mismatch pat" visible="true" showGenotypes="false"/>
         <Track attributeKey="NA12878.bit-vector-sites-mismatches.maternal.vcf.gz" clazz="org.broad.igv.variant.VariantTrack" displayMode="COLLAPSED" fontSize="10" id="http://localhost:8000/dna-methylation/CEPH1463.GRCh38.hifi.parent-phased/NA12878.bit-vector-sites-mismatches.maternal.vcf.gz" name="NA12878 bitvec mismatch mat" visible="true" showGenotypes="false"/>
     </Panel>
@@ -70,9 +77,9 @@
     <!-- Feature panel: phase blocks + reference -->
     <Panel height="200" name="FeaturePanel" width="2163">
         <Track attributeKey="Reference sequence" clazz="org.broad.igv.track.SequenceTrack" fontSize="10" id="Reference sequence" name="Reference sequence" sequenceTranslationStrandValue="+" shouldShowTranslation="false" visible="true"/>
-        <Track attributeKey="CEPH-1463.joint.GRCh38.deepvariant.glnexus.phased.NA12878.blocks.gtf" clazz="org.broad.igv.track.FeatureTrack" fontSize="10" id="http://localhost:8000/pedmec-phasing/CEPH-1463.joint.GRCh38.deepvariant.glnexus.phased.NA12878.blocks.gtf" name="NA12878 phase blocks" visible="true"/>
-        <Track attributeKey="CEPH-1463.joint.GRCh38.deepvariant.glnexus.phased.NA12891.blocks.gtf" clazz="org.broad.igv.track.FeatureTrack" fontSize="10" id="http://localhost:8000/pedmec-phasing/CEPH-1463.joint.GRCh38.deepvariant.glnexus.phased.NA12891.blocks.gtf" name="NA12891 phase blocks" visible="true"/>
-        <Track attributeKey="CEPH-1463.joint.GRCh38.deepvariant.glnexus.phased.NA12892.blocks.gtf" clazz="org.broad.igv.track.FeatureTrack" fontSize="10" id="http://localhost:8000/pedmec-phasing/CEPH-1463.joint.GRCh38.deepvariant.glnexus.phased.NA12892.blocks.gtf" name="NA12892 phase blocks" visible="true"/>
+        <Track attributeKey="CEPH-1463.joint.GRCh38.deepvariant.glnexus.phased.NA12878.blocks.gtf" clazz="org.broad.igv.track.FeatureTrack" displayMode="EXPANDED" fontSize="10" id="http://localhost:8000/pedmec-phasing/CEPH-1463.joint.GRCh38.deepvariant.glnexus.phased.NA12878.blocks.gtf" name="NA12878 phase blocks" visible="true"/>
+        <Track attributeKey="CEPH-1463.joint.GRCh38.deepvariant.glnexus.phased.NA12891.blocks.gtf" clazz="org.broad.igv.track.FeatureTrack" displayMode="EXPANDED" fontSize="10" id="http://localhost:8000/pedmec-phasing/CEPH-1463.joint.GRCh38.deepvariant.glnexus.phased.NA12891.blocks.gtf" name="NA12891 phase blocks" visible="true"/>
+        <Track attributeKey="CEPH-1463.joint.GRCh38.deepvariant.glnexus.phased.NA12892.blocks.gtf" clazz="org.broad.igv.track.FeatureTrack" displayMode="EXPANDED" fontSize="10" id="http://localhost:8000/pedmec-phasing/CEPH-1463.joint.GRCh38.deepvariant.glnexus.phased.NA12892.blocks.gtf" name="NA12892 phase blocks" visible="true"/>
     </Panel>
     <HiddenAttributes>
         <Attribute name="DATA FILE"/>
