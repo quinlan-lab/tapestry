@@ -2,13 +2,13 @@
 
 # Rank candidate meiotic crossovers in the kid by single-crossover cleanliness,
 # from the hap-map blocks and bit-vector mismatch sites produced by
-# phase_meth_to_parent_haps.sh. Writes a ranked TSV plus IGV navigation/batch
-# outputs, and logs the cleanest single-parent candidate to confirm in IGV
-# before recutting the dev set around it.
+# phase_meth_to_parent_haps.sh. Writes a ranked TSV and logs the cleanest
+# single-parent candidate; paste its break_interval into IGV to confirm before
+# recutting the dev set around it.
 #
 # Usage:
-#   Production:  ./find_clean_crossover.sh
-#   Dev mode:    ./find_clean_crossover.sh --dev-dir trio_dev_data
+#   Production:  ./find_clean_single_crossover.sh
+#   Dev mode:    ./find_clean_single_crossover.sh --dev-dir trio_dev_data
 
 source src/util/logging.sh
 
@@ -50,18 +50,14 @@ mismatch_maternal="${output_dir}/${kid_id}.bit-vector-sites-mismatches.maternal.
 
 # OUTPUT FILES
 out_tsv="${output_dir}/${kid_id}.crossover-candidates.tsv"
-out_igv_bed="${output_dir}/${kid_id}.crossover-candidates.igv.bed"
-out_igv_batch="${output_dir}/${kid_id}.crossover-candidates.igv.bat"
 
 log_info "Ranking candidate crossovers for ${kid_id} from ${output_dir}"
 
-PYTHONPATH=src:src/util .venv/bin/python src/util/find_clean_crossover.py \
+PYTHONPATH=src:src/util .venv/bin/python src/util/find_clean_single_crossover.py \
     --paternal-blocks   "$blocks_paternal" \
     --maternal-blocks   "$blocks_maternal" \
     --paternal-mismatch "$mismatch_paternal" \
     --maternal-mismatch "$mismatch_maternal" \
-    --out       "$out_tsv" \
-    --igv-bed   "$out_igv_bed" \
-    --igv-batch "$out_igv_batch"
+    --out       "$out_tsv"
 
 log_info "Done; ranked candidates in ${out_tsv}"

@@ -52,28 +52,24 @@ chrX,chrY,chrM): for a female proband there is no chrY, and the paternal chrX
 is transmitted without meiotic recombination outside the PARs, so candidates
 there are artifacts. Pass --exclude-chroms '' to keep all chromosomes.
 
-IGV confirmation workflow
--------------------------
---igv-bed writes a navigation track of the candidate breakpoint intervals
-(cleanliness-ranked); load it in IGV alongside the
-bit-vector-sites-mismatches.{paternal,maternal}.vcf.gz tracks and use
-Ctrl-F / Ctrl-B to step through candidates. --igv-batch writes a batch script
-(`igv.sh -b <path>` or Tools > Run Batch Script) that does a `goto` zoomed on
-each estimated breakpoint (+/- --igv-window bp), cleanest-first, optionally
-snapshotting a PNG per candidate with --snapshot-dir. At each candidate confirm:
-the mismatch density should show a SHARP transition from sparse ticks (kid
-agrees) to a dense contiguous run to the block edge (past the crossover), and
-that transition should appear in only ONE parent's track (a true meiotic
-crossover); a transition at the same kid coordinate in BOTH tracks is a kid
-phase-switch artifact.
+IGV confirmation
+----------------
+The printed table is cleanliness-ranked and its break_interval column is a
+ready-to-paste chrom:lo-hi locus, so confirm a candidate by pasting that locus
+into IGV alongside the bit-vector-sites-mismatches.{paternal,maternal}.vcf.gz
+tracks. There the mismatch density should show a SHARP transition from sparse
+ticks (kid agrees) to a dense contiguous run to the block edge (past the
+crossover), appearing in only ONE parent's track (a true meiotic crossover); a
+transition at the same kid coordinate in BOTH tracks is a kid phase-switch
+artifact.
 
 Usage:
-    PYTHONPATH=src:src/util .venv/bin/python src/util/find_clean_crossover.py \\
+    PYTHONPATH=src:src/util .venv/bin/python src/util/find_clean_single_crossover.py \\
         --paternal-blocks    <out>/NA12878.hap-map-blocks.paternal.sorted.bed.gz \\
         --maternal-blocks    <out>/NA12878.hap-map-blocks.maternal.sorted.bed.gz \\
         --paternal-mismatch  <out>/NA12878.bit-vector-sites-mismatches.paternal.bed \\
         --maternal-mismatch  <out>/NA12878.bit-vector-sites-mismatches.maternal.bed \\
-        --out candidates.tsv --igv-bed candidates.igv.bed --igv-batch candidates.igv.bat
+        --out candidates.tsv
 """
 
 import argparse
@@ -125,9 +121,25 @@ def _score_block(block, mm_pos):
         return None
 
     u = [(p - start) / L for p in mm_pos]
+    # Fraction of THIS block's mismatches that fall in each predicted minority
+    # interval -- i.e. the realised value of "frac" for each candidate side.
+    # frac_right: share landing in (c, 1] (minority anchored to the right end).
+    # frac_left:  share landing in [0, f) (minority anchored to the left end).
+    # Both intervals have length f, so uniformly scattered (phase-switch noise)
+    # mismatches give frac ~= f; a clean crossover concentrates ~all of them in
+    # the true side, giving frac ~= 1. The larger of the two names the side.
     frac_right = sum(1 for x in u if x > c) / m       # minority on the right
     frac_left = sum(1 for x in u if x < f) / m        # minority on the left
 
+    # break_pos: the crossover position PREDICTED FROM CONCORDANCE ALONE. A single
+    #   clean crossover leaves a contiguous minority segment of length f, whose
+    #   inner edge sits a distance f from the end it is anchored to -- coordinate
+    #   c (= 1 - f) when the minority is on the right, f when it is on the left.
+    # inner: the innermost OBSERVED minority mismatch (the one nearest the majority
+    #   side). break_pos and inner are then bracketed (see lo, hi below) so the
+    #   reported interval spans the disagreement between the concordance-predicted
+    #   cut and where the mismatches actually begin; zoom there in IGV for the true
+    #   flanking het coordinates. (default=break_pos guards the no-mismatch side.)
     if frac_right >= frac_left:
         side, frac = "right", frac_right
         break_pos = start + round(c * L)
@@ -158,54 +170,6 @@ def _score_block(block, mm_pos):
         "break_interval": f"{block['chrom']}:{lo}-{hi}",
         "num_mismatch": m,
     }
-
-
-def write_igv_bed(df, path):
-    """Write candidate breakpoint intervals as an IGV navigation track.
-
-    Load in IGV with the mismatch VCF tracks; select the track and step with
-    Ctrl-F / Ctrl-B (cleanest-first by file order is not guaranteed -- IGV walks
-    genomic order -- but the feature name carries the cleanliness so you can
-    prioritize visually). The feature name encodes
-    "<parent>,clean=<cleanliness>,conc=<concordance>,<crossover_kind>".
-    """
-    (
-        df.with_columns(
-            chrom=pl.col("break_interval").str.split(":").list.get(0),
-            _range=pl.col("break_interval").str.split(":").list.get(1),
-        )
-        .with_columns(
-            start=pl.col("_range").str.split("-").list.get(0).cast(pl.Int64),
-            end=pl.col("_range").str.split("-").list.get(1).cast(pl.Int64),
-            name=pl.col("parent") + pl.lit(",clean=") + pl.col("cleanliness").cast(pl.String)
-            + pl.lit(",conc=") + pl.col("concordance").cast(pl.String)
-            + pl.lit(",") + pl.col("crossover_kind"),
-        )
-        .select(["chrom", "start", "end", "name"])
-        .sort(["chrom", "start", "end"])
-        .write_csv(path, separator="\t", include_header=False)
-    )
-
-
-def write_igv_batch(df, path, window, snapshot_dir=None):
-    """Write an IGV batch script that visits each candidate breakpoint zoomed.
-
-    Cleanest-first. Each candidate produces a `goto` to break_pos +/- window so
-    you land on the transition (not the whole chromosome). With snapshot_dir a
-    PNG is written per candidate. Run via `igv.sh -b <path>` or Tools > Run
-    Batch Script.
-    """
-    lines = []
-    if snapshot_dir:
-        lines.append(f"snapshotDirectory {snapshot_dir}")
-    for r in df.iter_rows(named=True):
-        lo = max(0, r["break_pos"] - window)
-        hi = r["break_pos"] + window
-        lines.append(f"goto {r['chrom']}:{lo}-{hi}")
-        if snapshot_dir:
-            lines.append(f"snapshot {r['parent']}.{r['chrom']}_{r['break_pos']}.png")
-    with open(path, "w") as f:
-        f.write("\n".join(lines) + "\n")
 
 
 def _analyze_track(blocks_bed, mismatch_bed, parent, min_num_het, max_concordance,
@@ -265,17 +229,6 @@ def main():
                              "Pass '' to keep all chromosomes.")
     parser.add_argument("--out", default=None,
                         help="Optional TSV path for the full ranked candidate table")
-    parser.add_argument("--igv-bed", default=None,
-                        help="Optional BED path: candidate breakpoint intervals as an "
-                             "IGV navigation track")
-    parser.add_argument("--igv-batch", default=None,
-                        help="Optional IGV batch-script path with a zoomed `goto` per "
-                             "candidate (cleanest-first)")
-    parser.add_argument("--igv-window", type=int, default=100_000,
-                        help="Half-width (bp) of the --igv-batch goto window around each "
-                             "estimated breakpoint (default: 100,000)")
-    parser.add_argument("--snapshot-dir", default=None,
-                        help="If set with --igv-batch, snapshot a PNG per candidate here")
     args = parser.parse_args()
 
     logging.basicConfig(level=logging.INFO,
@@ -320,12 +273,6 @@ def main():
     if args.out:
         df.write_csv(args.out, separator="\t")
         logger.info(f"Wrote ranked candidate table to '{args.out}'")
-    if args.igv_bed:
-        write_igv_bed(df, args.igv_bed)
-        logger.info(f"Wrote IGV navigation track to '{args.igv_bed}'")
-    if args.igv_batch:
-        write_igv_batch(df, args.igv_batch, args.igv_window, snapshot_dir=args.snapshot_dir)
-        logger.info(f"Wrote IGV batch script to '{args.igv_batch}'")
 
     best = df.filter(pl.col("crossover_kind") == "single-parent").head(1)
     if len(best):
