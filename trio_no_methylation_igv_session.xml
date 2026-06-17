@@ -19,10 +19,10 @@
   the kid's bit-vector mismatch tracks (paternal or maternal) while the
   OTHER stays FLAT across the same spot (a true parental crossover, not a
   kid phase-switch, which would transition in BOTH tracks at the same
-  coordinate). The session opens at chr14:~16.09 Mb (NA12878), where the
-  pedMEC phase blocks show interleaved/nested phase sets; navigate anywhere.
+  coordinate). The session opens at chr20:~36.69 Mb (NA12878); navigate
+  anywhere.
 -->
-<Session genome="hg38" locus="chr14:16,060,275-16,117,246" version="8">
+<Session genome="hg38" locus="chr20:36,694,733-36,695,013" version="8">
     <Resources>
         <!-- PedMEC-phasing: phased VCF (tabix .tbi so IGV range-requests the window
              instead of downloading the genome-wide file) -->
@@ -57,8 +57,8 @@
         </Track>
         <Track attributeKey="NA12878.hap-map-blocks.paternal.sorted.bed.gz" clazz="org.broad.igv.track.FeatureTrack" displayMode="EXPANDED" fontSize="10" id="http://localhost:8000/dna-methylation/CEPH1463.GRCh38.hifi.parent-phased/NA12878.hap-map-blocks.paternal.sorted.bed.gz" name="NA12878 hap-map blks pat" visible="true"/>
         <Track attributeKey="NA12878.hap-map-blocks.maternal.sorted.bed.gz" clazz="org.broad.igv.track.FeatureTrack" displayMode="EXPANDED" fontSize="10" id="http://localhost:8000/dna-methylation/CEPH1463.GRCh38.hifi.parent-phased/NA12878.hap-map-blocks.maternal.sorted.bed.gz" name="NA12878 hap-map blks mat" visible="true"/>
-        <Track attributeKey="NA12878.bit-vector-sites-mismatches.paternal.vcf.gz" clazz="org.broad.igv.variant.VariantTrack" displayMode="COLLAPSED" fontSize="10" id="http://localhost:8000/dna-methylation/CEPH1463.GRCh38.hifi.parent-phased/NA12878.bit-vector-sites-mismatches.paternal.vcf.gz" name="NA12878 bitvec mismatch pat" visible="true" showGenotypes="false"/>
-        <Track attributeKey="NA12878.bit-vector-sites-mismatches.maternal.vcf.gz" clazz="org.broad.igv.variant.VariantTrack" displayMode="COLLAPSED" fontSize="10" id="http://localhost:8000/dna-methylation/CEPH1463.GRCh38.hifi.parent-phased/NA12878.bit-vector-sites-mismatches.maternal.vcf.gz" name="NA12878 bitvec mismatch mat" visible="true" showGenotypes="false"/>
+        <Track attributeKey="NA12878.bit-vector-sites-mismatches.paternal.vcf.gz" clazz="org.broad.igv.variant.VariantTrack" displayMode="COLLAPSED" featureVisibilityWindow="-1" fontSize="10" id="http://localhost:8000/dna-methylation/CEPH1463.GRCh38.hifi.parent-phased/NA12878.bit-vector-sites-mismatches.paternal.vcf.gz" name="NA12878 bitvec mismatch pat" visible="true" showGenotypes="false"/>
+        <Track attributeKey="NA12878.bit-vector-sites-mismatches.maternal.vcf.gz" clazz="org.broad.igv.variant.VariantTrack" displayMode="COLLAPSED" featureVisibilityWindow="-1" fontSize="10" id="http://localhost:8000/dna-methylation/CEPH1463.GRCh38.hifi.parent-phased/NA12878.bit-vector-sites-mismatches.maternal.vcf.gz" name="NA12878 bitvec mismatch mat" visible="true" showGenotypes="false"/>
     </Panel>
     <!-- Dad (NA12891): BAM -->
     <Panel height="200" name="PanelDad" width="2163">
