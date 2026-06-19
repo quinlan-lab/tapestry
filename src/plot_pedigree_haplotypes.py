@@ -31,6 +31,13 @@ Usage::
 
     python plot_pedigree_haplotypes.py --ped trio.ped --iht trio.iht.txt \
         --out pedigree_haplotypes.png [--chrom chr20]
+
+References (Platinum-Pedigree-Inheritance, pinned at e12aca6):
+  - Haplotype-map building, .iht.txt format and the plotting method this script
+    reproduces:
+    https://github.com/Platinum-Pedigree-Consortium/Platinum-Pedigree-Inheritance/blob/e12aca6b49ee7208952467db4a2a9e2f79b98efb/HAPLOTYPING.md#plotting-haplotype-maps
+  - The original R plotting script (code/plotting/plot-iht.R):
+    https://github.com/Platinum-Pedigree-Consortium/Platinum-Pedigree-Inheritance/blob/e12aca6b49ee7208952467db4a2a9e2f79b98efb/code/plotting/plot-iht.R
 """
 
 import argparse
