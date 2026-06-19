@@ -30,7 +30,7 @@ no row of their own are added as implicit founders.
 Usage::
 
     python plot_pedigree_haplotypes.py --ped trio.ped --iht trio.iht.txt \
-        --out pedigree_haplotypes.png [--chrom chr20]
+        --out pedigree_haplotypes.pdf [--chrom chr20]
 
 References (Platinum-Pedigree-Inheritance, pinned at e12aca6):
   - Haplotype-map building, .iht.txt format and the plotting method this script

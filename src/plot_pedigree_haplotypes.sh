@@ -7,4 +7,4 @@ iht=${output_dir}/CEPH1463.GRCh38.iht.sorted.txt
 python src/plot_pedigree_haplotypes.py \
 	--ped ${ped} \
 	--iht ${iht} \
-  	--out images/tapestry.pedigree_haplotypes.CEPH1463.GRCh38.chr1.png
+  	--out images/tapestry.pedigree_haplotypes.CEPH1463.GRCh38.chr1.pdf
