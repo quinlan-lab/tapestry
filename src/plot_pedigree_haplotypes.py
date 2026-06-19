@@ -45,6 +45,7 @@ import argparse
 import matplotlib
 
 matplotlib.use("Agg")
+import matplotlib.colors
 import matplotlib.pyplot as plt
 import numpy as np
 import polars as pl
@@ -291,40 +292,36 @@ def layout(people, slot=2.6, gap=1.1, row_height=4.0, iterations=40):
 # --------------------------------------------------------------------------- #
 # Drawing
 # --------------------------------------------------------------------------- #
-def _merge_runs(segs):
-    """Collapse consecutive segments sharing an allele into single runs.
-
-    The iht map stores one block per marker interval, so a stretch of the same
-    inherited haplotype arrives as many adjacent same-allele segments. Drawing
-    each as its own rectangle leaves antialiasing hairlines along every shared
-    edge; merging them into one rectangle removes those seams entirely.
-    """
-    runs = []
-    for start, end, allele in segs:
-        if runs and runs[-1][2] == allele and runs[-1][1] == start:
-            runs[-1] = (runs[-1][0], end, allele)
-        else:
-            runs.append((start, end, allele))
-    return runs
+_RASTER_PX = 4000  # horizontal resolution of each painted track strip
 
 
 def _paint_pair(ax, cx, cy, haps, xmin, xspan, colors, paint_w, track_h, gap_h):
-    """Draw the hap1/hap2 painted tracks centred at (cx, cy)."""
+    """Draw the hap1/hap2 painted tracks centred at (cx, cy).
+
+    Each track is rendered as a *single* rasterised strip via ``imshow`` rather
+    than as one vector rectangle per iht block. Abutting vector fills leave
+    antialiasing hairlines along every shared edge (visible even within a
+    solid-colour founder track, which is stored as many same-allele blocks);
+    a single raster has no internal edges, so no seam can appear in any PDF
+    viewer at any zoom level.
+    """
     left = cx - paint_w / 2.0
-    # Small overlap so abutting runs of *different* alleles tile seamlessly
-    # rather than leaving an antialiased hairline at the boundary.
-    overlap = paint_w * 0.001
     for k, hap in enumerate(("hap1", "hap2")):
         top = cy - k * (track_h + gap_h)
+        # Background outline; uncovered columns stay transparent so genuine gaps
+        # in the haplotype map read as the white track rather than a colour.
         ax.add_patch(Rectangle((left, top - track_h), paint_w, track_h,
                                facecolor="none", edgecolor="0.6", linewidth=0.4,
                                zorder=2))
-        for start, end, allele in _merge_runs(haps[hap]):
-            sx = left + (start - xmin) / xspan * paint_w
-            w = max((end - start) / xspan * paint_w, paint_w * 0.004) + overlap
-            ax.add_patch(Rectangle((sx, top - track_h), w, track_h,
-                                   facecolor=colors[allele], edgecolor="none",
-                                   antialiased=False, zorder=3))
+        strip = np.zeros((1, _RASTER_PX, 4))  # transparent RGBA
+        for start, end, allele in haps[hap]:
+            c0 = int((start - xmin) / xspan * _RASTER_PX)
+            c1 = int(np.ceil((end - xmin) / xspan * _RASTER_PX))
+            c0 = max(0, min(_RASTER_PX - 1, c0))
+            c1 = max(c0 + 1, min(_RASTER_PX, c1))
+            strip[0, c0:c1, :] = matplotlib.colors.to_rgba(colors[allele])
+        ax.imshow(strip, extent=(left, left + paint_w, top - track_h, top),
+                  aspect="auto", interpolation="nearest", zorder=3)
 
 
 def _build_colors(allele_order, palette="auto"):
