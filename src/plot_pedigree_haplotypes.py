@@ -45,7 +45,6 @@ import argparse
 import matplotlib
 
 matplotlib.use("Agg")
-import matplotlib.colors
 import matplotlib.pyplot as plt
 import numpy as np
 import polars as pl
@@ -292,36 +291,52 @@ def layout(people, slot=2.6, gap=1.1, row_height=4.0, iterations=40):
 # --------------------------------------------------------------------------- #
 # Drawing
 # --------------------------------------------------------------------------- #
-_RASTER_PX = 4000  # horizontal resolution of each painted track strip
+def _merge_runs(segs):
+    """Collapse consecutive segments sharing an allele into single runs.
+
+    The iht map stores one block per marker interval, so a stretch of the same
+    inherited haplotype arrives as many adjacent same-allele segments. Merging
+    them into one rectangle means a solid founder track becomes a single vector
+    shape -- both seam-free and far fewer objects to wrangle in Illustrator.
+    """
+    runs = []
+    for start, end, allele in segs:
+        if runs and runs[-1][2] == allele and runs[-1][1] == start:
+            runs[-1] = (runs[-1][0], end, allele)
+        else:
+            runs.append((start, end, allele))
+    return runs
 
 
 def _paint_pair(ax, cx, cy, haps, xmin, xspan, colors, paint_w, track_h, gap_h):
     """Draw the hap1/hap2 painted tracks centred at (cx, cy).
 
-    Each track is rendered as a *single* rasterised strip via ``imshow`` rather
-    than as one vector rectangle per iht block. Abutting vector fills leave
-    antialiasing hairlines along every shared edge (visible even within a
-    solid-colour founder track, which is stored as many same-allele blocks);
-    a single raster has no internal edges, so no seam can appear in any PDF
-    viewer at any zoom level.
+    Each iht block is a *vector* rectangle so the painting stays fully editable
+    in Illustrator (each haplotype block is its own selectable, recolourable
+    shape). To avoid the antialiasing hairlines that abutting vector fills leave
+    along every shared edge -- visible in PDF viewers even inside a solid-colour
+    founder track -- two things are done:
+
+      * consecutive same-allele blocks are merged (``_merge_runs``), so a solid
+        stretch is one rectangle with no internal edges at all, and
+      * every rectangle is stroked in *its own fill colour*, so the stroke
+        overpaints the seam at boundaries between differently-coloured blocks.
     """
     left = cx - paint_w / 2.0
     for k, hap in enumerate(("hap1", "hap2")):
         top = cy - k * (track_h + gap_h)
-        # Background outline; uncovered columns stay transparent so genuine gaps
-        # in the haplotype map read as the white track rather than a colour.
         ax.add_patch(Rectangle((left, top - track_h), paint_w, track_h,
                                facecolor="none", edgecolor="0.6", linewidth=0.4,
                                zorder=2))
-        strip = np.zeros((1, _RASTER_PX, 4))  # transparent RGBA
-        for start, end, allele in haps[hap]:
-            c0 = int((start - xmin) / xspan * _RASTER_PX)
-            c1 = int(np.ceil((end - xmin) / xspan * _RASTER_PX))
-            c0 = max(0, min(_RASTER_PX - 1, c0))
-            c1 = max(c0 + 1, min(_RASTER_PX, c1))
-            strip[0, c0:c1, :] = matplotlib.colors.to_rgba(colors[allele])
-        ax.imshow(strip, extent=(left, left + paint_w, top - track_h, top),
-                  aspect="auto", interpolation="nearest", zorder=3)
+        for start, end, allele in _merge_runs(haps[hap]):
+            sx = left + (start - xmin) / xspan * paint_w
+            w = max((end - start) / xspan * paint_w, paint_w * 0.004)
+            color = colors[allele]
+            # Same-colour stroke: fills the hairline at shared edges while
+            # keeping the block a clean, individually editable vector shape.
+            ax.add_patch(Rectangle((sx, top - track_h), w, track_h,
+                                   facecolor=color, edgecolor=color,
+                                   linewidth=0.3, zorder=3))
 
 
 def _build_colors(allele_order, palette="auto"):
