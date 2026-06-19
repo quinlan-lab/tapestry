@@ -291,20 +291,40 @@ def layout(people, slot=2.6, gap=1.1, row_height=4.0, iterations=40):
 # --------------------------------------------------------------------------- #
 # Drawing
 # --------------------------------------------------------------------------- #
+def _merge_runs(segs):
+    """Collapse consecutive segments sharing an allele into single runs.
+
+    The iht map stores one block per marker interval, so a stretch of the same
+    inherited haplotype arrives as many adjacent same-allele segments. Drawing
+    each as its own rectangle leaves antialiasing hairlines along every shared
+    edge; merging them into one rectangle removes those seams entirely.
+    """
+    runs = []
+    for start, end, allele in segs:
+        if runs and runs[-1][2] == allele and runs[-1][1] == start:
+            runs[-1] = (runs[-1][0], end, allele)
+        else:
+            runs.append((start, end, allele))
+    return runs
+
+
 def _paint_pair(ax, cx, cy, haps, xmin, xspan, colors, paint_w, track_h, gap_h):
     """Draw the hap1/hap2 painted tracks centred at (cx, cy)."""
     left = cx - paint_w / 2.0
+    # Small overlap so abutting runs of *different* alleles tile seamlessly
+    # rather than leaving an antialiased hairline at the boundary.
+    overlap = paint_w * 0.001
     for k, hap in enumerate(("hap1", "hap2")):
         top = cy - k * (track_h + gap_h)
         ax.add_patch(Rectangle((left, top - track_h), paint_w, track_h,
                                facecolor="none", edgecolor="0.6", linewidth=0.4,
                                zorder=2))
-        for start, end, allele in haps[hap]:
+        for start, end, allele in _merge_runs(haps[hap]):
             sx = left + (start - xmin) / xspan * paint_w
-            w = max((end - start) / xspan * paint_w, paint_w * 0.004)
+            w = max((end - start) / xspan * paint_w, paint_w * 0.004) + overlap
             ax.add_patch(Rectangle((sx, top - track_h), w, track_h,
                                    facecolor=colors[allele], edgecolor="none",
-                                   zorder=3))
+                                   antialiased=False, zorder=3))
 
 
 def _build_colors(allele_order, palette="auto"):
