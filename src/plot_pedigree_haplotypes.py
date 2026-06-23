@@ -583,7 +583,7 @@ def _build_colors(allele_order, palette="auto"):
 
 
 def draw(people, pos, level, haplotypes, allele_order, chrom, out,
-         title=None, palette="auto", mode_note=None):
+         palette="auto", mode_note=None):
     paint_w, track_h, gap_h = 1.9, 0.55, 0.12
     # Symbols are enlarged from a bare node marker to a label-bearing shape: the
     # individual's id is drawn *inside* the circle/square, so the radius is sized
@@ -670,9 +670,8 @@ def draw(people, pos, level, haplotypes, allele_order, chrom, out,
                        borderpad=1.2, frameon=False)
     legend.get_title().set_fontsize(21)
 
-    span_mb = f"{xmin / 1e6:.2f}–{xmax / 1e6:.2f} Mb"
-    note = f", {mode_note}" if mode_note else ""
-    ax.set_title(title or f"Pedigree haplotype painting — {chrom} ({span_mb}{note})")
+    # Title intentionally omitted from the figure -- it is added as an Illustrator
+    # text box for manuscript figures.
     ax.set_aspect("equal")
     ax.axis("off")
     ax.margins(0.08)
@@ -695,7 +694,6 @@ def main():
                     choices=["auto", "turbo", "tab20"],
                     help="allele colours: 'turbo' (as plot-iht.R), 'tab20' "
                          "(categorical), or 'auto' (turbo<=10 alleles, else tab20)")
-    ap.add_argument("--title", default=None)
     ap.add_argument("--no-collapse", dest="collapse", action="store_false",
                     help="draw the RAW gtg-ped-map output verbatim: keep G0 and "
                          "leave every label as-is (no apex-trio drop/relabel). Use "
@@ -725,7 +723,7 @@ def main():
                  else "apex trios relabelled A,B,C,D")
     pos, level = layout(people)
     out = draw(people, pos, level, haplotypes, allele_order, chrom, args.out,
-               title=args.title, palette=args.palette, mode_note=mode_note)
+               palette=args.palette, mode_note=mode_note)
     print(f"wrote {out}  ({len(people)} individuals, {chrom}, "
           f"{len(allele_order)} alleles, "
           f"{'raw' if not args.collapse else 'collapsed'})")
