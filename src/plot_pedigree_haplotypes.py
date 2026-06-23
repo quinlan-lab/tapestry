@@ -16,6 +16,16 @@ Unlike ``plot-iht.R`` -- which stacks every haplotype in one flat list -- this
 script positions each individual's painted pair beneath its node in the pedigree
 so that the flow of founder haplotypes through the family is visible.
 
+Before drawing, if the pedigree has apex *trios* (a founder couple with a single
+child who is itself a parent), the trio founders (G0) are dropped and the lone
+children (G1) -- together with the same haplotype letters where they recur in
+descendants -- are relabelled to founder colours A, B, C, D; married-in founders
+take the next free letters. This is deliberate: gtg-ped-map cannot resolve
+recombination in the lone child of a trio apex, so G1's raw tracks come out flat
+and would misleadingly read as "no crossovers". Relabelling keeps G1's colours
+connected to its descendants' recombination mosaics. See ``collapse_apex_trios``
+for the full, source-line-referenced rationale.
+
 Input contract (Platinum ``gtg-ped-map`` output, space-delimited)::
 
     #chrom start end marker_count len <ind_1> <ind_2> ... <ind_N> <trailing>
@@ -41,6 +51,8 @@ References (Platinum-Pedigree-Inheritance, pinned at e12aca6):
 """
 
 import argparse
+import itertools
+import string
 
 import matplotlib
 
@@ -123,6 +135,211 @@ def parse_iht(path, chrom=None):
             alleles.update((a1, a2))
 
     return chrom, haplotypes, sorted(alleles)
+
+
+# --------------------------------------------------------------------------- #
+# Display transform: collapse apex trios — drop G0, relabel G1 -> A,B,C,D
+# --------------------------------------------------------------------------- #
+#
+# WHY THIS EXISTS — the "first generation never recombines" artifact
+# ------------------------------------------------------------------
+# In CEPH1463 the apex of the pedigree is two *trios*, not quads:
+#
+#     NA12889 x NA12890  ->  NA12877   (their ONLY child)
+#     NA12891 x NA12892  ->  NA12878   (their ONLY child)
+#
+# gtg-ped-map (Platinum-Pedigree-Inheritance, the program that produced the
+# .iht.txt this script paints) cannot resolve recombination in an individual
+# who is the *lone child* of a founder couple. So NA12877 and NA12878 -- the G1
+# row, i.e. the parents of the big sibship -- come out as two solid, seam-free
+# haplotype tracks (a constant label per haplotype, e.g. NA12877 = E|G), even
+# though crossovers certainly happened in the grandparental meioses that made
+# them. Those flat G1 tracks are an algorithmic limitation, NOT biology, and are
+# misleading in a figure.
+#
+# Crucially, gtg-ped-map labels each child by the *parent haplotype letter it
+# inherited* (find_valid_char hands the child the parent's current label), so
+# the sibship below NA12877/NA12878 carries exactly those same letters {E,G} and
+# {I,K} as a recombination mosaic -- it is the *sibship* (>= 2 meioses) that
+# reveals the crossovers the lone parent could not. The two haplotypes of each
+# trio apex therefore already ARE founder haplotypes for everything beneath them.
+#
+# The display transform is therefore a relabel of G1's existing letters (not a
+# fresh painting of G1), so G1's colours stay connected to its descendants'
+# recombination mosaics. Given the apex trios exist, we:
+#   1. identify the apex trios from the PED (a founder couple whose single shared
+#      child is itself a parent);
+#   2. relabel the letters carried by the G1 children (NA12877, NA12878) -- and
+#      those same letters wherever they recur in descendants -- to A, B, C, D;
+#   3. relabel the married-in founders' letters -- and their letters in
+#      descendants -- to the next free letters (E, F, ...); then
+#   4. draw, mapping the final letters to colours.
+# G0 itself is dropped from the plot entirely. Because step 2 keeps G1's real
+# (relabelled) segments, a true trio apex still renders as a clean solid A|B / C|D
+# pair, but now its colours flow into the sibship's mosaics.
+#
+# Why gtg-ped-map cannot phase a trio apex (binary = code/rust/src/bin/map_builder.rs,
+# all links pinned at commit e12aca6b49ee7208952467db4a2a9e2f79b98efb):
+#
+#   1. Founders get fixed two-letter labels A/B, C/D, ...; children start blank.
+#      Iht::new
+#      https://github.com/Platinum-Pedigree-Consortium/Platinum-Pedigree-Inheritance/blob/e12aca6b49ee7208952467db4a2a9e2f79b98efb/code/rust/src/iht.rs#L172-L198
+#
+#   2. A transmitted marker is only informative when the parent is heterozygous
+#      and carries an allele the spouse lacks. unique_allele
+#      https://github.com/Platinum-Pedigree-Consortium/Platinum-Pedigree-Inheritance/blob/e12aca6b49ee7208952467db4a2a9e2f79b98efb/code/rust/src/bin/map_builder.rs#L243-L268
+#
+#   3. The label handed to the child is the parent's *first* valid haplotype
+#      letter -- find_valid_char returns the first non-'?' char, so a founder
+#      (A,B) always contributes 'A'. The code never decides whether the
+#      transmitted allele physically sits on haplotype A or B.
+#      find_valid_char
+#      https://github.com/Platinum-Pedigree-Consortium/Platinum-Pedigree-Inheritance/blob/e12aca6b49ee7208952467db4a2a9e2f79b98efb/code/rust/src/bin/map_builder.rs#L285-L293
+#      flabel pick + child assignment
+#      https://github.com/Platinum-Pedigree-Consortium/Platinum-Pedigree-Inheritance/blob/e12aca6b49ee7208952467db4a2a9e2f79b98efb/code/rust/src/bin/map_builder.rs#L328-L359
+#      So a lone child's paternal slot is only ever 'A' or '?' (never 'B'), and
+#      its maternal slot only ever 'C' or '?'. A constant label = no crossover.
+#
+#   4. The two mechanisms that would introduce the complementary founder allele
+#      both require >= 2 children and skip a trio:
+#        * backfill_sibs -- assigns the non-inherited founder allele (the 'B') to
+#          siblings lacking the 'A' marker -- is gated on `children.len() > 1`.
+#          https://github.com/Platinum-Pedigree-Consortium/Platinum-Pedigree-Inheritance/blob/e12aca6b49ee7208952467db4a2a9e2f79b98efb/code/rust/src/bin/map_builder.rs#L804-L818
+#        * perform_flips_in_place -- the orientation-consistency pass -- operates
+#          only on get_founders_with_multiple_children(), so trio founders are
+#          excluded and never flip-corrected.
+#          https://github.com/Platinum-Pedigree-Consortium/Platinum-Pedigree-Inheritance/blob/e12aca6b49ee7208952467db4a2a9e2f79b98efb/code/rust/src/bin/map_builder.rs#L1135-L1140
+#          get_flipable_alleles / get_founders_with_multiple_children
+#          https://github.com/Platinum-Pedigree-Consortium/Platinum-Pedigree-Inheritance/blob/e12aca6b49ee7208952467db4a2a9e2f79b98efb/code/rust/src/iht.rs#L554-L581
+#          https://github.com/Platinum-Pedigree-Consortium/Platinum-Pedigree-Inheritance/blob/e12aca6b49ee7208952467db4a2a9e2f79b98efb/code/rust/src/ped.rs#L264-L281
+#
+#   5. A recombination is emitted only when a child's label *changes* between
+#      consecutive blocks; a constant-or-missing track yields zero recombinants.
+#      summarize_child_changes
+#      https://github.com/Platinum-Pedigree-Consortium/Platinum-Pedigree-Inheritance/blob/e12aca6b49ee7208952467db4a2a9e2f79b98efb/code/rust/src/bin/map_builder.rs#L673-L700
+#
+# This is why the HAPLOTYPING.md note says gtg-ped-map phases "quads and larger":
+# resolving a founder's two transmitted haplotypes needs >= 2 observed meioses
+# (>= 2 children). The 11 G3 siblings below satisfy this and DO show crossovers;
+# NA12877/NA12878 cannot and do not.
+def _label_stream():
+    """Yield 'A','B',...,'Z','AA','AB',... -- an unbounded supply of labels."""
+    for width in itertools.count(1):
+        for combo in itertools.product(string.ascii_uppercase, repeat=width):
+            yield "".join(combo)
+
+
+def _children_of(people):
+    """Map each individual to the list of individuals that name it as a parent."""
+    kids = {pid: [] for pid in people}
+    for pid, attrs in people.items():
+        for parent in (attrs["father"], attrs["mother"]):
+            if parent in kids:
+                kids[parent].append(pid)
+    return kids
+
+
+def _distinct_labels(hap):
+    """Allele labels in a {hap1,hap2} record, hap1 before hap2, de-duplicated."""
+    seen = []
+    for which in ("hap1", "hap2"):
+        for _, _, allele in hap.get(which, []):
+            if allele not in seen:
+                seen.append(allele)
+    return seen
+
+
+def find_apex_trios(people):
+    """Return ``(g0_apex, g1)`` for trios sitting at the top of the pedigree.
+
+    An apex trio is a couple **both of whom are founders** (no parents) whose
+    only shared child is a single individual that is itself a parent. ``g0_apex``
+    is the set of those founder parents (to be dropped); ``g1`` is the list of
+    their lone children (the row to be relabelled A/B, C/D, ...). For CEPH1463
+    this finds the two trios NA12889xNA12890->NA12877 and NA12891xNA12892->NA12878.
+    """
+    founders = {pid for pid, a in people.items()
+                if not a["father"] and not a["mother"]}
+    kids = _children_of(people)
+
+    g0_apex, g1, seen_couples = set(), [], set()
+    for pid, attrs in people.items():
+        father, mother = attrs["father"], attrs["mother"]
+        if father not in founders or mother not in founders:
+            continue
+        couple = frozenset((father, mother))
+        if couple in seen_couples:
+            continue
+        seen_couples.add(couple)
+        shared = [c for c in kids[father] if c in kids[mother]]
+        # Lone child who is itself a parent => an apex trio above the sibship.
+        if len(shared) == 1 and kids[shared[0]]:
+            g0_apex.update((father, mother))
+            g1.append(shared[0])
+    return g0_apex, sorted(g1)
+
+
+def collapse_apex_trios(people, haplotypes):
+    """Drop apex-trio founders (G0) and relabel G1 + descendants to A,B,C,D,...
+
+    Returns ``(people, haplotypes, allele_order)``. If the PED has no apex trios
+    (see :func:`find_apex_trios`) the inputs are returned unchanged (bar a fresh
+    ``allele_order``), so non-trio pedigrees are drawn exactly as before.
+
+    When apex trios exist, the relabel follows the four-step recipe documented
+    above: G1's haplotype letters (and the same letters in descendants) become
+    A,B,C,D,...; married-in founders' letters (and theirs in descendants) take
+    the next free letters; G0 is removed entirely. The relabel is a single global
+    bijection applied to every track, so a colour means the same haplotype
+    everywhere it appears -- G1's founder colours flow down into the sibship.
+    """
+    def order(): return sorted({
+        al for h in haplotypes.values()
+        for which in ("hap1", "hap2") for _, _, al in h[which]
+    })
+
+    g0_apex, g1 = find_apex_trios(people)
+    if not g1:
+        return people, haplotypes, order()
+
+    # 1. Drop G0; sever G1's now-dangling parent links so G1 render as founders.
+    for pid in g0_apex:
+        people.pop(pid, None)
+        haplotypes.pop(pid, None)
+    for attrs in people.values():
+        for role in ("father", "mother"):
+            if attrs[role] in g0_apex:
+                attrs[role] = None
+
+    # Build one global label bijection, consuming A,B,C,D,... in priority order.
+    labels = _label_stream()
+    remap = {}
+
+    def reserve(pid):
+        for allele in _distinct_labels(haplotypes.get(pid, {})):
+            if allele not in remap:
+                remap[allele] = next(labels)
+
+    # 2. G1 letters first  -> A, B, C, D, ...
+    for pid in g1:
+        reserve(pid)
+    # 3. then the married-in founders' letters -> next free letters.
+    marryins = sorted(pid for pid, a in people.items()
+                      if not a["father"] and not a["mother"] and pid not in g1)
+    for pid in marryins:
+        reserve(pid)
+    # Defensive: any label only ever seen in descendants gets the next free slot
+    # (in real gtg-ped-map output every descendant label traces to a G1 or
+    # married-in founder, so this is a no-op there).
+    for pid in sorted(haplotypes):
+        reserve(pid)
+
+    # 4. Apply the bijection to every track, then recolour from the new labels.
+    for hap in haplotypes.values():
+        for which in ("hap1", "hap2"):
+            hap[which] = [(s, e, remap[al]) for s, e, al in hap[which]]
+
+    return people, haplotypes, order()
 
 
 # --------------------------------------------------------------------------- #
@@ -358,7 +575,7 @@ def _build_colors(allele_order, palette="auto"):
 
 
 def draw(people, pos, level, haplotypes, allele_order, chrom, out,
-         title=None, palette="auto"):
+         title=None, palette="auto", mode_note=None):
     paint_w, track_h, gap_h = 1.9, 0.55, 0.12
     sym_r = 0.42
 
@@ -438,7 +655,8 @@ def draw(people, pos, level, haplotypes, allele_order, chrom, out,
     legend.get_title().set_fontsize(9)
 
     span_mb = f"{xmin / 1e6:.2f}–{xmax / 1e6:.2f} Mb"
-    ax.set_title(title or f"Pedigree haplotype painting — {chrom} ({span_mb})")
+    note = f", {mode_note}" if mode_note else ""
+    ax.set_title(title or f"Pedigree haplotype painting — {chrom} ({span_mb}{note})")
     ax.set_aspect("equal")
     ax.axis("off")
     ax.margins(0.08)
@@ -462,6 +680,10 @@ def main():
                     help="allele colours: 'turbo' (as plot-iht.R), 'tab20' "
                          "(categorical), or 'auto' (turbo<=10 alleles, else tab20)")
     ap.add_argument("--title", default=None)
+    ap.add_argument("--no-collapse", dest="collapse", action="store_false",
+                    help="draw the RAW gtg-ped-map output verbatim: keep G0 and "
+                         "leave every label as-is (no apex-trio drop/relabel). Use "
+                         "this to show the 'before' beside the default 'after'.")
     args = ap.parse_args()
 
     people = parse_ped(args.ped)
@@ -473,11 +695,24 @@ def main():
     for p in missing:  # keep the node, but it simply has no painted segments
         haplotypes.setdefault(p, {"hap1": [], "hap2": []})
 
+    if args.collapse:
+        # If the PED has apex trios, drop their founders (G0) and relabel the lone
+        # children (G1) -- and their letters in descendants -- to A,B,C,D, with the
+        # married-in founders taking the next free letters. See collapse_apex_trios()
+        # for the full rationale: gtg-ped-map cannot resolve recombination in the lone
+        # child of a trio apex, so G1's flat tracks would otherwise read misleadingly
+        # as "no crossovers".
+        people, haplotypes, allele_order = collapse_apex_trios(people, haplotypes)
+
+    # Make the two renders self-labelling so a before/after pair is unambiguous.
+    mode_note = ("raw gtg-ped-map output" if not args.collapse
+                 else "apex trios relabelled A,B,C,D")
     pos, level = layout(people)
     out = draw(people, pos, level, haplotypes, allele_order, chrom, args.out,
-               title=args.title, palette=args.palette)
+               title=args.title, palette=args.palette, mode_note=mode_note)
     print(f"wrote {out}  ({len(people)} individuals, {chrom}, "
-          f"{len(allele_order)} alleles)")
+          f"{len(allele_order)} alleles, "
+          f"{'raw' if not args.collapse else 'collapsed'})")
 
 
 if __name__ == "__main__":
