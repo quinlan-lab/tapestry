@@ -415,7 +415,7 @@ def _initial_order(people, level):
     return order
 
 
-def layout(people, slot=2.6, gap=1.1, row_height=4.0, iterations=40):
+def layout(people, slot=2.6, gap=1.1, row_height=5.2, iterations=40):
     """Return ``{pid: (x, y)}`` placing founders at the top.
 
     A light Sugiyama-style relaxation: alternately pull each node toward the
@@ -580,7 +580,7 @@ def draw(people, pos, level, haplotypes, allele_order, chrom, out,
     # Symbols are enlarged from a bare node marker to a label-bearing shape: the
     # individual's id is drawn *inside* the circle/square, so the radius is sized
     # to comfortably hold a sample id such as "NA12877" rather than a dot.
-    sym_r = 1.05
+    sym_r = 0.82
 
     starts = [s for h in haplotypes.values() for s, _, _ in h["hap1"]]
     ends = [e for h in haplotypes.values() for _, e, _ in h["hap1"]]
@@ -612,12 +612,16 @@ def draw(people, pos, level, haplotypes, allele_order, chrom, out,
                 if {at["father"], at["mother"]} >= {a, b}]
         if not kids:
             continue
-        # Drop the marriage line to a sibship bar that sits below the parents'
-        # painted pair, then branch up to each child. The bar is widened to span
-        # the marriage midpoint as well as every child, so the drop always meets
-        # the children's risers even if a child is not perfectly centred.
+        # Drop the marriage line to a sibship bar, then branch down to each child.
+        # The bar is placed midway in the clear gap between the bottom of the
+        # parents' painted pair and the top of the children's symbols, so it never
+        # crosses a shape; each riser runs straight down to a child's symbol top at
+        # the child's centre x, keeping the connector centred on every shape. The
+        # bar spans the marriage midpoint as well as every child so the drop always
+        # meets the risers even if a child is not perfectly centred.
         paint_bottom = my - sym_r - 0.35 - 2 * track_h - gap_h
-        sib_y = paint_bottom - 0.4
+        child_top = max(pos[k][1] for k in kids) + sym_r
+        sib_y = (paint_bottom + child_top) / 2.0
         ax.plot([mx, mx], [my, sib_y], **line_kw)
         kid_xs = [pos[k][0] for k in kids]
         ax.plot([min(kid_xs + [mx]), max(kid_xs + [mx])], [sib_y, sib_y],
