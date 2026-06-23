@@ -644,7 +644,7 @@ def draw(people, pos, level, haplotypes, allele_order, chrom, out,
             ax.add_patch(Circle((cx, cy), sym_r, facecolor="white",
                                 edgecolor="black", linewidth=1.2, zorder=4))
         ax.text(cx, cy, pid, ha="center", va="center",
-                fontsize=7, zorder=5)
+                fontsize=9, zorder=5)
         _paint_pair(ax, cx, cy - sym_r - 0.35, haplotypes[pid], xmin, xspan,
                     colors, paint_w, track_h, gap_h)
 
