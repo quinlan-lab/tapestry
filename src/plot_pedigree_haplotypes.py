@@ -577,7 +577,10 @@ def _build_colors(allele_order, palette="auto"):
 def draw(people, pos, level, haplotypes, allele_order, chrom, out,
          title=None, palette="auto", mode_note=None):
     paint_w, track_h, gap_h = 1.9, 0.55, 0.12
-    sym_r = 0.42
+    # Symbols are enlarged from a bare node marker to a label-bearing shape: the
+    # individual's id is drawn *inside* the circle/square, so the radius is sized
+    # to comfortably hold a sample id such as "NA12877" rather than a dot.
+    sym_r = 1.05
 
     starts = [s for h in haplotypes.values() for s, _, _ in h["hap1"]]
     ends = [e for h in haplotypes.values() for _, e, _ in h["hap1"]]
@@ -640,19 +643,20 @@ def draw(people, pos, level, haplotypes, allele_order, chrom, out,
         else:
             ax.add_patch(Circle((cx, cy), sym_r, facecolor="white",
                                 edgecolor="black", linewidth=1.2, zorder=4))
-        ax.text(cx, cy + sym_r + 0.18, pid, ha="center", va="bottom",
-                fontsize=8, zorder=5)
+        ax.text(cx, cy, pid, ha="center", va="center",
+                fontsize=7, zorder=5)
         _paint_pair(ax, cx, cy - sym_r - 0.35, haplotypes[pid], xmin, xspan,
                     colors, paint_w, track_h, gap_h)
 
     # ---- legend / cosmetics ----
-    handles = [Line2D([0], [0], marker="s", linestyle="none", markersize=9,
+    handles = [Line2D([0], [0], marker="s", linestyle="none", markersize=22,
                       markerfacecolor=colors[a], markeredgecolor="0.4", label=a)
                for a in allele_order]
     legend = ax.legend(handles=handles, title="Allele / founder haplotype",
                        loc="center left", bbox_to_anchor=(1.01, 0.5),
-                       fontsize=8, frameon=False)
-    legend.get_title().set_fontsize(9)
+                       fontsize=18, labelspacing=1.0, handletextpad=0.8,
+                       borderpad=1.2, frameon=False)
+    legend.get_title().set_fontsize(21)
 
     span_mb = f"{xmin / 1e6:.2f}–{xmax / 1e6:.2f} Mb"
     note = f", {mode_note}" if mode_note else ""
