@@ -4,6 +4,12 @@ ped=${repo}/data/CEPH1463.ped
 output_dir=/scratch/ucgd/lustre-labs/quinlan/data-shared/haplotype-maps/CEPH1463.GRCh38
 iht=${output_dir}/CEPH1463.GRCh38.iht.sorted.txt
 
+# The default chrom/start_mb/end_mb below (chr22, 10-50 Mb) are chosen so the
+# output can be validated by manual inspection against Zev Kronenberg's pedigree
+# haplotype visualization of the same region:
+#   https://docs.google.com/document/d/1HGBhjqk4cqZaWIkh0GeAaBC_fcZYWRRnYO5cjiifKEY/edit?usp=sharing
+# The same visualization also appears in the Platinum-Pedigree-Inheritance docs:
+#   https://github.com/Platinum-Pedigree-Consortium/Platinum-Pedigree-Inheritance/blob/e12aca6b49ee7208952467db4a2a9e2f79b98efb/HAPLOTYPING.md
 chrom=chr22
 
 # Optional region to visualize, in Mb. Leave both empty to plot the whole
