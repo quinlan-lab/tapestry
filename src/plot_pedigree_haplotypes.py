@@ -533,8 +533,13 @@ def _merge_runs(segs):
     return runs
 
 
-def _paint_pair(ax, cx, cy, haps, xmin, xspan, colors, paint_w, track_h, gap_h):
+def _paint_pair(ax, cx, cy, haps, xmin, xspan, colors, paint_w, track_h):
     """Draw the hap1/hap2 painted tracks centred at (cx, cy).
+
+    The pair matches the two-stripe haplotype-block idiom of Fig 4A/B
+    (``wiki/_panel_grid.py:draw_two_stripe_block``): hap1 sits directly on top of
+    hap2 with **no gap** between them and **no surrounding outline box**, so the
+    two tracks read as a single contiguous block.
 
     Each iht block is a *vector* rectangle so the painting stays fully editable
     in Illustrator (each haplotype block is its own selectable, recolourable
@@ -549,10 +554,7 @@ def _paint_pair(ax, cx, cy, haps, xmin, xspan, colors, paint_w, track_h, gap_h):
     """
     left = cx - paint_w / 2.0
     for k, hap in enumerate(("hap1", "hap2")):
-        top = cy - k * (track_h + gap_h)
-        ax.add_patch(Rectangle((left, top - track_h), paint_w, track_h,
-                               facecolor="none", edgecolor="0.6", linewidth=0.4,
-                               zorder=2))
+        top = cy - k * track_h  # hap2 abuts hap1's bottom edge (no gap)
         for start, end, allele in _merge_runs(haps[hap]):
             sx = left + (start - xmin) / xspan * paint_w
             w = max((end - start) / xspan * paint_w, paint_w * 0.004)
@@ -584,7 +586,7 @@ def _build_colors(allele_order, palette="auto"):
 
 def draw(people, pos, level, haplotypes, allele_order, chrom, out,
          palette="auto", mode_note=None):
-    paint_w, track_h, gap_h = 1.9, 0.55, 0.12
+    paint_w, track_h = 1.9, 0.34
     # Symbols are enlarged from a bare node marker to a label-bearing shape: the
     # individual's id is drawn *inside* the circle/square, so the radius is sized
     # to comfortably hold a sample id such as "NA12877" rather than a dot.
@@ -602,7 +604,7 @@ def draw(people, pos, level, haplotypes, allele_order, chrom, out,
     # and/or wide pedigrees are neither cramped nor padded with whitespace.
     node_xs = [p[0] for p in pos.values()]
     node_ys = [p[1] for p in pos.values()]
-    pair_height = sym_r + 0.35 + 2 * track_h + gap_h  # symbol bottom -> paint bottom
+    pair_height = sym_r + 0.35 + 2 * track_h  # symbol bottom -> paint bottom
     width_units = (max(node_xs) - min(node_xs)) + paint_w + 2.0
     height_units = (max(node_ys) - min(node_ys)) + sym_r + pair_height + 2.0
     scale = 0.6  # inches per layout unit
@@ -627,7 +629,7 @@ def draw(people, pos, level, haplotypes, allele_order, chrom, out,
         # the child's centre x, keeping the connector centred on every shape. The
         # bar spans the marriage midpoint as well as every child so the drop always
         # meets the risers even if a child is not perfectly centred.
-        paint_bottom = my - sym_r - 0.35 - 2 * track_h - gap_h
+        paint_bottom = my - sym_r - 0.35 - 2 * track_h
         child_top = max(pos[k][1] for k in kids) + sym_r
         sib_y = (paint_bottom + child_top) / 2.0
         ax.plot([mx, mx], [my, sib_y], **line_kw)
@@ -658,7 +660,7 @@ def draw(people, pos, level, haplotypes, allele_order, chrom, out,
         ax.text(cx, cy, pid, ha="center", va="center",
                 fontsize=9, zorder=5)
         _paint_pair(ax, cx, cy - sym_r - 0.35, haplotypes[pid], xmin, xspan,
-                    colors, paint_w, track_h, gap_h)
+                    colors, paint_w, track_h)
 
     # ---- legend / cosmetics ----
     handles = [Line2D([0], [0], marker="s", linestyle="none", markersize=22,
