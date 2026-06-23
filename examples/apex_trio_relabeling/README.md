@@ -7,12 +7,13 @@ and why. The pedigree mirrors the apex of CEPH1463: two grandparent couples
 parent a sibship (`KID1..KID3`); `MARRYIN` marries in and parents `GKID` with
 `KID1`.
 
-## The two figures
+## The figures
 
 | file | command | what it shows |
 |------|---------|---------------|
 | `before_raw_gtg-ped-map.pdf` | `--no-collapse` | gtg-ped-map's output **verbatim** |
 | `after_apex-trio_relabel.pdf` | (default) | after dropping G0 and relabeling G1 |
+| `pedigree_trios-removed_no-gap.pdf` | `--hap-gap 0` | same as *after*, but with no vertical gap between hap1 and hap2 (the contiguous Fig 4A/B two-stripe look) |
 
 **Before** — `DAD` and `MOM` are each the lone child of a grandparent couple (an
 apex *trio*). gtg-ped-map cannot resolve recombination in the lone child of a
@@ -44,6 +45,8 @@ python src/plot_pedigree_haplotypes.py --ped $D/example.ped --iht $D/example.iht
     --no-collapse --out $D/before_raw_gtg-ped-map.pdf
 python src/plot_pedigree_haplotypes.py --ped $D/example.ped --iht $D/example.iht.txt \
     --out $D/after_apex-trio_relabel.pdf
+python src/plot_pedigree_haplotypes.py --ped $D/example.ped --iht $D/example.iht.txt \
+    --hap-gap 0 --out $D/pedigree_trios-removed_no-gap.pdf
 ```
 
 `example.iht.txt` is Mendelian-consistent by construction (every child allele is
