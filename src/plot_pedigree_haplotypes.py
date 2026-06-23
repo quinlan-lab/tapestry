@@ -63,6 +63,14 @@ import polars as pl
 from matplotlib.lines import Line2D
 from matplotlib.patches import Circle, Rectangle
 
+# Render all text in Arial. fonttype 42 (TrueType) keeps glyphs as editable text
+# in the PDF/SVG -- not outlined paths -- so labels stay selectable/restylable in
+# Illustrator. Falls back to the next listed sans-serif if Arial is unavailable.
+plt.rcParams["font.family"] = "sans-serif"
+plt.rcParams["font.sans-serif"] = ["Arial", "Helvetica", "DejaVu Sans"]
+plt.rcParams["pdf.fonttype"] = 42
+plt.rcParams["svg.fonttype"] = "none"
+
 
 # --------------------------------------------------------------------------- #
 # Parsing
