@@ -592,16 +592,16 @@ def _build_colors(allele_order, palette="auto"):
     """
     n = len(allele_order)
     if palette == "turbo" or (palette == "auto" and n <= 10):
-        cols = list(plt.cm.turbo(np.linspace(0.05, 0.95, n)))
+        cols = list(plt.cm.turbo(np.linspace(0.05, 0.95, n))) # type:ignore 
     else:  # "tab20" or auto with many alleles -> categorical
-        base = (list(plt.cm.tab20.colors) + list(plt.cm.tab20b.colors)
-                + list(plt.cm.tab20c.colors))
+        base = (list(plt.cm.tab20.colors) + list(plt.cm.tab20b.colors) # type:ignore 
+                + list(plt.cm.tab20c.colors)) # type:ignore 
         cols = [base[i % len(base)] for i in range(n)]
     return {a: cols[i] for i, a in enumerate(allele_order)}
 
 
-def draw(people, pos, level, haplotypes, allele_order, chrom, out,
-         palette="auto", mode_note=None, hap_gap=0.12):
+def draw(people, pos, haplotypes, allele_order, out,
+         palette="auto", hap_gap=0.12):
     paint_w, track_h, gap_h = 1.9, 0.34, hap_gap
     # Symbols are enlarged from a bare node marker to a label-bearing shape: the
     # individual's id is drawn *inside* the circle/square, so the radius is sized
@@ -632,7 +632,7 @@ def draw(people, pos, level, haplotypes, allele_order, chrom, out,
     for couple in _couples(people):
         a, b = tuple(couple)
         (xa, ya), (xb, yb) = pos[a], pos[b]
-        ax.plot([xa, xb], [ya, yb], **line_kw)
+        ax.plot([xa, xb], [ya, yb], **line_kw) # type: ignore
         mx, my = (xa + xb) / 2.0, (ya + yb) / 2.0
         kids = [k for k, at in people.items()
                 if {at["father"], at["mother"]} >= {a, b}]
@@ -648,13 +648,13 @@ def draw(people, pos, level, haplotypes, allele_order, chrom, out,
         paint_bottom = my - sym_r - 0.35 - 2 * track_h - gap_h
         child_top = max(pos[k][1] for k in kids) + sym_r
         sib_y = (paint_bottom + child_top) / 2.0
-        ax.plot([mx, mx], [my, sib_y], **line_kw)
+        ax.plot([mx, mx], [my, sib_y], **line_kw) # type: ignore
         kid_xs = [pos[k][0] for k in kids]
         ax.plot([min(kid_xs + [mx]), max(kid_xs + [mx])], [sib_y, sib_y],
-                **line_kw)
+                **line_kw) # type: ignore
         for k in kids:
             kx, ky = pos[k]
-            ax.plot([kx, kx], [sib_y, ky + sym_r], **line_kw)
+            ax.plot([kx, kx], [sib_y, ky + sym_r], **line_kw) # type: ignore
 
     # Single-parent links (only one parent present in the family).
     for pid, attrs in people.items():
@@ -662,7 +662,7 @@ def draw(people, pos, level, haplotypes, allele_order, chrom, out,
         if len(parents) == 1:
             px, py = pos[parents[0]]
             kx, ky = pos[pid]
-            ax.plot([px, px], [py, ky + sym_r], **line_kw)
+            ax.plot([px, px], [py, ky + sym_r], **line_kw) # type: ignore
 
     # ---- individuals: sex symbol + painted haplotype pair ----
     for pid, (cx, cy) in pos.items():
@@ -747,12 +747,9 @@ def main():
         # as "no crossovers".
         people, haplotypes, allele_order = collapse_apex_trios(people, haplotypes)
 
-    # Make the two renders self-labelling so a before/after pair is unambiguous.
-    mode_note = ("raw gtg-ped-map output" if not args.collapse
-                 else "apex trios relabelled A,B,C,D")
-    pos, level = layout(people)
-    out = draw(people, pos, level, haplotypes, allele_order, chrom, args.out,
-               palette=args.palette, mode_note=mode_note, hap_gap=args.hap_gap)
+    pos, _ = layout(people)
+    out = draw(people, pos, haplotypes, allele_order, args.out,
+               palette=args.palette, hap_gap=args.hap_gap)
     print(f"wrote {out}  ({len(people)} individuals, {chrom}, "
           f"{len(allele_order)} alleles, "
           f"{'raw' if not args.collapse else 'collapsed'})")
