@@ -105,11 +105,16 @@ def parse_ped(path):
     return people
 
 
-def parse_iht(path, chrom=None):
+def parse_iht(path, chrom=None, region_start=None, region_end=None):
     """Return ``(chrom, {sample: {"hap1": segs, "hap2": segs}}, allele_order)``.
 
     ``segs`` is a list of ``(start, end, allele)`` tuples. ``allele_order`` is
     the sorted set of allele labels used for a stable colour mapping.
+
+    ``region_start``/``region_end`` (bp, optional) restrict the painting to that
+    sub-interval of ``chrom``: blocks not overlapping it are dropped and the
+    overlapping ones are clipped to its bounds, so the drawn x-extent is exactly
+    the requested window.
     """
     df = pl.read_csv(
         path,
@@ -132,6 +137,16 @@ def parse_iht(path, chrom=None):
     alleles = set()
     for row in df.iter_rows(named=True):
         start, end = int(row["start"]), int(row["end"])
+        # Restrict to the requested window: skip non-overlapping blocks and clip
+        # the overlapping ones to [region_start, region_end].
+        if region_start is not None:
+            if end <= region_start:
+                continue
+            start = max(start, region_start)
+        if region_end is not None:
+            if start >= region_end:
+                continue
+            end = min(end, region_end)
         for ind in individuals:
             cell = str(row[ind])
             parts = cell.replace("|", "/").split("/")
@@ -693,6 +708,12 @@ def main():
     ap.add_argument("--out", required=True, help="output image (.png/.pdf/.svg)")
     ap.add_argument("--chrom", default=None,
                     help="chromosome to plot (default: first in the iht file)")
+    ap.add_argument("--start", type=int, default=None,
+                    help="start coordinate (bp) of the region to plot; blocks "
+                         "are clipped to it (default: chromosome start)")
+    ap.add_argument("--end", type=int, default=None,
+                    help="end coordinate (bp) of the region to plot; blocks "
+                         "are clipped to it (default: chromosome end)")
     ap.add_argument("--palette", default="auto",
                     choices=["auto", "turbo", "tab20"],
                     help="allele colours: 'turbo' (as plot-iht.R), 'tab20' "
@@ -708,7 +729,8 @@ def main():
     args = ap.parse_args()
 
     people = parse_ped(args.ped)
-    chrom, haplotypes, allele_order = parse_iht(args.iht, args.chrom)
+    chrom, haplotypes, allele_order = parse_iht(
+        args.iht, args.chrom, region_start=args.start, region_end=args.end)
 
     # Restrict to individuals present in both the PED and the haplotype map.
     people = {p: a for p, a in people.items() if p in haplotypes}
