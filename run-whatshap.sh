@@ -4,6 +4,8 @@
 #   Production:  ./run-whatshap.sh
 #   Dev mode:    ./run-whatshap.sh --dev-dir trio_dev_data
 
+source src/util/logging.sh
+
 DEV_DIR=""
 
 # Argument handling
@@ -14,14 +16,12 @@ while [[ "$#" -gt 0 ]]; do
             shift 2
             ;;
         *)
-            echo "Error: Unknown parameter passed: $1"
-            echo "Usage: $0 [--dev-dir <DEV_DATA_DIR>]"
+            log_error "Unknown parameter passed: $1"
+            log_error "Usage: $0 [--dev-dir <DEV_DATA_DIR>]"
             exit 1
             ;;
     esac
 done
-
-source src/util/logging.sh 
 
 # --- Default Configurations (Production) ---
 trio_ped="/scratch/ucgd/lustre-labs/quinlan/u6018199/tapestry/trio.ped"
@@ -29,8 +29,7 @@ reference="/scratch/ucgd/lustre-labs/quinlan/data-shared/constraint-tools/refere
 output_dir="/scratch/ucgd/lustre-labs/quinlan/data-shared/pedmec-phasing"
 
 vcf_joint_called="/scratch/ucgd/lustre-labs/quinlan/data-shared/datasets/Palladium/deepvariant/CEPH-1463.joint.GRCh38.deepvariant.glnexus.phased.vcf.gz"
-palladium_bam_dir="/scratch/ucgd/lustre-labs/quinlan/data-shared/datasets/Palladium/hifi-bams/GRCh38"
-bam_input_dir="${palladium_bam_dir}"
+bam_input_dir="/scratch/ucgd/lustre-labs/quinlan/data-shared/datasets/Palladium/hifi-bams/GRCh38"
 
 # --- Optional Dev Data Overrides ---
 if [ -n "$DEV_DIR" ]; then
@@ -54,7 +53,7 @@ if [ -n "$DEV_DIR" ]; then
 
     # Fail fast if dev data doesn't exist
     if [ ! -f "$vcf_joint_called" ]; then
-        echo "Error: Dev VCF not found. Did you run trio_dev_data_create.sh?"
+        log_error "Dev VCF not found. Did you run trio_dev_data_create.sh?"
         exit 1
     fi
 fi
@@ -63,12 +62,17 @@ fi
 # PED columns: family_id  individual_id(kid)  paternal_id(dad)  maternal_id(mom)  sex  phenotype
 # https://github.com/Platinum-Pedigree-Consortium/Platinum-Pedigree-Datasets?tab=readme-ov-file#accessing-controlled-samples
 if [ ! -f "$trio_ped" ]; then
-    echo "Error: ped file not found: $trio_ped" >&2
+    log_error "ped file not found: $trio_ped"
+    exit 1
+fi
+n_records=$(awk '!/^#/ && NF >= 4' "$trio_ped" | wc -l)
+if [ "$n_records" -ne 1 ]; then
+    log_error "expected exactly one trio record in ${trio_ped}, found ${n_records}"
     exit 1
 fi
 read -r kid_id dad_id mom_id < <(awk '!/^#/ && NF >= 4 { print $2, $3, $4; exit }' "$trio_ped")
 if [ -z "$kid_id" ] || [ -z "$dad_id" ] || [ -z "$mom_id" ]; then
-    echo "Error: could not extract kid/dad/mom IDs from ped: $trio_ped" >&2
+    log_error "could not extract kid/dad/mom IDs from ped: $trio_ped"
     exit 1
 fi
 log_info "Trio extracted from ${trio_ped}: kid=${kid_id} dad=${dad_id} mom=${mom_id}"
@@ -89,7 +93,7 @@ get_bam() {
     elif [ "$id" == "$mom_id" ]; then
         echo "$bam_mom"
     else
-        echo "Error: Unknown sample ID: $id" >&2
+        log_error "Unknown sample ID: $id"
         exit 1
     fi
 }
