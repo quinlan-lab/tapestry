@@ -24,7 +24,7 @@ done
 source src/util/logging.sh 
 
 # --- Default Configurations (Production) ---
-trio_ped="/scratch/ucgd/lustre-labs/quinlan/u6018199/tapestry/trio_dev_data/input/trio.ped"
+trio_ped="/scratch/ucgd/lustre-labs/quinlan/u6018199/tapestry/trio.ped"
 reference="/scratch/ucgd/lustre-labs/quinlan/data-shared/constraint-tools/reference/grch38/hg38.analysisSet.fa.gz" 
 output_dir="/scratch/ucgd/lustre-labs/quinlan/data-shared/pedmec-phasing"
 
