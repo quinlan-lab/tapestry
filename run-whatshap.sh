@@ -25,32 +25,22 @@ source src/util/logging.sh
 
 # --- Default Configurations (Production) ---
 trio_ped="/scratch/ucgd/lustre-labs/quinlan/u6018199/tapestry/trio.ped"
-reference="/scratch/ucgd/lustre-labs/quinlan/data-shared/constraint-tools/reference/grch38/hg38.analysisSet.fa.gz" 
+reference="/scratch/ucgd/lustre-labs/quinlan/data-shared/constraint-tools/reference/grch38/hg38.analysisSet.fa.gz"
 output_dir="/scratch/ucgd/lustre-labs/quinlan/data-shared/pedmec-phasing"
-
-# https://github.com/Platinum-Pedigree-Consortium/Platinum-Pedigree-Datasets?tab=readme-ov-file#accessing-controlled-samples
-kid_id="NA12878"
-dad_id="NA12891" 
-mom_id="NA12892"
 
 vcf_joint_called="/scratch/ucgd/lustre-labs/quinlan/data-shared/datasets/Palladium/deepvariant/CEPH-1463.joint.GRCh38.deepvariant.glnexus.phased.vcf.gz"
 palladium_bam_dir="/scratch/ucgd/lustre-labs/quinlan/data-shared/datasets/Palladium/hifi-bams/GRCh38"
-
-bam_kid="${palladium_bam_dir}/${kid_id}.GRCh38.haplotagged.bam" # not topped off
-bam_dad="${palladium_bam_dir}/${dad_id}.GRCh38.haplotagged.bam" # not topped off
-bam_mom="${palladium_bam_dir}/${mom_id}.GRCh38.haplotagged.bam" # not topped off
+bam_input_dir="${palladium_bam_dir}"
 
 # --- Optional Dev Data Overrides ---
 if [ -n "$DEV_DIR" ]; then
     log_info "DEV MODE ENABLED: Reading from and writing to ${DEV_DIR}"
-    
+
 	# Override input paths to point to the generated dev data
     trio_ped="${DEV_DIR}/input/trio.ped"
     vcf_joint_called="${DEV_DIR}/input/CEPH-1463.joint.GRCh38.deepvariant.glnexus.vcf.gz"
-	bam_kid="${DEV_DIR}/input/${kid_id}.GRCh38.haplotagged.bam"
-    bam_dad="${DEV_DIR}/input/${dad_id}.GRCh38.haplotagged.bam"
-    bam_mom="${DEV_DIR}/input/${mom_id}.GRCh38.haplotagged.bam"
-    
+	bam_input_dir="${DEV_DIR}/input"
+
     source "$(dirname "$0")/trio_dev_data_config.sh"
     dev_chrom="${DEV_REGION%%:*}"
     reference="${DEV_DIR}/input/${dev_chrom}.fa"
@@ -58,7 +48,7 @@ if [ -n "$DEV_DIR" ]; then
     # Override output dir to write entirely inside the dev directory
     # (Appending '/output' to keep the generated files separate from the raw dev inputs)
     output_dir="${DEV_DIR}/output/pedmec-phasing"
-    
+
     # In dev mode, only phase the single dev chromosome
     dev_chromosomes=("${dev_chrom}")
 
@@ -68,6 +58,24 @@ if [ -n "$DEV_DIR" ]; then
         exit 1
     fi
 fi
+
+# --- Derive trio sample IDs from the ped file (kept in sync with the ped, not hardcoded) ---
+# PED columns: family_id  individual_id(kid)  paternal_id(dad)  maternal_id(mom)  sex  phenotype
+# https://github.com/Platinum-Pedigree-Consortium/Platinum-Pedigree-Datasets?tab=readme-ov-file#accessing-controlled-samples
+if [ ! -f "$trio_ped" ]; then
+    echo "Error: ped file not found: $trio_ped" >&2
+    exit 1
+fi
+read -r kid_id dad_id mom_id < <(awk '!/^#/ && NF >= 4 { print $2, $3, $4; exit }' "$trio_ped")
+if [ -z "$kid_id" ] || [ -z "$dad_id" ] || [ -z "$mom_id" ]; then
+    echo "Error: could not extract kid/dad/mom IDs from ped: $trio_ped" >&2
+    exit 1
+fi
+log_info "Trio extracted from ${trio_ped}: kid=${kid_id} dad=${dad_id} mom=${mom_id}"
+
+bam_kid="${bam_input_dir}/${kid_id}.GRCh38.haplotagged.bam" # not topped off
+bam_dad="${bam_input_dir}/${dad_id}.GRCh38.haplotagged.bam" # not topped off
+bam_mom="${bam_input_dir}/${mom_id}.GRCh38.haplotagged.bam" # not topped off
 
 # Create the output directory (whether production or dev)
 mkdir -p ${output_dir}
