@@ -13,6 +13,22 @@ source src/util/trio_ped.sh
 DEV_DIR=""
 SKIP_METHYLATION=""
 
+usage() {
+    cat <<EOF
+Usage: $0 [--dev-dir <DEV_DATA_DIR>] [--skip-methylation]
+
+Phase methylation to parent haplotypes for the trio defined in the ped file.
+
+Options:
+  -d, --dev-dir <DEV_DATA_DIR>  Read from and write to the given dev data dir
+                                instead of the production paths.
+      --skip-methylation        Produce only hap-map blocks and bit-vector
+                                mismatch sites from the WhatsHap output; does
+                                not need aligned_bam_to_cpg_scores.sh to have run.
+  -h, --help                    Show this help message and exit.
+EOF
+}
+
 # --- Argument Parsing ---
 while [[ "$#" -gt 0 ]]; do
     case $1 in
@@ -24,9 +40,13 @@ while [[ "$#" -gt 0 ]]; do
             SKIP_METHYLATION="--skip-methylation"
             shift
             ;;
+        -h|--help)
+            usage
+            exit 0
+            ;;
         *)
-            echo "Error: Unknown parameter: $1"
-            echo "Usage: $0 [--dev-dir <DEV_DATA_DIR>] [--skip-methylation]"
+            echo "Error: Unknown parameter: $1" >&2
+            usage >&2
             exit 1
             ;;
     esac
