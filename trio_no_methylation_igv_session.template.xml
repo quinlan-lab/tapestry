@@ -2,7 +2,7 @@
 <!--
   TEMPLATE. Do not edit the rendered trio_no_methylation_igv_session.xml by
   hand (it is git-ignored). Sample IDs appear as {{KID_ID}}/{{DAD_ID}}/{{MOM_ID}}
-  placeholders; render the concrete session with generate_trio_igv_session.sh,
+  placeholders; render the concrete session with trio_no_methylation_igv_session.generate.sh,
   which derives the trio IDs from the ped file.
 
   IGV session for inspecting trio phasing: the joint phased VCF, the

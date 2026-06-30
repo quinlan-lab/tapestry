@@ -5,8 +5,8 @@
 # regenerate it whenever the trio (i.e. the ped file) changes.
 #
 # Usage:
-#   Production:  ./generate_trio_igv_session.sh
-#   Dev mode:    ./generate_trio_igv_session.sh --dev-dir trio_dev_data
+#   Production:  ./trio_no_methylation_igv_session.generate.sh
+#   Dev mode:    ./trio_no_methylation_igv_session.generate.sh --dev-dir trio_dev_data
 
 source src/util/logging.sh
 source src/util/trio_ped.sh
