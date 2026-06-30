@@ -14,3 +14,5 @@ analysis/imprinted_meth_all_samples.bed
 trio_dev_data/output
 trio_dev_data/input/chr*.fa
 trio_dev_data/input/chr*.fa.fai
+# Rendered IGV session (generate with generate_trio_igv_session.sh)
+trio_no_methylation_igv_session.xml

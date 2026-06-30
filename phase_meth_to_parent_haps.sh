@@ -53,7 +53,7 @@ while [[ "$#" -gt 0 ]]; do
 done
 
 # --- Default Configurations (Production) ---
-trio_ped="/scratch/ucgd/lustre-labs/quinlan/u6018199/tapestry/trio.ped"
+trio_ped="trio.ped"  # production trio ped, committed to this repo
 
 # INPUT DIRS
 pedmec_phasing_dir="/scratch/ucgd/lustre-labs/quinlan/data-shared/pedmec-phasing" # output dir of run-whatshap.sh

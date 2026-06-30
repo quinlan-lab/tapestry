@@ -1,0 +1,94 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<!--
+  TEMPLATE. Do not edit the rendered trio_no_methylation_igv_session.xml by
+  hand (it is git-ignored). Sample IDs appear as {{KID_ID}}/{{DAD_ID}}/{{MOM_ID}}
+  placeholders; render the concrete session with generate_trio_igv_session.sh,
+  which derives the trio IDs from the ped file.
+
+  IGV session for inspecting trio phasing: the joint phased VCF, the
+  haplotagged BAMs and pedMEC phase blocks for the trio ({{KID_ID}} kid,
+  {{DAD_ID}} dad, {{MOM_ID}} mom), plus the kid's parent-phased hap-map blocks
+  and bit-vector mismatch sites. DNA methylation tracks are intentionally
+  omitted.
+
+  Serve the data, then tunnel from your laptop. On the host holding the
+  data, run serve_data_for_igv.py with port 8000 and the data-dir flag
+  pointing at the directory that contains pedmec-phasing/ and
+  dna-methylation/ (dev or production: the session does not care which,
+  it only sees the served paths); on your laptop run
+  ssh -L 8000:localhost:8000 to that host; then File then Open Session and
+  pick this file.
+
+  Example use, confirm a candidate meiotic crossover: navigate to the
+  candidate site and look for a SHARP sparse-to-dense transition in ONE of
+  the kid's bit-vector mismatch tracks (paternal or maternal) while the
+  OTHER stays FLAT across the same spot (a true parental crossover, not a
+  kid phase-switch, which would transition in BOTH tracks at the same
+  coordinate). The session opens at chr20:~36.69 Mb ({{KID_ID}}); navigate
+  anywhere.
+-->
+<Session genome="hg38" locus="chr20:36,694,733-36,695,013" version="8">
+    <Resources>
+        <!-- PedMEC-phasing: phased VCF (tabix .tbi so IGV range-requests the window
+             instead of downloading the genome-wide file) -->
+        <Resource path="http://localhost:8000/pedmec-phasing/CEPH-1463.joint.GRCh38.deepvariant.glnexus.phased.vcf.gz" index="http://localhost:8000/pedmec-phasing/CEPH-1463.joint.GRCh38.deepvariant.glnexus.phased.vcf.gz.tbi" type="vcf"/>
+        <!-- PedMEC-phasing: phase blocks (GTF). No index: pedMEC blocks are few
+             (KB-sized genome-wide), so IGV builds an in-memory index from the
+             whole file. The pipeline does not produce a .gtf.idx, and pointing
+             at a non-existent one makes IGV fail instead of falling back. -->
+        <Resource path="http://localhost:8000/pedmec-phasing/CEPH-1463.joint.GRCh38.deepvariant.glnexus.phased.{{KID_ID}}.blocks.gtf" type="gtf"/>
+        <Resource path="http://localhost:8000/pedmec-phasing/CEPH-1463.joint.GRCh38.deepvariant.glnexus.phased.{{DAD_ID}}.blocks.gtf" type="gtf"/>
+        <Resource path="http://localhost:8000/pedmec-phasing/CEPH-1463.joint.GRCh38.deepvariant.glnexus.phased.{{MOM_ID}}.blocks.gtf" type="gtf"/>
+        <!-- PedMEC-phasing: haplotagged BAMs (.bai) -->
+        <Resource path="http://localhost:8000/pedmec-phasing/{{KID_ID}}.GRCh38.haplotagged.bam" index="http://localhost:8000/pedmec-phasing/{{KID_ID}}.GRCh38.haplotagged.bam.bai" type="bam"/>
+        <Resource path="http://localhost:8000/pedmec-phasing/{{DAD_ID}}.GRCh38.haplotagged.bam" index="http://localhost:8000/pedmec-phasing/{{DAD_ID}}.GRCh38.haplotagged.bam.bai" type="bam"/>
+        <Resource path="http://localhost:8000/pedmec-phasing/{{MOM_ID}}.GRCh38.haplotagged.bam" index="http://localhost:8000/pedmec-phasing/{{MOM_ID}}.GRCh38.haplotagged.bam.bai" type="bam"/>
+        <!-- Parent-phased: kid hap-map blocks (bgzipped + tabix .tbi) -->
+        <Resource path="http://localhost:8000/dna-methylation/CEPH1463.GRCh38.hifi.parent-phased/{{KID_ID}}.hap-map-blocks.paternal.sorted.bed.gz" index="http://localhost:8000/dna-methylation/CEPH1463.GRCh38.hifi.parent-phased/{{KID_ID}}.hap-map-blocks.paternal.sorted.bed.gz.tbi"/>
+        <Resource path="http://localhost:8000/dna-methylation/CEPH1463.GRCh38.hifi.parent-phased/{{KID_ID}}.hap-map-blocks.maternal.sorted.bed.gz" index="http://localhost:8000/dna-methylation/CEPH1463.GRCh38.hifi.parent-phased/{{KID_ID}}.hap-map-blocks.maternal.sorted.bed.gz.tbi"/>
+        <!-- Parent-phased: kid bit-vector mismatch sites (tabix .tbi) -->
+        <Resource path="http://localhost:8000/dna-methylation/CEPH1463.GRCh38.hifi.parent-phased/{{KID_ID}}.bit-vector-sites-mismatches.paternal.vcf.gz" index="http://localhost:8000/dna-methylation/CEPH1463.GRCh38.hifi.parent-phased/{{KID_ID}}.bit-vector-sites-mismatches.paternal.vcf.gz.tbi" type="vcf"/>
+        <Resource path="http://localhost:8000/dna-methylation/CEPH1463.GRCh38.hifi.parent-phased/{{KID_ID}}.bit-vector-sites-mismatches.maternal.vcf.gz" index="http://localhost:8000/dna-methylation/CEPH1463.GRCh38.hifi.parent-phased/{{KID_ID}}.bit-vector-sites-mismatches.maternal.vcf.gz.tbi" type="vcf"/>
+    </Resources>
+    <!-- Phased VCF -->
+    <Panel height="80" name="DataPanel" width="2163">
+        <Track attributeKey="CEPH-1463.joint.GRCh38.deepvariant.glnexus.phased.vcf.gz" clazz="org.broad.igv.variant.VariantTrack" displayMode="EXPANDED" fontSize="10" height="60" id="http://localhost:8000/pedmec-phasing/CEPH-1463.joint.GRCh38.deepvariant.glnexus.phased.vcf.gz" name="CEPH-1463.joint.GRCh38.deepvariant.glnexus.phased.vcf.gz" siteColorMode="ALLELE_FREQUENCY" visible="true"/>
+    </Panel>
+    <!-- Kid ({{KID_ID}}): BAM + hap-map blocks + bit-vector mismatch tracks -->
+    <Panel height="500" name="PanelKid" width="2163">
+        <Track attributeKey="{{KID_ID}}.GRCh38.haplotagged.bam Coverage" clazz="org.broad.igv.sam.CoverageTrack" fontSize="10" id="http://localhost:8000/pedmec-phasing/{{KID_ID}}.GRCh38.haplotagged.bam_coverage" name="{{KID_ID}} kid Coverage" visible="false"/>
+        <Track attributeKey="{{KID_ID}}.GRCh38.haplotagged.bam" clazz="org.broad.igv.sam.AlignmentTrack" color="185,185,185" displayMode="SQUISHED" experimentType="THIRD_GEN" fontSize="10" height="150" id="http://localhost:8000/pedmec-phasing/{{KID_ID}}.GRCh38.haplotagged.bam" name="{{KID_ID}} kid BAM" visible="true">
+            <RenderOptions colorByTag="PS" colorOption="TAG" groupByOption="PHASE" hideSmallIndels="true" smallIndelThreshold="100"/>
+        </Track>
+        <Track attributeKey="{{KID_ID}}.hap-map-blocks.paternal.sorted.bed.gz" clazz="org.broad.igv.track.FeatureTrack" displayMode="EXPANDED" fontSize="10" id="http://localhost:8000/dna-methylation/CEPH1463.GRCh38.hifi.parent-phased/{{KID_ID}}.hap-map-blocks.paternal.sorted.bed.gz" name="{{KID_ID}} kid hap-map blks pat" visible="true"/>
+        <Track attributeKey="{{KID_ID}}.hap-map-blocks.maternal.sorted.bed.gz" clazz="org.broad.igv.track.FeatureTrack" displayMode="EXPANDED" fontSize="10" id="http://localhost:8000/dna-methylation/CEPH1463.GRCh38.hifi.parent-phased/{{KID_ID}}.hap-map-blocks.maternal.sorted.bed.gz" name="{{KID_ID}} kid hap-map blks mat" visible="true"/>
+        <Track attributeKey="{{KID_ID}}.bit-vector-sites-mismatches.paternal.vcf.gz" clazz="org.broad.igv.variant.VariantTrack" displayMode="COLLAPSED" featureVisibilityWindow="-1" fontSize="10" id="http://localhost:8000/dna-methylation/CEPH1463.GRCh38.hifi.parent-phased/{{KID_ID}}.bit-vector-sites-mismatches.paternal.vcf.gz" name="{{KID_ID}} kid bitvec mismatch pat" visible="true" showGenotypes="false"/>
+        <Track attributeKey="{{KID_ID}}.bit-vector-sites-mismatches.maternal.vcf.gz" clazz="org.broad.igv.variant.VariantTrack" displayMode="COLLAPSED" featureVisibilityWindow="-1" fontSize="10" id="http://localhost:8000/dna-methylation/CEPH1463.GRCh38.hifi.parent-phased/{{KID_ID}}.bit-vector-sites-mismatches.maternal.vcf.gz" name="{{KID_ID}} kid bitvec mismatch mat" visible="true" showGenotypes="false"/>
+    </Panel>
+    <!-- Dad ({{DAD_ID}}): BAM -->
+    <Panel height="200" name="PanelDad" width="2163">
+        <Track attributeKey="{{DAD_ID}}.GRCh38.haplotagged.bam Coverage" clazz="org.broad.igv.sam.CoverageTrack" fontSize="10" id="http://localhost:8000/pedmec-phasing/{{DAD_ID}}.GRCh38.haplotagged.bam_coverage" name="{{DAD_ID}} dad Coverage" visible="false"/>
+        <Track attributeKey="{{DAD_ID}}.GRCh38.haplotagged.bam" clazz="org.broad.igv.sam.AlignmentTrack" color="185,185,185" displayMode="SQUISHED" experimentType="THIRD_GEN" fontSize="10" height="150" id="http://localhost:8000/pedmec-phasing/{{DAD_ID}}.GRCh38.haplotagged.bam" name="{{DAD_ID}} dad BAM" visible="true">
+            <RenderOptions colorByTag="PS" colorOption="TAG" groupByOption="PHASE" hideSmallIndels="true" smallIndelThreshold="100"/>
+        </Track>
+    </Panel>
+    <!-- Mom ({{MOM_ID}}): BAM -->
+    <Panel height="200" name="PanelMom" width="2163">
+        <Track attributeKey="{{MOM_ID}}.GRCh38.haplotagged.bam Coverage" clazz="org.broad.igv.sam.CoverageTrack" fontSize="10" id="http://localhost:8000/pedmec-phasing/{{MOM_ID}}.GRCh38.haplotagged.bam_coverage" name="{{MOM_ID}} mom Coverage" visible="false"/>
+        <Track attributeKey="{{MOM_ID}}.GRCh38.haplotagged.bam" clazz="org.broad.igv.sam.AlignmentTrack" color="185,185,185" displayMode="SQUISHED" experimentType="THIRD_GEN" fontSize="10" height="150" id="http://localhost:8000/pedmec-phasing/{{MOM_ID}}.GRCh38.haplotagged.bam" name="{{MOM_ID}} mom BAM" visible="true">
+            <RenderOptions colorByTag="PS" colorOption="TAG" groupByOption="PHASE" hideSmallIndels="true" smallIndelThreshold="100"/>
+        </Track>
+    </Panel>
+    <!-- Feature panel: phase blocks + reference -->
+    <Panel height="200" name="FeaturePanel" width="2163">
+        <Track attributeKey="Reference sequence" clazz="org.broad.igv.track.SequenceTrack" fontSize="10" id="Reference sequence" name="Reference sequence" sequenceTranslationStrandValue="+" shouldShowTranslation="false" visible="true"/>
+        <Track attributeKey="CEPH-1463.joint.GRCh38.deepvariant.glnexus.phased.{{KID_ID}}.blocks.gtf" clazz="org.broad.igv.track.FeatureTrack" displayMode="EXPANDED" fontSize="10" id="http://localhost:8000/pedmec-phasing/CEPH-1463.joint.GRCh38.deepvariant.glnexus.phased.{{KID_ID}}.blocks.gtf" name="{{KID_ID}} kid phase blocks" visible="true"/>
+        <Track attributeKey="CEPH-1463.joint.GRCh38.deepvariant.glnexus.phased.{{DAD_ID}}.blocks.gtf" clazz="org.broad.igv.track.FeatureTrack" displayMode="EXPANDED" fontSize="10" id="http://localhost:8000/pedmec-phasing/CEPH-1463.joint.GRCh38.deepvariant.glnexus.phased.{{DAD_ID}}.blocks.gtf" name="{{DAD_ID}} dad phase blocks" visible="true"/>
+        <Track attributeKey="CEPH-1463.joint.GRCh38.deepvariant.glnexus.phased.{{MOM_ID}}.blocks.gtf" clazz="org.broad.igv.track.FeatureTrack" displayMode="EXPANDED" fontSize="10" id="http://localhost:8000/pedmec-phasing/CEPH-1463.joint.GRCh38.deepvariant.glnexus.phased.{{MOM_ID}}.blocks.gtf" name="{{MOM_ID}} mom phase blocks" visible="true"/>
+    </Panel>
+    <HiddenAttributes>
+        <Attribute name="DATA FILE"/>
+        <Attribute name="DATA TYPE"/>
+        <Attribute name="NAME"/>
+    </HiddenAttributes>
+</Session>

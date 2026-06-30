@@ -43,7 +43,7 @@ while [[ "$#" -gt 0 ]]; do
 done
 
 # --- Default Configurations (Production) ---
-trio_ped="/scratch/ucgd/lustre-labs/quinlan/u6018199/tapestry/trio.ped"
+trio_ped="trio.ped"  # production trio ped, committed to this repo
 reference="/scratch/ucgd/lustre-labs/quinlan/data-shared/constraint-tools/reference/grch38/hg38.analysisSet.fa.gz"
 output_dir="/scratch/ucgd/lustre-labs/quinlan/data-shared/pedmec-phasing"
 
