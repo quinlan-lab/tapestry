@@ -9,6 +9,20 @@ source src/util/trio_ped.sh
 
 DEV_DIR=""
 
+usage() {
+    cat <<EOF
+Usage: $0 [--dev-dir <DEV_DATA_DIR>]
+
+Pedigree-aware phasing and haplotagging with WhatsHap for the trio defined
+in the ped file.
+
+Options:
+  -d, --dev-dir <DEV_DATA_DIR>  Read from and write to the given dev data dir
+                                instead of the production paths.
+  -h, --help                    Show this help message and exit.
+EOF
+}
+
 # Argument handling
 while [[ "$#" -gt 0 ]]; do
     case $1 in
@@ -16,9 +30,13 @@ while [[ "$#" -gt 0 ]]; do
             DEV_DIR="${2%/}"
             shift 2
             ;;
+        -h|--help)
+            usage
+            exit 0
+            ;;
         *)
             log_error "Unknown parameter passed: $1"
-            log_error "Usage: $0 [--dev-dir <DEV_DATA_DIR>]"
+            usage >&2
             exit 1
             ;;
     esac
