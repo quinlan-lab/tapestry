@@ -8,6 +8,7 @@
 #      WhatsHap output; does not need aligned_bam_to_cpg_scores.sh to have run)
 
 source src/util/logging.sh
+source src/util/trio_ped.sh
 
 DEV_DIR=""
 SKIP_METHYLATION=""
@@ -31,12 +32,8 @@ while [[ "$#" -gt 0 ]]; do
     esac
 done
 
-# --- Configuration ---
-kid_id="NA12878"
-dad_id="NA12891"
-mom_id="NA12892"
-
 # --- Default Configurations (Production) ---
+trio_ped="/scratch/ucgd/lustre-labs/quinlan/u6018199/tapestry/trio.ped"
 
 # INPUT DIRS
 pedmec_phasing_dir="/scratch/ucgd/lustre-labs/quinlan/data-shared/pedmec-phasing" # output dir of run-whatshap.sh
@@ -49,6 +46,8 @@ output_dir="/scratch/ucgd/lustre-labs/quinlan/data-shared/dna-methylation/CEPH14
 # --- Optional Dev Data Overrides ---
 if [ -n "$DEV_DIR" ]; then
     log_info "DEV MODE ENABLED: Reading from and writing to ${DEV_DIR}"
+
+    trio_ped="${DEV_DIR}/input/trio.ped"
 
     # INPUT DIRS
     pedmec_phasing_dir="${DEV_DIR}/output/pedmec-phasing" # output dir of run-whatshap.sh
@@ -76,6 +75,9 @@ meth_bed() {
         echo "${meth_model_dir}/${uid}.GRCh38.haplotagged.${hap}.bed.gz" # bed file of model-based methylation from aligned_bam_to_cpg_scores.sh
     fi
 }
+
+# --- Derive trio sample IDs from the ped file (kept in sync with the ped, not hardcoded) ---
+read_trio_ids "$trio_ped"
 
 log_info "Phasing methylation to parent haplotypes for trio: ${kid_id}, ${dad_id}, ${mom_id}"
 

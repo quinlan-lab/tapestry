@@ -5,6 +5,7 @@
 #   Dev mode:    ./run-whatshap.sh --dev-dir trio_dev_data
 
 source src/util/logging.sh
+source src/util/trio_ped.sh
 
 DEV_DIR=""
 
@@ -59,23 +60,7 @@ if [ -n "$DEV_DIR" ]; then
 fi
 
 # --- Derive trio sample IDs from the ped file (kept in sync with the ped, not hardcoded) ---
-# PED columns: family_id  individual_id(kid)  paternal_id(dad)  maternal_id(mom)  sex  phenotype
-# https://github.com/Platinum-Pedigree-Consortium/Platinum-Pedigree-Datasets?tab=readme-ov-file#accessing-controlled-samples
-if [ ! -f "$trio_ped" ]; then
-    log_error "ped file not found: $trio_ped"
-    exit 1
-fi
-n_records=$(awk '!/^#/ && NF >= 4' "$trio_ped" | wc -l)
-if [ "$n_records" -ne 1 ]; then
-    log_error "expected exactly one trio record in ${trio_ped}, found ${n_records}"
-    exit 1
-fi
-read -r kid_id dad_id mom_id < <(awk '!/^#/ && NF >= 4 { print $2, $3, $4; exit }' "$trio_ped")
-if [ -z "$kid_id" ] || [ -z "$dad_id" ] || [ -z "$mom_id" ]; then
-    log_error "could not extract kid/dad/mom IDs from ped: $trio_ped"
-    exit 1
-fi
-log_info "Trio extracted from ${trio_ped}: kid=${kid_id} dad=${dad_id} mom=${mom_id}"
+read_trio_ids "$trio_ped"
 
 bam_kid="${bam_input_dir}/${kid_id}.GRCh38.haplotagged.bam" # not topped off
 bam_dad="${bam_input_dir}/${dad_id}.GRCh38.haplotagged.bam" # not topped off
