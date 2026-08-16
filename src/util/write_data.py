@@ -1,8 +1,8 @@
 import os
 from pathlib import Path
 import polars as pl
+import pysam
 
-from shell import shell
 
 # https://samtools.github.io/hts-specs/BEDv1.pdf
 # "We recommend that only a single tab (\t) be used as field separator."
@@ -85,8 +85,9 @@ def write_bit_vector_mismatches_vcf(output_dir, df_sites_mismatch, logger, uid=N
     vcf = f"{stem}.vcf"
     write_df_to_vcf(df_sites_mismatch, vcf, uid=uid)
 
-    cmd = f'src/util/compress-index-vcf --name {stem}'
-    shell(cmd)
+    pysam.tabix_compress(vcf, f"{vcf}.gz", force=True)
+    pysam.tabix_index(f"{vcf}.gz", preset="vcf", force=True)
+    Path(vcf).unlink()
 
     logger.info(f"Wrote bit-vector-sites-mismatches (for IGV) to: '{vcf}.gz'")
 
@@ -127,17 +128,11 @@ def write_methylation(df, file_path, source):
     Returns the root path (without .sorted.bed.gz suffix).
     """
     write_dataframe_to_bed(df, file_path, source)
-    root, suffix = os.path.splitext(file_path)
-
-    cmd = (
-        f'cat {file_path}'
-        f' | src/util/sort-compress-index-bed'
-        f' --name {root}'
-    )
-    shell(cmd)
-    shell(f'rm {file_path}')
+    root, _suffix = os.path.splitext(file_path)
+    compressed = f"{root}.sorted.bed.gz"
+    pysam.tabix_compress(file_path, compressed, force=True)
+    pysam.tabix_index(compressed, preset="bed", force=True)
+    Path(file_path).unlink()
 
     return root
-
-
 

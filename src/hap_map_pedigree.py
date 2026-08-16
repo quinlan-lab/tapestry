@@ -13,6 +13,29 @@ def extract_bit_vectors(record):
 def get_hap_map(df_all_phasing):
     df_sites = df_all_phasing.select(["chrom", "start", "end", "REF", "ALT"])
 
+    if df_all_phasing.is_empty():
+        df_hap_map = pl.DataFrame(
+            schema={
+                "chrom": pl.String,
+                "start": pl.Int64,
+                "end": pl.Int64,
+                "paternal_haplotype": pl.String,
+                "maternal_haplotype": pl.String,
+                "haplotype_concordance": pl.Float64,
+                "num_het_SNVs": pl.Int64,
+            }
+        )
+        df_sites_mismatch = pl.DataFrame(
+            schema={
+                "chrom": pl.String,
+                "start": pl.Int64,
+                "end": pl.Int64,
+                "REF": pl.String,
+                "ALT": pl.String,
+            }
+        )
+        return df_hap_map, df_sites, df_sites_mismatch
+
     # Group het SNVs by (chrom, phase_block, iht_block), 
     # which implicitly finds the intersection of these two types of blocks, 
     # and compute the read-backed and inheritance-backed bit vectors in those intersections.

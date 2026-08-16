@@ -1,6 +1,11 @@
 .venv
 .vscode
 __pycache__
+.nextflow*
+.nextflow-reports/
+work/
+work-*/
+.test-work/
 .trash
 .DS_Store
 ~ai-*.tmp

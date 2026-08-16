@@ -1,0 +1,11 @@
+bioframe==0.8.0
+cyvcf2==0.31.1
+jsonschema==4.25.1
+numpy==2.3.4
+pandas==2.3.3
+polars==1.36.1
+pyBigWig==0.3.24
+pyarrow==21.0.0
+pyfaidx==0.9.0.3
+pysam==0.23.3
+PyYAML==6.0.2

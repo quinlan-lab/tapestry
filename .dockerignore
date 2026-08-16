@@ -1,0 +1,13 @@
+.git
+.nextflow*
+.nextflow-reports
+.test-work
+.venv
+work
+work-*
+trio_dev_data
+images
+manuscript
+wiki
+**/__pycache__
+**/*.pyc

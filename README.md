@@ -2,9 +2,57 @@
 
 A pipeline to phase DNA methylation from HiFi reads in a human pedigree (including, as a special case, a trio) to the haplotypes of the pedigree's founders. 
 
+## Generic WDL-output workflow
+
+The generic Nextflow workflow consumes outputs from the PacBio HiFi human WGS
+WDL through the schema-v1 YAML/JSON run configuration and Tapestry canonical
+manifest documented in [`ROADMAP.md`](ROADMAP.md). The current contract supports
+GRCh38 autosomes, pedigree mode, model methylation, and WDL v3.3.0 or v3.3.1.
+It does not call HiPhase or pb-CpG-tools: those products come from the WDL.
+
+Populate a copy of [`examples/generic/family.yaml`](examples/generic/family.yaml)
+and its canonical manifest, then run:
+
+```bash
+# Validate without starting scientific processes.
+nextflow run . -entry validate -profile docker \
+  --run-config /path/to/family.yaml
+
+# Run inheritance, founder phasing, and all-CpG expansion.
+nextflow run . -profile docker \
+  --run-config /path/to/family.yaml \
+  -resume
+```
+
+Validation resolves paths relative to the YAML and manifest, verifies the PED
+and exact VCF/manifest sample sets, checks reference and indexed artifact
+contracts, and publishes normalized inputs plus a validation report under
+`project.outdir/pipeline_info/`. Other stable WDL v3.x releases are rejected
+unless the run explicitly sets `upstream.allow_unaudited_release: true`.
+
+The full workflow publishes `pipeline_info/`, `reference/`, `inheritance/`, one
+directory under `samples/` for each selected eligible pedigree member, and
+`results-manifest.json` beneath `project.outdir`. The manifest contains only
+published relative paths, identifies indexed artifacts, and records count mode
+as disabled. Docker, Apptainer, and Slurm profiles are defined in
+[`nextflow.config`](nextflow.config); site-specific queues and resource policy
+should be supplied by a local profile.
+Nextflow's trace, report, timeline, and DAG are written to
+`.nextflow-reports/` in the launch directory and overwritten safely on a
+`-resume` run; standard `-with-*` options can redirect them.
+
+The OCI image defined by [`Dockerfile`](Dockerfile) contains the pinned Python
+environment, bcftools/tabix, and `gtg` commit
+`e12aca6b49ee7208952467db4a2a9e2f79b98efb`. It also contains a
+checksum-pinned UCSC `bedGraphToBigWig` binary solely as the parity oracle for
+the `pyBigWig` migration test; production tracks use `pyBigWig`. Override the development image with
+`--container <image-or-digest>` until a release digest is published.
+
 ## Dependencies
 
-We assume the following command-line tools are in the user's PATH: 
+The generic workflow obtains its tools from the configured container. The
+legacy shell workflows below assume the following command-line tools are in the
+user's PATH:
 
 * `bgzip`, `tabix`, `bcftools`
 * `gtg-ped-map`, `gtg-concordance` (https://github.com/Platinum-Pedigree-Consortium/Platinum-Pedigree-Inheritance/blob/e12aca6b49ee7208952467db4a2a9e2f79b98efb/HAPLOTYPING.md)
@@ -33,13 +81,11 @@ pip install -r requirements.txt
 Install `bedGraphToBigWig` into the virtual environment's bin directory:
 
 ```
-# macOS:
-curl -O https://hgdownload.cse.ucsc.edu/admin/exe/macOSX.x86_64/bedGraphToBigWig
+# Choose the binary for your platform from the official UCSC downloads. Linux
+# x86_64 example:
+curl -O https://hgdownload.soe.ucsc.edu/admin/exe/linux.x86_64/bedGraphToBigWig
 chmod +x bedGraphToBigWig
 mv bedGraphToBigWig .venv/bin/
-
-# Linux (the latest UCSC binary requires glibc ≥ 2.34, so use an older version):
-cp ~/bin/bedGraphToBigWig .venv/bin/
 ```
 
 ## Pedigree-wise workflow 

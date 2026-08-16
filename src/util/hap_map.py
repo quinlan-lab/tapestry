@@ -1,7 +1,8 @@
 import numpy as np
 import polars as pl
+import pysam
+from pathlib import Path
 
-from shell import shell
 from write_data import write_bed
 
 
@@ -29,7 +30,7 @@ def write_hap_map_blocks(df_hap_map, uid, parental, output_dir):
             + pl.lit(",")
             + pl.col("haplotype_concordance").round(2).cast(pl.String)
             + pl.lit(",")
-            + pl.col("num_het_SNVs_in_parent").cast(pl.String),
+            + pl.col("num_het_SNVs").cast(pl.String),
         )
         .select([
             pl.col("chrom"),
@@ -40,10 +41,8 @@ def write_hap_map_blocks(df_hap_map, uid, parental, output_dir):
     )
     write_bed(output_dir, df_blocks, f"{uid}.hap-map-blocks.{parental}")
 
-    cmd = (
-        f'cat {output_dir}/{uid}.hap-map-blocks.{parental}.bed'
-        f' | src/util/sort-compress-index-bed'
-        f' --name {output_dir}/{uid}.hap-map-blocks.{parental}'
-    )
-    shell(cmd)
-    shell(f'rm {output_dir}/{uid}.hap-map-blocks.{parental}.bed')
+    plain = f"{output_dir}/{uid}.hap-map-blocks.{parental}.bed"
+    compressed = f"{output_dir}/{uid}.hap-map-blocks.{parental}.bed.gz"
+    pysam.tabix_compress(plain, compressed, force=True)
+    pysam.tabix_index(compressed, preset="bed", force=True)
+    Path(plain).unlink()

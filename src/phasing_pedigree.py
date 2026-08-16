@@ -2,6 +2,7 @@
 # /scratch/ucgd/lustre-labs/quinlan/u6018199/cyvcf2
 # https://quinlangroup.slack.com/archives/C449KJT3J/p1751389842484399
 from cyvcf2 import VCF  # type: ignore
+from contextlib import closing
 
 # from tqdm import tqdm # testing
 import polars as pl
@@ -15,7 +16,7 @@ def get_read_phasing(vcf):
     # assume vcf follows this phasing format: hap1 | hap2 
 
     records = []
-    with VCF(vcf, strict_gt=True) as vcf_reader: # cyvcf2 handles .vcf.gz directly
+    with closing(VCF(vcf, strict_gt=True)) as vcf_reader: # cyvcf2 handles .vcf.gz directly
         # # assume multi-sample vcf:
         # samples = vcf_reader.samples
         # sample_index = samples.index(uid) if uid in samples else None
@@ -77,8 +78,19 @@ def get_read_phasing(vcf):
                 "allele_hap2": allele_hap2,
             })
 
-    df = pl.DataFrame(records)
-    return df 
+    return pl.DataFrame(
+        records,
+        schema={
+            "chrom": pl.String,
+            "start": pl.Int64,
+            "end": pl.Int64,
+            "REF": pl.String,
+            "ALT": pl.String,
+            "phase_block_id": pl.String,
+            "allele_hap1": pl.String,
+            "allele_hap2": pl.String,
+        },
+    )
 
 def get_read_phase_blocks(tsv): 
     df = (
@@ -93,6 +105,9 @@ def get_read_phase_blocks(tsv):
         .cast({
             "phase_block_id": pl.String,
         })
+        # HiPhase reports 1-based inclusive block coordinates. Internal overlap
+        # operations use zero-based half-open coordinates.
+        .with_columns((pl.col("start") - 1).alias("start"))
     )
     return df
 
@@ -101,9 +116,11 @@ def get_iht_phasing(uid, vcf):
     # https://quinlangroup.slack.com/archives/C08U7NLC9PZ/p1748885496941579
 
     records = []
-    with VCF(vcf, strict_gt=True) as vcf_reader: # cyvcf2 handles .vcf.gz directly
+    with closing(VCF(vcf, strict_gt=True)) as vcf_reader: # cyvcf2 handles .vcf.gz directly
         samples = vcf_reader.samples
-        sample_index = samples.index(uid) if uid in samples else None
+        if uid not in samples:
+            raise ValueError(f"Sample {uid!r} is absent from inheritance VCF: {samples}")
+        sample_index = samples.index(uid)
 
         # for variant in tqdm(vcf_reader, total=vcf_reader.num_records): # testing 
         for variant in vcf_reader:
@@ -147,8 +164,18 @@ def get_iht_phasing(uid, vcf):
                 "allele_mat": allele_mat,
             })
  
-    df = pl.DataFrame(records)
-    return df 
+    return pl.DataFrame(
+        records,
+        schema={
+            "chrom": pl.String,
+            "start": pl.Int64,
+            "end": pl.Int64,
+            "REF": pl.String,
+            "ALT": pl.String,
+            "allele_pat": pl.String,
+            "allele_mat": pl.String,
+        },
+    )
 
 def get_iht_blocks(uid, txt):
     records = []
@@ -157,7 +184,9 @@ def get_iht_blocks(uid, txt):
         assert header.startswith("chrom start end"), f"Unexpected header format: {header}"
         assert header.endswith("marker_count len markers"), f"Unexpected header format: {header}"
         samples = header.split()[3:-3]  # skip first 3 columns (chrom, start, end) and last 3 columns (marker_count len markers)
-        sample_index = samples.index(uid) if uid in samples else None
+        if uid not in samples:
+            raise ValueError(f"Sample {uid!r} is absent from IHT header: {samples}")
+        sample_index = samples.index(uid)
 
         for line in f:
             line = line.strip()
@@ -182,10 +211,36 @@ def get_iht_blocks(uid, txt):
                 "founder_label_mat": founder_label_mat,
             })
             
-    df = pl.DataFrame(records)
-    return df 
+    return pl.DataFrame(
+        records,
+        schema={
+            "chrom": pl.String,
+            "start": pl.Int64,
+            "end": pl.Int64,
+            "founder_label_pat": pl.String,
+            "founder_label_mat": pl.String,
+        },
+    )
 
 def get_all_phasing(df_read_phasing, df_read_phase_blocks, df_iht_phasing, df_iht_blocks):
+    if any(
+        frame.is_empty()
+        for frame in (
+            df_read_phasing,
+            df_read_phase_blocks,
+            df_iht_phasing,
+            df_iht_blocks,
+        )
+    ):
+        return pl.DataFrame(
+            schema={
+                "chrom": pl.String,
+                "start": pl.Int64,
+                "end": pl.Int64,
+                "REF": pl.String,
+                "ALT": pl.String,
+            }
+        )
     df = (
         df_read_phasing
         .join(

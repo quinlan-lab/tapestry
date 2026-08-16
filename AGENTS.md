@@ -5,16 +5,27 @@ combines variant phasing, haplotagged reads, and per-CpG methylation calls to
 produce BED/BigWig outputs in which methylation is traced to a founder or parent
 haplotype.
 
-The repo currently targets the CEPH 1463/Palladium data set and GRCh38. Many
+The legacy scripts target the CEPH 1463/Palladium data set and GRCh38. Many
 top-level shell scripts contain CHPC `/scratch/...` paths, fixed filename
 patterns, tool locations, sample IDs, chromosome lists, and resource settings.
-Treat those as the current worked deployment, not portable API contracts.
+Treat those as a worked deployment, not portable API contracts.
 
-The planned next step is to make Tapestry a generic downstream consumer of the
+Tapestry now includes a generic downstream workflow for the
 [PacBio HiFi human WGS WDL](https://github.com/PacificBiosciences/HiFi-human-WGS-WDL),
-driven by one versioned YAML run file. That work is a **proposal, not yet
-implemented** — see [ROADMAP.md](ROADMAP.md). This guide describes the repo as it
-is today.
+driven by one versioned YAML run file and a canonical WDL-output manifest. See
+[`ROADMAP.md`](ROADMAP.md) for the schema and remaining release gates and
+[`impl.md`](impl.md) for the implementation/acceptance plan. The legacy
+site-specific shell paths remain available but are not the generic API.
+
+### Generic pedigree/model-only path
+
+`main.nf` validates the contract, normalizes the family VCF, runs pinned
+`gtg-ped-map`/`gtg-concordance`, filters WDL model BEDs, reconciles HiPhase and
+inheritance phase per selected sample, generates reference-autosome CpGs, and
+publishes all-CpG tables, BigWigs, QC, provenance, and a results manifest. The
+generic path is GRCh38 `chr1`-`chr22` only and supports WDL v3.3.0/v3.3.1 by
+default. Another stable v3.x release requires an explicit unaudited-release
+opt-in; prereleases and other major versions are rejected.
 
 ## Current workflows
 
@@ -55,6 +66,21 @@ paths; its data-creation scripts still depend on site-local source data.
 
 ## Repository map
 
+- `main.nf`, `nextflow.config`: generic DSL2 workflow and local/Docker/
+  Apptainer/Slurm profiles. Scientific inputs come from `--run-config`; executor
+  and resource policy belong in profiles.
+- `schemas/`, `examples/generic/`: authoritative machine contracts and portable
+  human-authored examples. `ROADMAP.md` remains the source of truth for schema
+  intent.
+- `src/tapestry_validate.py`: strict YAML/JSON, manifest, PED, reference, VCF,
+  HiPhase-table, model-BED, release, and output-collision validation.
+- `src/normalize_joint_vcf.py`, `src/run_gtg_inheritance.py`: deterministic
+  all-site/complete-family VCF branches and pinned `gtg` orchestration.
+- `src/filter_model_beds.py`, `src/generate_reference_cpgs.py`,
+  `src/expand_model_to_all_cpgs.py`: generic model-only filtering and all-CpG
+  publication.
+- `Dockerfile`, `requirements-pipeline.txt`, `containers/gtg.Cargo.lock`: pinned
+  generic runtime; do not update the `gtg` commit or Cargo lock independently.
 - `README.md`: authoritative user-facing description, workflow details, and
   final output-column definitions.
 - `docs/pedigree_workflow.mmd`: pedigree workflow/data-flow diagram.
@@ -143,6 +169,28 @@ production data:
 ```bash
 PYTHONPATH=src:src/util .venv/bin/python tests/test_recombination_dedup.py
 ```
+
+The generic suite is designed for the pipeline container:
+
+```bash
+docker run --rm -v "$PWD:/work" -w /work \
+  -e PYTHONDONTWRITEBYTECODE=1 \
+  -e PYTHONPATH=/work/src:/work/src/util \
+  tapestry:dev python -m unittest discover -v -s tests -p 'test_*.py'
+
+docker run --rm -v "$PWD:/work" -w /work \
+  -e PYTHONDONTWRITEBYTECODE=1 \
+  -e PYTHONPATH=/work/src:/work/src/util \
+  tapestry:dev python tests/test_recombination_dedup.py
+```
+
+For workflow changes, run both `-entry validate` and the synthetic informative
+family through the Docker profile, then repeat with `-resume` and confirm every
+task is cached. Real WDL v3.3.0 and v3.3.1 CEPH fixtures and the
+scientific parity comparison remain mandatory release gates even when synthetic
+tests pass. The deterministic `pyBigWig`/`bedGraphToBigWig` migration test runs
+against the checksum-pinned UCSC binary included in the container and must not
+be skipped in container test runs.
 
 For Python changes, also run `.venv/bin/pyright`. For changed shell entry points,
 run `bash -n <script>`. For workflow changes, prefer the smallest
