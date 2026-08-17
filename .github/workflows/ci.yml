@@ -60,7 +60,7 @@ jobs:
       - name: Set up Nextflow
         uses: nf-core/setup-nextflow@893c28b667aedeba26e37f296d260ccc5bc4d914 # v3.0.1
         with:
-          version: "24.04.2"
+          version: "25.04.8"
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@bb05f3f5519dd87d3ba754cc423b652a5edd6d2c # v4.2.0

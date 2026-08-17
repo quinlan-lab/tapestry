@@ -145,7 +145,7 @@ write permissions:
 - `Static checks` creates a Python 3.11 virtual environment, installs pinned
   runtime and CI dependencies, type-checks the maintained generic modules, and
   checks the E2E shell syntax.
-- `Workflow` uses Java 17 and Nextflow 24.04.2, builds `tapestry:ci` with cached
+- `Workflow` uses Java 17 and Nextflow 25.04.8, builds `tapestry:ci` with cached
   Docker layers, runs all containerized unit/regression tests, and executes the
   informative workflow twice.
 - The resume assertion requires exactly nine trace rows and requires every row

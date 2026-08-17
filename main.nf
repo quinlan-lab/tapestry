@@ -1,22 +1,22 @@
 import java.nio.file.Paths
 nextflow.enable.dsl = 2
 
-params['outputs-json'] = null
+params.outputsJson = null
 params.ped = null
-params['reference-fasta'] = null
-params['reference-index'] = null
-params['reference-gzi'] = null
+params.referenceFasta = null
+params.referenceIndex = null
+params.referenceGzi = null
 params.outdir = null
-params['project-id'] = null
+params.projectId = null
 params.samples = null
 params.regions = null
-params['map-min-qual'] = 20
-params['map-min-depth'] = 10
-params['min-run-markers'] = 10
-params['concordance-min-qual'] = 20
-params['concordance-min-depth'] = 5
-params['min-coverage'] = 10
-params['mismatch-window-bp'] = 50
+params.mapMinQual = 20
+params.mapMinDepth = 10
+params.minRunMarkers = 10
+params.concordanceMinQual = 20
+params.concordanceMinDepth = 5
+params.minCoverage = 10
+params.mismatchWindowBp = 50
 params.bigwig = true
 params.container = null
 
@@ -96,10 +96,10 @@ def validationMountOptions(inputs, containerEngine) {
 }
 
 
-def requiredInputPath(name) {
+def requiredInputPath(name, optionName = name) {
     def value = params[name]
     if (!value) {
-        error "Missing required pipeline argument: --${name} <path>"
+        error "Missing required pipeline argument: --${optionName} <path>"
     }
     return file(value, checkIfExists: true).toAbsolutePath().toString()
 }
@@ -121,9 +121,9 @@ def booleanParam(value, name) {
 
 
 def resolveRunSettings() {
-    def outputsJson = requiredInputPath('outputs-json')
+    def outputsJson = requiredInputPath('outputsJson', 'outputs-json')
     def ped = requiredInputPath('ped')
-    def referenceFasta = requiredInputPath('reference-fasta')
+    def referenceFasta = requiredInputPath('referenceFasta', 'reference-fasta')
     if (!params.outdir) {
         error "Missing required pipeline argument: --outdir <directory>"
     }
@@ -131,11 +131,11 @@ def resolveRunSettings() {
     if (!configuredOutdir.isAbsolute()) {
         configuredOutdir = Paths.get(launchDir.toString()).resolve(configuredOutdir)
     }
-    def referenceIndex = params['reference-index']
-        ? file(params['reference-index'], checkIfExists: true).toAbsolutePath().toString()
+    def referenceIndex = params.referenceIndex
+        ? file(params.referenceIndex, checkIfExists: true).toAbsolutePath().toString()
         : null
-    def referenceGzi = params['reference-gzi']
-        ? file(params['reference-gzi'], checkIfExists: true).toAbsolutePath().toString()
+    def referenceGzi = params.referenceGzi
+        ? file(params.referenceGzi, checkIfExists: true).toAbsolutePath().toString()
         : null
     def samples = params.samples
         ? params.samples.toString().split(',').collect { it.trim() }.findAll { it }
@@ -149,16 +149,16 @@ def resolveRunSettings() {
         referenceFasta: referenceFasta,
         referenceIndex: referenceIndex,
         referenceGzi: referenceGzi,
-        projectId: params['project-id']?.toString(),
+        projectId: params.projectId?.toString(),
         samples: samples,
         regions: params.regions?.toString(),
-        mapMinQual: params['map-min-qual'],
-        mapMinDepth: params['map-min-depth'],
-        minRunMarkers: params['min-run-markers'],
-        concordanceMinQual: params['concordance-min-qual'],
-        concordanceMinDepth: params['concordance-min-depth'],
-        minCoverage: params['min-coverage'],
-        mismatchWindowBp: params['mismatch-window-bp'],
+        mapMinQual: params.mapMinQual,
+        mapMinDepth: params.mapMinDepth,
+        minRunMarkers: params.minRunMarkers,
+        concordanceMinQual: params.concordanceMinQual,
+        concordanceMinDepth: params.concordanceMinDepth,
+        minCoverage: params.minCoverage,
+        mismatchWindowBp: params.mismatchWindowBp,
         bigwig: booleanParam(params.bigwig, 'bigwig')
     ]
     def publishRoot = configuredOutdir.normalize().toAbsolutePath().toString()
