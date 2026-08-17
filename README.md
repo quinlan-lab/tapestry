@@ -15,27 +15,37 @@ Populate a copy of [`examples/generic/family.yaml`](examples/generic/family.yaml
 and its canonical manifest, then run:
 
 ```bash
-# Validate without starting scientific processes.
-nextflow run . -entry validate -profile docker \
-  --run-config /path/to/family.yaml
-
-# Run inheritance, founder phasing, and all-CpG expansion.
+# Validate inputs, then run inheritance, founder phasing, and all-CpG expansion.
 nextflow run . -profile docker \
   --run-config /path/to/family.yaml \
   -resume
 ```
 
+The full command always validates before starting scientific processes. For an
+optional preflight that stops after validation, add `-entry validate`:
+
+```bash
+nextflow run . -entry validate -profile docker \
+  --run-config /path/to/family.yaml
+```
+
+The user YAML contains paths, selections, output choices, and scientific
+thresholds. Fixed product constraints—pedigree mode, GRCh38, `gtg`, and model
+methylation—are added to `resolved-run.json`; they are not redundant YAML keys.
 Validation resolves paths relative to the YAML and manifest, verifies the PED
 and exact VCF/manifest sample sets, checks reference and indexed artifact
 contracts, and publishes normalized inputs plus a validation report under
-`project.outdir/pipeline_info/`. Other stable WDL v3.x releases are rejected
-unless the run explicitly sets `upstream.allow_unaudited_release: true`.
+`project.outdir/pipeline_info/`. It also prints the selected family, samples,
+WDL release, reference regions, coverage threshold, BigWig choice, and output
+directory. Other stable WDL v3.x releases are rejected unless the run explicitly
+sets `upstream.allow_unaudited_release: true`.
 
 The full workflow publishes `pipeline_info/`, `reference/`, `inheritance/`, one
 directory under `samples/` for each selected eligible pedigree member, and
 `results-manifest.json` beneath `project.outdir`. The manifest contains only
 published relative paths, identifies indexed artifacts, and records count mode
-as disabled. Docker, Apptainer, and Slurm profiles are defined in
+as disabled. Completion prints the manifest path and per-sample status counts.
+Docker, Apptainer, and Slurm profiles are defined in
 [`nextflow.config`](nextflow.config); site-specific queues and resource policy
 should be supplied by a local profile.
 Nextflow's trace, report, timeline, and DAG are written to

@@ -14,7 +14,11 @@ import yaml
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
 
-from tapestry_validate import InputValidationError, validate_run  # noqa: E402
+from tapestry_validate import (  # noqa: E402
+    InputValidationError,
+    format_validation_summary,
+    validate_run,
+)
 
 
 COMMIT_331 = "477ef39ad69e86e90897ea7e313b86bfc12a2a96"
@@ -234,21 +238,15 @@ def make_fixture(
 
     config = {
         "schema_version": 1,
-        "mode": "pedigree",
         "project": {"id": "fixture", "outdir": "results/fixture"},
         "pedigree": {"ped": "family.ped"},
         "reference": {
-            "name": "GRCh38",
             "fasta": "data/reference.fa",
             "fasta_index": "data/reference.fa.fai",
         },
-        "upstream": {
-            "manifest": "manifest.json",
-            "allow_unaudited_release": allow_unaudited,
-        },
+        "upstream": {"manifest": "manifest.json"},
         "samples": {"include": ["CHILD"]},
         "inheritance": {
-            "method": "gtg",
             "map": {
                 "min_qual": 20,
                 "min_depth": 10,
@@ -257,13 +255,14 @@ def make_fixture(
             "concordance": {"min_qual": 20, "min_depth": 5},
         },
         "methylation": {
-            "modes": ["model"],
             "min_coverage": 10,
             "mismatch_window_bp": 50,
         },
         "regions": {"include": [region]},
         "outputs": {"bigwig": True},
     }
+    if allow_unaudited:
+        config["upstream"]["allow_unaudited_release"] = True
     config_path = root / "run.yaml"
     config_path.write_text(yaml.safe_dump(config, sort_keys=False), encoding="utf-8")
     return config_path
@@ -290,6 +289,36 @@ class ValidateRunTests(unittest.TestCase):
                 (output / "resolved-run.json").read_text(encoding="utf-8")
             )
             self.assertTrue(Path(resolved["reference"]["fasta"]).is_absolute())
+            self.assertEqual(resolved["mode"], "pedigree")
+            self.assertEqual(resolved["reference"]["name"], "GRCh38")
+            self.assertEqual(resolved["inheritance"]["method"], "gtg")
+            self.assertEqual(resolved["methylation"]["modes"], ["model"])
+            self.assertFalse(resolved["upstream"]["allow_unaudited_release"])
+            summary = format_validation_summary(report)
+            self.assertIn("Tapestry validation succeeded", summary)
+            self.assertIn("Reference: GRCh38 (chr1)", summary)
+            self.assertIn(f"Output: {root / 'results' / 'fixture'}", summary)
+
+    def test_fixed_internal_fields_are_not_public_config_keys(self) -> None:
+        cases = [
+            ("mode", "pedigree"),
+            ("reference.name", "GRCh38"),
+            ("inheritance.method", "gtg"),
+            ("methylation.modes", ["model"]),
+        ]
+        for key, value in cases:
+            with self.subTest(key=key), tempfile.TemporaryDirectory() as temporary:
+                root = Path(temporary)
+                config = make_fixture(root)
+                parsed = yaml.safe_load(config.read_text(encoding="utf-8"))
+                target = parsed
+                parts = key.split(".")
+                for part in parts[:-1]:
+                    target = target[part]
+                target[parts[-1]] = value
+                config.write_text(yaml.safe_dump(parsed), encoding="utf-8")
+                with self.assertRaisesRegex(InputValidationError, "run config schema"):
+                    validate_run(config, root / "validation")
 
     def test_json_and_yaml_have_the_same_fingerprint(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:
@@ -321,7 +350,7 @@ class ValidateRunTests(unittest.TestCase):
             root = Path(temporary)
             config = make_fixture(root)
             config.write_text(
-                config.read_text(encoding="utf-8") + "mode: pedigree\n",
+                config.read_text(encoding="utf-8") + "schema_version: 1\n",
                 encoding="utf-8",
             )
             with self.assertRaisesRegex(InputValidationError, "duplicate YAML key"):

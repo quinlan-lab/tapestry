@@ -143,6 +143,10 @@ def _resolve_path(value: str, base_dir: Path) -> str:
 def resolve_run_config(config: dict[str, Any], config_path: Path) -> dict[str, Any]:
     resolved = copy.deepcopy(config)
     base_dir = config_path.parent
+    resolved.setdefault("mode", "pedigree")
+    resolved["reference"].setdefault("name", "GRCh38")
+    resolved["inheritance"].setdefault("method", "gtg")
+    resolved["methylation"].setdefault("modes", ["model"])
     resolved["project"]["outdir"] = _resolve_path(
         resolved["project"]["outdir"], base_dir
     )
@@ -920,12 +924,22 @@ def validate_run(
         "warnings": warnings,
         "validator_version": VALIDATOR_VERSION,
         "config_fingerprint": fingerprint,
+        "project_id": config["project"]["id"],
+        "output_dir": config["project"]["outdir"],
         "family_id": family_id,
         "selected_samples": selected,
         "selected_autosomes": regions,
-        "reference": {"fasta": str(fasta), "contig_lengths": {
-            region: reference_lengths[region] for region in regions
-        }},
+        "reference": {
+            "name": config["reference"]["name"],
+            "fasta": str(fasta),
+            "contig_lengths": {
+                region: reference_lengths[region] for region in regions
+            },
+        },
+        "settings": {
+            "model_min_coverage": config["methylation"]["min_coverage"],
+            "bigwig": config["outputs"]["bigwig"],
+        },
         "joint_small_variants": joint_stats,
         "samples": sample_stats,
         "versions": {
@@ -964,6 +978,24 @@ def validate_run(
     return report
 
 
+def format_validation_summary(report: dict[str, Any]) -> str:
+    """Return a concise human-readable summary of a validated run."""
+    regions = report["selected_autosomes"]
+    region_text = "chr1-chr22" if regions == list(AUTOSOMES) else ", ".join(regions)
+    lines = [
+        "Tapestry validation succeeded",
+        f"  Family: {report['family_id']}",
+        f"  Samples: {', '.join(report['selected_samples'])}",
+        f"  Upstream: PacBio WDL {report['versions']['wdl_release']}",
+        f"  Reference: {report['reference']['name']} ({region_text})",
+        f"  Model minimum coverage: {report['settings']['model_min_coverage']}",
+        f"  BigWig: {'enabled' if report['settings']['bigwig'] else 'disabled'}",
+        f"  Output: {report['output_dir']}",
+    ]
+    lines.extend(f"  WARNING: {warning}" for warning in report["warnings"])
+    return "\n".join(lines)
+
+
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         description="Validate and normalize a Tapestry schema-v1 run configuration."
@@ -986,12 +1018,7 @@ def main(argv: list[str] | None = None) -> int:
         )
         print(f"tapestry validation failed: {exc}", file=sys.stderr)
         return 2
-    for warning in report["warnings"]:
-        print(f"WARNING: {warning}", file=sys.stderr)
-    print(
-        f"validated family {report['family_id']} with samples "
-        f"{', '.join(report['selected_samples'])}"
-    )
+    print(format_validation_summary(report))
     return 0
 
 

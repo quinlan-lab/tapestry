@@ -192,6 +192,20 @@ def build_results_manifest(
     return result
 
 
+def format_completion_summary(result: dict[str, Any], output_dir: Path) -> str:
+    """Return a concise human-readable summary of a completed run."""
+    statuses = [sample["status"] for sample in result["samples"].values()]
+    complete = statuses.count("complete")
+    no_phase = statuses.count("no_inheritance_phase")
+    return "\n".join(
+        [
+            "Tapestry completed",
+            f"  Results manifest: {output_dir / 'results-manifest.json'}",
+            f"  Samples: {complete} complete, {no_phase} without inheritance phase",
+        ]
+    )
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--resolved-run", required=True, type=Path)
@@ -202,7 +216,8 @@ def main(argv: list[str] | None = None) -> int:
     result = build_results_manifest(
         args.resolved_run, args.selected_samples, args.sample_qc, args.output
     )
-    print(f"recorded {len(result['selected_samples'])} selected samples")
+    config = json.loads(args.resolved_run.read_text(encoding="utf-8"))
+    print(format_completion_summary(result, Path(config["project"]["outdir"])))
     return 0
 
 

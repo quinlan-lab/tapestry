@@ -8,13 +8,15 @@ the localized outputs from a PacBio HiFi human WGS WDL v3.3.0 or v3.3.1 family
 run. The canonical manifest is Tapestry-owned JSON, not raw Cromwell, miniwdl,
 or Terra metadata.
 
-Validate a populated copy with:
+Run a populated copy with:
 
 ```bash
-nextflow run . -entry validate -profile docker \
-  --run-config /path/to/family.yaml
-
 nextflow run . -profile docker \
   --run-config /path/to/family.yaml \
   -resume
 ```
+
+Validation is always the first stage. To stop after the optional preflight, add
+`-entry validate`. The compact YAML contains only user inputs and scientific
+choices; the resolved run records the fixed pedigree/GRCh38/`gtg`/model
+constraints.

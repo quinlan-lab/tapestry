@@ -15,13 +15,13 @@ Tapestry starts after a completed PacBio HiFi human WGS WDL `family` run. One
 YAML run file points to a canonical Tapestry manifest of WDL outputs:
 
 ```bash
-# Validate only.
-nextflow run . -entry validate -profile docker \
-  --run-config family.yaml
-
-# Run inheritance, founder phasing, and all-CpG expansion.
+# Validate, then run inheritance, founder phasing, and all-CpG expansion.
 nextflow run . -profile docker \
   --run-config family.yaml -resume
+
+# Optional validation-only preflight.
+nextflow run . -entry validate -profile docker \
+  --run-config family.yaml
 ```
 
 Schema v1 supports GRCh38 whole autosomes, pedigree mode, model methylation,
@@ -126,6 +126,8 @@ than expanding schema v1 speculatively.
 ## Guardrails
 
 - Keep YAML as the recommended human format and JSON as its machine equivalent.
+- Keep fixed product constraints out of the user YAML; record pedigree mode,
+  GRCh38, `gtg`, and model mode in the normalized run instead.
 - Keep `--run-config`; resolve run paths relative to that file and manifest
   paths relative to the manifest.
 - Keep scientific parameters in the run contract and execution policy in

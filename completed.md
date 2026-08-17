@@ -164,6 +164,18 @@ The implementation was reproduced locally with the same Nextflow version: all
 stages were cached on resume. The first hosted green run and repository branch
 protection remain release-administration tasks in `ROADMAP.md`.
 
+## Compact user interface
+
+Implemented 2026-08-17.
+
+- The primary command is one resumable Nextflow run; validation remains the
+  mandatory first stage, while `-entry validate` is an optional preflight.
+- The run YAML contains only user inputs and scientific choices. Fixed pedigree,
+  GRCh38, `gtg`, and model-mode values exist only in the normalized run.
+- Validation prints the resolved family, samples, WDL release, reference,
+  regions, coverage threshold, BigWig choice, and output directory.
+- Completion prints the results-manifest path and per-sample status counts.
+
 These tests establish the implemented contract on deterministic fixtures. They
 do not replace the real WDL/CEPH, cluster-runtime, hosted-CI, and
 release-publication gates in `ROADMAP.md`.

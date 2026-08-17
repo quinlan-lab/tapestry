@@ -17,6 +17,9 @@ machine contracts are in `schemas/`, current commands are in `README.md`,
 remaining work is in `ROADMAP.md`, and completed decisions and evidence are in
 `completed.md`. `impl.md` is the original detailed implementation plan. The
 legacy site-specific shell paths remain available but are not the generic API.
+The public YAML contains only paths, selections, output choices, and scientific
+thresholds. Fixed pedigree/GRCh38/`gtg`/model constraints are inserted into the
+normalized run and are rejected as redundant public keys.
 
 ### Generic pedigree/model-only path
 
@@ -173,6 +176,9 @@ paths; its data-creation scripts still depend on site-local source data.
 - Update `README.md` and example configs whenever user-facing inputs, output
   schemas, labels, or workflow commands change. Update wiki/manuscript only when
   the corresponding scientific explanation or figure source changes.
+- Keep the full workflow as the primary command: it always validates first.
+  Present `-entry validate` only as an optional preflight. Preserve the compact
+  validation and completion summaries when changing process outputs.
 
 ## Verification
 

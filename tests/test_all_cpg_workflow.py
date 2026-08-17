@@ -19,7 +19,10 @@ from expand_model_to_all_cpgs import (  # noqa: E402
     write_output,
 )
 from generate_reference_cpgs import generate_reference_cpgs  # noqa: E402
-from write_results_manifest import build_results_manifest  # noqa: E402
+from write_results_manifest import (  # noqa: E402
+    build_results_manifest,
+    format_completion_summary,
+)
 
 
 def _bgzip(path: Path, text: str, preset: str) -> Path:
@@ -160,6 +163,13 @@ class AllCpgWorkflowTests(unittest.TestCase):
                 "samples/CHILD/CHILD.dna-methylation.pat.model.TESTREF.bw",
             )
             self.assertNotIn(str(root), output.read_text(encoding="utf-8"))
+            summary = format_completion_summary(manifest, root / "published")
+            self.assertIn("Tapestry completed", summary)
+            self.assertIn(
+                f"Results manifest: {root / 'published' / 'results-manifest.json'}",
+                summary,
+            )
+            self.assertIn("Samples: 1 complete, 0 without inheritance phase", summary)
 
     def test_results_manifest_marks_bigwig_disabled(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:

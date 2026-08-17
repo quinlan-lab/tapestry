@@ -119,6 +119,7 @@ process VALIDATE_INPUTS {
     val container_mounts
 
     output:
+    stdout emit: validation_summary
     path 'resolved-run.json', emit: resolved_run
     path 'resolved-manifest.json', emit: resolved_manifest
     path 'normalized.ped', emit: normalized_ped
@@ -443,6 +444,7 @@ process WRITE_RESULTS_MANIFEST {
     path manifest_writer
 
     output:
+    stdout emit: completion_summary
     path 'results-manifest.json', emit: results_manifest
 
     script:
@@ -468,6 +470,7 @@ workflow RUN_VALIDATION {
         Channel.value(file("${projectDir}/schemas", checkIfExists: true)),
         Channel.value(settings[2])
     )
+    VALIDATE_INPUTS.out.validation_summary.view { it.trim() }
 
     emit:
     resolved_run = VALIDATE_INPUTS.out.resolved_run
@@ -634,4 +637,5 @@ workflow {
         Channel.value(settings[1]),
         Channel.value(file("${projectDir}/src/write_results_manifest.py", checkIfExists: true))
     )
+    WRITE_RESULTS_MANIFEST.out.completion_summary.view { it.trim() }
 }

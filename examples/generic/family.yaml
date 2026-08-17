@@ -1,5 +1,4 @@
 schema_version: 1
-mode: pedigree
 
 project:
   id: example_family
@@ -9,19 +8,16 @@ pedigree:
   ped: family.ped
 
 reference:
-  name: GRCh38
   fasta: data/hg38.analysisSet.fa
   fasta_index: data/hg38.analysisSet.fa.fai
 
 upstream:
   manifest: pacbio-wdl.tapestry.json
-  allow_unaudited_release: false
 
 samples:
   include: [CHILD]
 
 inheritance:
-  method: gtg
   map:
     min_qual: 20
     min_depth: 10
@@ -31,7 +27,6 @@ inheritance:
     min_depth: 5
 
 methylation:
-  modes: [model]
   min_coverage: 10
   mismatch_window_bp: 50
 

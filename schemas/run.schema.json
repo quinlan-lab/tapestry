@@ -6,7 +6,6 @@
   "additionalProperties": false,
   "required": [
     "schema_version",
-    "mode",
     "project",
     "pedigree",
     "reference",
@@ -17,7 +16,6 @@
   ],
   "properties": {
     "schema_version": {"const": 1},
-    "mode": {"const": "pedigree"},
     "project": {
       "type": "object",
       "additionalProperties": false,
@@ -36,9 +34,8 @@
     "reference": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["name", "fasta", "fasta_index"],
+      "required": ["fasta", "fasta_index"],
       "properties": {
-        "name": {"const": "GRCh38"},
         "fasta": {"$ref": "#/$defs/path"},
         "fasta_index": {"$ref": "#/$defs/path"},
         "fasta_gzi": {"$ref": "#/$defs/path"}
@@ -69,9 +66,8 @@
     "inheritance": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["method", "map", "concordance"],
+      "required": ["map", "concordance"],
       "properties": {
-        "method": {"const": "gtg"},
         "map": {
           "type": "object",
           "additionalProperties": false,
@@ -96,15 +92,8 @@
     "methylation": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["modes", "min_coverage", "mismatch_window_bp"],
+      "required": ["min_coverage", "mismatch_window_bp"],
       "properties": {
-        "modes": {
-          "type": "array",
-          "prefixItems": [{"const": "model"}],
-          "items": false,
-          "minItems": 1,
-          "maxItems": 1
-        },
         "min_coverage": {"type": "integer", "minimum": 1},
         "mismatch_window_bp": {"type": "integer", "minimum": 0}
       }
