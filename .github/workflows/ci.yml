@@ -110,6 +110,7 @@ jobs:
         with:
           name: workflow-diagnostics-${{ github.run_id }}-${{ github.run_attempt }}
           if-no-files-found: ignore
+          include-hidden-files: true
           retention-days: 5
           path: |
             .test-work/e2e.*/nextflow.*.log

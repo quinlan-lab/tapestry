@@ -357,6 +357,7 @@ process PHASE_MODEL_TO_FOUNDERS {
     def bigwig_option = bigwig_enabled ? '' : '--no-bigwig'
     """
     set -euo pipefail
+    export PYTHONDONTWRITEBYTECODE=1
     test -s validation.success
     export PYTHONPATH="${source_dir}:${source_dir}/util"
     python3 "${source_dir}/phase_meth_to_founder_haps.py" \\
