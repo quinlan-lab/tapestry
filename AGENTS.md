@@ -12,14 +12,14 @@ Treat those as a worked deployment, not portable API contracts.
 
 Tapestry now includes a generic downstream workflow for the
 [PacBio HiFi human WGS WDL](https://github.com/PacificBiosciences/HiFi-human-WGS-WDL),
-driven by one versioned YAML run file and a canonical WDL-output manifest. The
-machine contracts are in `schemas/`, current commands are in `README.md`,
+driven directly by miniwdl `outputs.json`, a six-column PED, and a GRCh38
+reference. Validation generates the canonical WDL-output manifest and resolved
+run as pipeline records. Current commands are in `README.md`,
 remaining work is in `ROADMAP.md`, and completed decisions and evidence are in
 `completed.md`. `impl.md` is the original detailed implementation plan. The
 legacy site-specific shell paths remain available but are not the generic API.
-The public YAML contains only paths, selections, output choices, and scientific
-thresholds. Fixed pedigree/GRCh38/`gtg`/model constraints are inserted into the
-normalized run and are rejected as redundant public keys.
+Scientific choices are Nextflow parameters and are recorded in the normalized
+run. Fixed pedigree/GRCh38/`gtg`/model constraints are inserted internally.
 
 ### Generic pedigree/model-only path
 
@@ -28,8 +28,7 @@ normalized run and are rejected as redundant public keys.
 inheritance phase per selected sample, generates reference-autosome CpGs, and
 publishes all-CpG tables, BigWigs, QC, provenance, and a results manifest. The
 generic path is GRCh38 `chr1`-`chr22` only and supports WDL v3.3.0/v3.3.1 by
-default. Another stable v3.x release requires an explicit unaudited-release
-opt-in; prereleases and other major versions are rejected.
+default. Other releases are rejected until they are audited and added.
 
 ## Current workflows
 
@@ -71,15 +70,17 @@ paths; its data-creation scripts still depend on site-local source data.
 ## Repository map
 
 - `main.nf`, `nextflow.config`: generic DSL2 workflow and local/Docker/
-  Apptainer/Slurm profiles. Scientific inputs come from `--run-config`; executor
-  and resource policy belong in profiles.
-- `schemas/`, `examples/generic/`: authoritative machine contracts and portable
-  human-authored examples.
+  Apptainer/Slurm profiles. Users pass miniwdl outputs, PED, reference, output
+  location, and optional scientific overrides directly; executor and resource
+  policy belong in profiles.
+- `examples/generic/`: a minimal PED example for the direct workflow.
 - `ROADMAP.md`, `completed.md`, `impl.md`: remaining work, completed work, and
-  the archived detailed implementation plan, respectively. Do not copy the
-  current schema into planning documents.
-- `src/tapestry_validate.py`: strict YAML/JSON, manifest, PED, reference, VCF,
-  HiPhase-table, model-BED, release, and output-collision validation.
+  the archived detailed implementation plan, respectively. Do not copy current
+  interface details into planning documents.
+- `src/tapestry_validate.py`: converts family-WDL miniwdl `outputs.json`, PED,
+  and direct workflow settings into private canonical contracts, then performs
+  strict manifest, reference, VCF, HiPhase-table, model-BED, release, and
+  output-collision validation.
 - `src/normalize_joint_vcf.py`, `src/run_gtg_inheritance.py`: deterministic
   all-site/complete-family VCF branches and pinned `gtg` orchestration.
 - `src/filter_model_beds.py`, `src/generate_reference_cpgs.py`,
@@ -173,8 +174,9 @@ paths; its data-creation scripts still depend on site-local source data.
 - Keep generated data, indexes, logs, and large genomic outputs out of git.
   Small deterministic fixtures belong in `tests/` or `examples/` (note
   `examples/` already holds `apex_trio_relabeling/`).
-- Update `README.md` and example configs whenever user-facing inputs, output
-  schemas, labels, or workflow commands change. Update wiki/manuscript only when
+- Update `README.md` and tests whenever user-facing inputs, output records,
+  labels, or workflow commands change.
+  Update wiki/manuscript only when
   the corresponding scientific explanation or figure source changes.
 - Keep the full workflow as the primary command: it always validates first.
   Present `-entry validate` only as an optional preflight. Preserve the compact

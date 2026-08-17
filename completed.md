@@ -1,9 +1,9 @@
 # Completed work
 
 This file records implemented Tapestry milestones and settled decisions. It is
-historical evidence, not the public input specification. The machine-readable
-contracts live in `schemas/`; user-facing commands and examples live in
-`README.md` and `examples/generic/`. Remaining work is tracked in `ROADMAP.md`.
+historical evidence, not the public input specification. The user-facing
+command lives in `README.md`.
+Remaining work is tracked in `ROADMAP.md`.
 
 ## Generic autosomal pedigree/model-only MVP
 
@@ -20,25 +20,23 @@ The implemented path supports:
 - Local, Docker, Apptainer, and Slurm Nextflow profiles.
 
 Count methylation, sex chromosomes, other references, arbitrary intervals,
-direct workflow-engine adapters, and generic trio orchestration were explicitly
+other workflow-engine adapters, and generic trio orchestration were explicitly
 left for later phases.
 
 ## Settled interface decisions
 
-- YAML is the recommended human-authored format; equivalent JSON is accepted.
-- The entry point is `nextflow run . --run-config family.yaml`. Tapestry uses
-  `--run-config`, rather than Nextflow's `-params-file`, so paths resolve relative
-  to the run file.
-- `upstream.manifest` names a small canonical Tapestry manifest, not raw
-  Cromwell, miniwdl, or Terra output JSON. Future adapters must emit this same
-  contract.
-- Scientific inputs and thresholds live in the run file. Executor, queue,
+- The entry point accepts miniwdl `outputs.json`, PED, reference FASTA, and
+  output directory directly as Nextflow parameters.
+- Validation detects the WDL release and internally generates the canonical
+  Tapestry manifest and normalized run. Users do not author either contract.
+- Miniwdl adaptation and contract validation are one validator operation; there
+  is no preparatory command or intermediate user-facing YAML.
+- Scientific overrides are optional Nextflow parameters. Executor, queue,
   container, account, and site resource policy live in Nextflow profiles.
-- Omitted `samples.include` selects every eligible PED member; an explicit empty
-  selection or ineligible sample is rejected.
-- WDL v3.3.0 and v3.3.1 are accepted only with their audited commits. Other
-  stable v3.x releases require explicit unaudited-release opt-in. Prereleases and
-  other major versions are rejected.
+- Omitted `--samples` selects every eligible PED member; duplicate, unknown, or
+  ineligible selections are rejected.
+- WDL v3.3.0 and v3.3.1 map to their audited commits. Other releases are
+  rejected.
 - Reference-dependent filenames derive from `reference.name`; they are not
   hard-coded in workflow or manifest-generation code.
 
@@ -113,7 +111,8 @@ outputs and are reported as `no_inheritance_phase`, not falsely as `complete`.
 
 ## Completed milestones
 
-- Contract schemas, strict YAML/JSON parsing, examples, and validate-only entry.
+- Direct miniwdl JSON parsing, resolved provenance records, and validate-only
+  entry.
 - Deterministic joint-VCF normalization and inheritance slice.
 - Portable model-only founder phasing with empty/no-phase handling.
 - Reference CpG generation, all-CpG expansion, BigWigs, QC, and complete results
@@ -124,7 +123,7 @@ outputs and are reported as `no_inheritance_phase`, not falsely as `complete`.
 
 ## Verification evidence
 
-As of 2026-08-15:
+As of 2026-08-17:
 
 - All 23 containerized unit/regression tests pass with no skips.
 - The informative synthetic Docker workflow completes all nine processes.
@@ -133,8 +132,7 @@ As of 2026-08-15:
   `results-manifest.json`.
 - The BigWig migration parity test passes against the pinned UCSC binary.
 - Targeted Pyright reports zero errors and warnings.
-- JSON Schema parsing, Nextflow profile configuration, shell syntax, and
-  `git diff --check` pass.
+- Nextflow profile configuration, shell syntax, and `git diff --check` pass.
 
 ## Continuous integration
 
@@ -145,8 +143,8 @@ manual dispatch. It deliberately has no runtime matrix and no publication or
 write permissions:
 
 - `Static checks` creates a Python 3.11 virtual environment, installs pinned
-  runtime and CI dependencies, type-checks the maintained generic modules,
-  parses both JSON schemas, and checks the E2E shell syntax.
+  runtime and CI dependencies, type-checks the maintained generic modules, and
+  checks the E2E shell syntax.
 - `Workflow` uses Java 17 and Nextflow 24.04.2, builds `tapestry:ci` with cached
   Docker layers, runs all containerized unit/regression tests, and executes the
   informative workflow twice.
@@ -170,10 +168,12 @@ Implemented 2026-08-17.
 
 - The primary command is one resumable Nextflow run; validation remains the
   mandatory first stage, while `-entry validate` is an optional preflight.
-- The run YAML contains only user inputs and scientific choices. Fixed pedigree,
-  GRCh38, `gtg`, and model-mode values exist only in the normalized run.
+- Nextflow accepts miniwdl `outputs.json`, PED, reference, and output directory
+  directly. Validation generates the internal canonical manifest and normalized
+  run.
 - Validation prints the resolved family, samples, WDL release, reference,
-  regions, coverage threshold, BigWig choice, and output directory.
+  regions, inheritance and methylation thresholds, BigWig choice, and output
+  directory.
 - Completion prints the results-manifest path and per-sample status counts.
 
 These tests establish the implemented contract on deterministic fixtures. They

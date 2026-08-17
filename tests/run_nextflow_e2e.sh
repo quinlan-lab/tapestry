@@ -38,7 +38,14 @@ common=(
     run "${repo_root}"
     -profile docker
     --container "${container_image}"
-    --run-config "${fixture_root}/fixture/run.yaml"
+    --outputs-json "${fixture_root}/fixture/miniwdl-outputs.json"
+    --ped "${fixture_root}/fixture/family.ped"
+    --reference-fasta "${fixture_root}/fixture/data/reference.fa"
+    --outdir "${fixture_root}/fixture/results/fixture"
+    --project-id fixture
+    --samples CHILD
+    --regions chr1
+    --min-run-markers 1
     -work-dir "${fixture_root}/work"
 )
 

@@ -4,45 +4,54 @@ A pipeline to phase DNA methylation from HiFi reads in a human pedigree (includi
 
 ## Generic WDL-output workflow
 
-The generic Nextflow workflow consumes outputs from the PacBio HiFi human WGS
-WDL through the schema-v1 YAML/JSON run configuration and Tapestry canonical
-manifest defined in [`schemas/`](schemas/) and illustrated in
-[`examples/generic/`](examples/generic/). The current contract supports
-GRCh38 autosomes, pedigree mode, model methylation, and WDL v3.3.0 or v3.3.1.
-It does not call HiPhase or pb-CpG-tools: those products come from the WDL.
-
-Populate a copy of [`examples/generic/family.yaml`](examples/generic/family.yaml)
-and its canonical manifest, then run:
+The generic Nextflow workflow consumes a completed miniwdl run of the PacBio
+HiFi human WGS `family` WDL. It supports GRCh38 autosomes, pedigree mode, model
+methylation, and WDL v3.3.0 or v3.3.1. It does not call HiPhase or
+pb-CpG-tools: those products come from the WDL.
 
 ```bash
-# Validate inputs, then run inheritance, founder phasing, and all-CpG expansion.
-nextflow run . -profile docker \
-  --run-config /path/to/family.yaml \
+nextflow run . -profile slurm,apptainer \
+  --outputs-json /path/to/miniwdl-run/outputs.json \
+  --ped /path/to/family.ped \
+  --reference-fasta /path/to/GRCh38.fa \
+  --outdir /path/to/tapestry-results \
+  --container /path/to/tapestry.sif \
   -resume
 ```
+
+The FASTA index defaults to `<reference-fasta>.fai`; override it with
+`--reference-index`. Tapestry detects the WDL release from `workflow_version`,
+selects every PED member with both parents present, and processes `chr1` through
+`chr22`. Optional overrides include `--samples CHILD1,CHILD2`,
+`--regions chr1,chr2`, `--min-coverage 10`, `--mismatch-window-bp 50`, and
+`--bigwig false`. Inheritance thresholds are exposed as `--map-min-qual`,
+`--map-min-depth`, `--min-run-markers`, `--concordance-min-qual`, and
+`--concordance-min-depth`; their respective defaults are 20, 10, 10, 20, and
+5. Validation prints every effective scientific setting and records it in
+`pipeline_info/resolved-run.json`.
 
 The full command always validates before starting scientific processes. For an
 optional preflight that stops after validation, add `-entry validate`:
 
 ```bash
 nextflow run . -entry validate -profile docker \
-  --run-config /path/to/family.yaml
+  --outputs-json /path/to/miniwdl-run/outputs.json \
+  --ped /path/to/family.ped \
+  --reference-fasta /path/to/GRCh38.fa \
+  --outdir /path/to/tapestry-results
 ```
 
-The user YAML contains paths, selections, output choices, and scientific
-thresholds. Fixed product constraints—pedigree mode, GRCh38, `gtg`, and model
-methylation—are added to `resolved-run.json`; they are not redundant YAML keys.
-Validation resolves paths relative to the YAML and manifest, verifies the PED
-and exact VCF/manifest sample sets, checks reference and indexed artifact
-contracts, and publishes normalized inputs plus a validation report under
-`project.outdir/pipeline_info/`. It also prints the selected family, samples,
-WDL release, reference regions, coverage threshold, BigWig choice, and output
-directory. Other stable WDL v3.x releases are rejected unless the run explicitly
-sets `upstream.allow_unaudited_release: true`.
+Validation converts miniwdl outputs into Tapestry's internal canonical manifest,
+verifies the PED and exact VCF/output sample sets, checks reference and indexed
+artifact contracts, and publishes `resolved-run.json`,
+`resolved-manifest.json`, normalized inputs, and a validation report under
+`<outdir>/pipeline_info/`. It also prints the selected family, samples, WDL
+release, reference regions, coverage threshold, BigWig choice, and output
+directory. Users do not author an intermediate run configuration or manifest.
 
 The full workflow publishes `pipeline_info/`, `reference/`, `inheritance/`, one
 directory under `samples/` for each selected eligible pedigree member, and
-`results-manifest.json` beneath `project.outdir`. The manifest contains only
+`results-manifest.json` beneath `<outdir>`. The manifest contains only
 published relative paths, identifies indexed artifacts, and records count mode
 as disabled. Completion prints the manifest path and per-sample status counts.
 Docker, Apptainer, and Slurm profiles are defined in

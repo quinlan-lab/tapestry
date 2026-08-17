@@ -1,9 +1,23 @@
 import java.nio.file.Paths
-import org.yaml.snakeyaml.Yaml
-
 nextflow.enable.dsl = 2
 
-params['run-config'] = null
+params['outputs-json'] = null
+params.ped = null
+params['reference-fasta'] = null
+params['reference-index'] = null
+params['reference-gzi'] = null
+params.outdir = null
+params['project-id'] = null
+params.samples = null
+params.regions = null
+params['map-min-qual'] = 20
+params['map-min-depth'] = 10
+params['min-run-markers'] = 10
+params['concordance-min-qual'] = 20
+params['concordance-min-depth'] = 5
+params['min-coverage'] = 10
+params['mismatch-window-bp'] = 50
+params.bigwig = true
 params.container = null
 
 
@@ -13,50 +27,60 @@ def resolvedPath(baseDir, value) {
 }
 
 
-def collectManifestMounts(node, key, baseDir, roots) {
-    def pathKeys = [
-        'vcf', 'index', 'bed', 'bam', 'phase_blocks', 'phase_stats',
-        'phase_haplotags', 'outputs_manifest', 'metadata'
-    ] as Set
-    if (node instanceof Map) {
-        node.each { childKey, childValue ->
-            collectManifestMounts(childValue, childKey.toString(), baseDir, roots)
-        }
+def addMountRoot(roots, path) {
+    roots.add(path.parent)
+    try {
+        roots.add(path.toRealPath().parent)
     }
-    else if (node instanceof Collection) {
-        node.each { child -> collectManifestMounts(child, key, baseDir, roots) }
-    }
-    else if (node instanceof String && pathKeys.contains(key)) {
-        roots.add(resolvedPath(baseDir, node).parent)
+    catch (Exception ignored) {
+        // Python validation reports missing paths with precise field context.
     }
 }
 
 
-def validationMountOptions(configFile, config, containerEngine) {
+def collectMiniwdlMounts(node, key, baseDir, roots) {
+    def pathOutputs = [
+        'joint_small_variants_vcf', 'joint_small_variants_vcf_index',
+        'phased_small_variant_vcf', 'phased_small_variant_vcf_index',
+        'phase_blocks',
+        'cpg_combined_bed', 'cpg_combined_bed_index',
+        'cpg_hap1_bed', 'cpg_hap1_bed_index',
+        'cpg_hap2_bed', 'cpg_hap2_bed_index'
+    ] as Set
+    if (node instanceof Map) {
+        node.each { childKey, childValue ->
+            collectMiniwdlMounts(childValue, childKey.toString(), baseDir, roots)
+        }
+    }
+    else if (node instanceof Collection) {
+        node.each { child -> collectMiniwdlMounts(child, key, baseDir, roots) }
+    }
+    else if (node instanceof String && pathOutputs.contains(key.tokenize('.').last())) {
+        addMountRoot(roots, resolvedPath(baseDir, node))
+    }
+}
+
+
+def validationMountOptions(inputs, containerEngine) {
     def roots = new LinkedHashSet()
-    roots.add(configFile.parent)
+    def outputsFile = Paths.get(inputs.outputsJson)
+    addMountRoot(roots, outputsFile)
+    addMountRoot(roots, Paths.get(inputs.ped))
+    addMountRoot(roots, Paths.get(inputs.referenceFasta))
+    if (inputs.referenceIndex) {
+        addMountRoot(roots, Paths.get(inputs.referenceIndex))
+    }
+    if (inputs.referenceGzi) {
+        addMountRoot(roots, Paths.get(inputs.referenceGzi))
+    }
     try {
-        ['ped'].each { key ->
-            if (config.pedigree?.get(key)) {
-                roots.add(resolvedPath(configFile.parent, config.pedigree[key]).parent)
-            }
-        }
-        ['fasta', 'fasta_index', 'fasta_gzi'].each { key ->
-            if (config.reference?.get(key)) {
-                roots.add(resolvedPath(configFile.parent, config.reference[key]).parent)
-            }
-        }
-        if (config.upstream?.manifest) {
-            def manifestPath = resolvedPath(configFile.parent, config.upstream.manifest)
-            roots.add(manifestPath.parent)
-            if (manifestPath.toFile().isFile()) {
-                def manifest = new groovy.json.JsonSlurper().parse(manifestPath.toFile())
-                collectManifestMounts(manifest, '', manifestPath.parent, roots)
-            }
+        if (outputsFile.toFile().isFile()) {
+            def outputs = new groovy.json.JsonSlurper().parse(outputsFile.toFile())
+            collectMiniwdlMounts(outputs, '', outputsFile.parent, roots)
         }
     }
     catch (Exception ignored) {
-        // The Python validator reports schema/path errors with precise field context.
+        // Python validation reports malformed miniwdl JSON precisely.
     }
     if (containerEngine == 'docker') {
         return roots.collect { root ->
@@ -72,34 +96,77 @@ def validationMountOptions(configFile, config, containerEngine) {
 }
 
 
+def requiredInputPath(name) {
+    def value = params[name]
+    if (!value) {
+        error "Missing required pipeline argument: --${name} <path>"
+    }
+    return file(value, checkIfExists: true).toAbsolutePath().toString()
+}
+
+
+def booleanParam(value, name) {
+    if (value instanceof Boolean) {
+        return value
+    }
+    def normalized = value.toString().toLowerCase()
+    if (normalized == 'true') {
+        return true
+    }
+    if (normalized == 'false') {
+        return false
+    }
+    error "--${name} must be true or false"
+}
+
+
 def resolveRunSettings() {
-    def runConfig = params['run-config']
-    if (!runConfig) {
-        error "Missing required pipeline argument: --run-config <run.yaml|run.json>"
+    def outputsJson = requiredInputPath('outputs-json')
+    def ped = requiredInputPath('ped')
+    def referenceFasta = requiredInputPath('reference-fasta')
+    if (!params.outdir) {
+        error "Missing required pipeline argument: --outdir <directory>"
     }
-
-    def configFile = file(runConfig, checkIfExists: true).toAbsolutePath()
-    def config
-    if (configFile.name.toLowerCase().endsWith('.json')) {
-        config = new groovy.json.JsonSlurper().parseText(configFile.text)
-    }
-    else {
-        config = new Yaml().load(configFile.text)
-    }
-    if (!(config instanceof Map) || !(config.project instanceof Map) || !config.project.outdir) {
-        error "Run config must define project.outdir; full validation is performed by VALIDATE_INPUTS"
-    }
-
-    def configuredOutdir = Paths.get(config.project.outdir.toString())
+    def configuredOutdir = Paths.get(params.outdir.toString())
     if (!configuredOutdir.isAbsolute()) {
-        configuredOutdir = configFile.parent.resolve(configuredOutdir)
+        configuredOutdir = Paths.get(launchDir.toString()).resolve(configuredOutdir)
     }
+    def referenceIndex = params['reference-index']
+        ? file(params['reference-index'], checkIfExists: true).toAbsolutePath().toString()
+        : null
+    def referenceGzi = params['reference-gzi']
+        ? file(params['reference-gzi'], checkIfExists: true).toAbsolutePath().toString()
+        : null
+    def samples = params.samples
+        ? params.samples.toString().split(',').collect { it.trim() }.findAll { it }
+        : []
+    if (samples.size() != samples.toSet().size()) {
+        error "--samples contains duplicate sample IDs"
+    }
+    def inputs = [
+        outputsJson: outputsJson,
+        ped: ped,
+        referenceFasta: referenceFasta,
+        referenceIndex: referenceIndex,
+        referenceGzi: referenceGzi,
+        projectId: params['project-id']?.toString(),
+        samples: samples,
+        regions: params.regions?.toString(),
+        mapMinQual: params['map-min-qual'],
+        mapMinDepth: params['map-min-depth'],
+        minRunMarkers: params['min-run-markers'],
+        concordanceMinQual: params['concordance-min-qual'],
+        concordanceMinDepth: params['concordance-min-depth'],
+        minCoverage: params['min-coverage'],
+        mismatchWindowBp: params['mismatch-window-bp'],
+        bigwig: booleanParam(params.bigwig, 'bigwig')
+    ]
+    def publishRoot = configuredOutdir.normalize().toAbsolutePath().toString()
     return [
-        configFile.toString(),
-        configuredOutdir.normalize().toAbsolutePath().toString(),
-        validationMountOptions(
-            configFile,
-            config,
+        inputs: inputs,
+        publishRoot: publishRoot,
+        mountOptions: validationMountOptions(
+            inputs,
             workflow.containerEngine?.toString()
         )
     ]
@@ -112,10 +179,9 @@ process VALIDATE_INPUTS {
     publishDir "${publish_root}/pipeline_info", mode: 'copy', overwrite: true
 
     input:
-    env TAPESTRY_RUN_CONFIG
+    val direct_inputs
     val publish_root
     path validator
-    path schema_dir
     val container_mounts
 
     output:
@@ -130,12 +196,43 @@ process VALIDATE_INPUTS {
     path 'validation.success', emit: validation_success
 
     script:
+    def referenceIndexOption = direct_inputs.referenceIndex
+        ? "--reference-index \"${direct_inputs.referenceIndex}\""
+        : ''
+    def referenceGziOption = direct_inputs.referenceGzi
+        ? "--reference-gzi \"${direct_inputs.referenceGzi}\""
+        : ''
+    def projectIdOption = direct_inputs.projectId
+        ? "--project-id \"${direct_inputs.projectId}\""
+        : ''
+    def sampleOptions = direct_inputs.samples
+        .collect { sample -> "--sample \"${sample}\"" }
+        .join(' ')
+    def regionsOption = direct_inputs.regions
+        ? "--regions \"${direct_inputs.regions}\""
+        : ''
+    def bigwigOption = direct_inputs.bigwig ? '' : '--no-bigwig'
     """
     set -euo pipefail
     python3 "${validator}" \\
-      --run-config "\${TAPESTRY_RUN_CONFIG}" \\
-      --output-dir . \\
-      --schema-dir "${schema_dir}"
+      --outputs-json "${direct_inputs.outputsJson}" \\
+      --ped "${direct_inputs.ped}" \\
+      --reference-fasta "${direct_inputs.referenceFasta}" \\
+      ${referenceIndexOption} \\
+      ${referenceGziOption} \\
+      ${projectIdOption} \\
+      ${sampleOptions} \\
+      ${regionsOption} \\
+      --map-min-qual "${direct_inputs.mapMinQual}" \\
+      --map-min-depth "${direct_inputs.mapMinDepth}" \\
+      --min-run-markers "${direct_inputs.minRunMarkers}" \\
+      --concordance-min-qual "${direct_inputs.concordanceMinQual}" \\
+      --concordance-min-depth "${direct_inputs.concordanceMinDepth}" \\
+      --min-coverage "${direct_inputs.minCoverage}" \\
+      --mismatch-window-bp "${direct_inputs.mismatchWindowBp}" \\
+      ${bigwigOption} \\
+      --project-outdir "${publish_root}" \\
+      --output-dir .
     """
 }
 
@@ -464,11 +561,10 @@ process WRITE_RESULTS_MANIFEST {
 workflow RUN_VALIDATION {
     def settings = resolveRunSettings()
     VALIDATE_INPUTS(
-        Channel.value(settings[0]),
-        Channel.value(settings[1]),
+        Channel.value(settings.inputs),
+        Channel.value(settings.publishRoot),
         Channel.value(file("${projectDir}/src/tapestry_validate.py", checkIfExists: true)),
-        Channel.value(file("${projectDir}/schemas", checkIfExists: true)),
-        Channel.value(settings[2])
+        Channel.value(settings.mountOptions)
     )
     VALIDATE_INPUTS.out.validation_summary.view { it.trim() }
 
@@ -540,13 +636,13 @@ workflow {
     FILTER_MODEL_BEDS(
         model_artifacts,
         validation_gate,
-        Channel.value(settings[1]),
+        Channel.value(settings.publishRoot),
         Channel.value(file("${projectDir}/src/filter_model_beds.py", checkIfExists: true))
     )
     CAPTURE_RUNTIME_VERSIONS(
         RUN_VALIDATION.out.resolved_manifest,
         validation_gate,
-        Channel.value(settings[1]),
+        Channel.value(settings.publishRoot),
         Channel.value(file("${projectDir}/src/capture_versions.py", checkIfExists: true))
     )
     NORMALIZE_JOINT_VCF(
@@ -554,9 +650,9 @@ workflow {
         RUN_VALIDATION.out.resolved_manifest,
         RUN_VALIDATION.out.normalized_ped,
         validation_gate,
-        Channel.value(settings[1]),
+        Channel.value(settings.publishRoot),
         Channel.value(file("${projectDir}/src/normalize_joint_vcf.py", checkIfExists: true)),
-        Channel.value(settings[2])
+        Channel.value(settings.mountOptions)
     )
     RUN_GTG_INHERITANCE(
         RUN_VALIDATION.out.resolved_run,
@@ -567,14 +663,14 @@ workflow {
         NORMALIZE_JOINT_VCF.out.map_index,
         NORMALIZE_JOINT_VCF.out.normalization_report,
         validation_gate,
-        Channel.value(settings[1]),
+        Channel.value(settings.publishRoot),
         Channel.value(file("${projectDir}/src/run_gtg_inheritance.py", checkIfExists: true))
     )
 
     GENERATE_REFERENCE_CPGS(
         reference_artifact,
         validation_gate,
-        Channel.value(settings[1]),
+        Channel.value(settings.publishRoot),
         Channel.value(file("${projectDir}/src/generate_reference_cpgs.py", checkIfExists: true))
     )
 
@@ -595,7 +691,7 @@ workflow {
     PHASE_MODEL_TO_FOUNDERS(
         founder_inputs,
         validation_gate,
-        Channel.value(settings[1]),
+        Channel.value(settings.publishRoot),
         Channel.value(file("${projectDir}/src", checkIfExists: true))
     )
 
@@ -619,7 +715,7 @@ workflow {
     EXPAND_MODEL_TO_ALL_CPGS(
         all_cpg_inputs,
         validation_gate,
-        Channel.value(settings[1]),
+        Channel.value(settings.publishRoot),
         Channel.value(file("${projectDir}/src/expand_model_to_all_cpgs.py", checkIfExists: true))
     )
 
@@ -634,7 +730,7 @@ workflow {
         CAPTURE_RUNTIME_VERSIONS.out.versions,
         completed_sample_qc,
         validation_gate,
-        Channel.value(settings[1]),
+        Channel.value(settings.publishRoot),
         Channel.value(file("${projectDir}/src/write_results_manifest.py", checkIfExists: true))
     )
     WRITE_RESULTS_MANIFEST.out.completion_summary.view { it.trim() }

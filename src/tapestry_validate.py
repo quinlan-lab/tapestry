@@ -8,16 +8,13 @@ import copy
 import csv
 import gzip
 import hashlib
-import importlib.metadata
 import json
 import re
 import sys
 from pathlib import Path
-from typing import Any, Iterable, TextIO
+from typing import Any, TextIO
 
-import jsonschema
 import pysam
-import yaml
 
 
 VALIDATOR_VERSION = "0.1.0"
@@ -28,7 +25,17 @@ SUPPORTED_WDL_RELEASES = {
     "v3.3.0": "db06f0af2354d847b971b0548eaade9ff145c912",
     "v3.3.1": "477ef39ad69e86e90897ea7e313b86bfc12a2a96",
 }
-STABLE_V3_RELEASE = re.compile(r"^v3\.\d+\.\d+$")
+SAMPLE_OUTPUTS = (
+    "phased_small_variant_vcf",
+    "phased_small_variant_vcf_index",
+    "phase_blocks",
+    "cpg_combined_bed",
+    "cpg_combined_bed_index",
+    "cpg_hap1_bed",
+    "cpg_hap1_bed_index",
+    "cpg_hap2_bed",
+    "cpg_hap2_bed_index",
+)
 AUTOSOMES = tuple(f"chr{i}" for i in range(1, 23))
 MISSING_PARENTS = frozenset({"0", ".", "NA"})
 PHASE_BLOCK_COLUMNS = frozenset(
@@ -51,27 +58,6 @@ class InputValidationError(ValueError):
     """An actionable error in a user-provided run contract or artifact."""
 
 
-class _UniqueKeyLoader(yaml.SafeLoader):
-    pass
-
-
-def _construct_unique_mapping(
-    loader: _UniqueKeyLoader, node: yaml.nodes.MappingNode, deep: bool = False
-) -> dict[Any, Any]:
-    mapping: dict[Any, Any] = {}
-    for key_node, value_node in node.value:
-        key = loader.construct_object(key_node, deep=deep)
-        if key in mapping:
-            raise InputValidationError(f"duplicate YAML key: {key!r}")
-        mapping[key] = loader.construct_object(value_node, deep=deep)
-    return mapping
-
-
-_UniqueKeyLoader.add_constructor(
-    yaml.resolver.BaseResolver.DEFAULT_MAPPING_TAG, _construct_unique_mapping
-)
-
-
 def _unique_json_object(pairs: list[tuple[str, Any]]) -> dict[str, Any]:
     result: dict[str, Any] = {}
     for key, value in pairs:
@@ -81,121 +67,22 @@ def _unique_json_object(pairs: list[tuple[str, Any]]) -> dict[str, Any]:
     return result
 
 
-def _format_json_path(parts: Iterable[Any]) -> str:
-    result = "$"
-    for part in parts:
-        result += f"[{part}]" if isinstance(part, int) else f".{part}"
-    return result
-
-
-def load_document(path: Path) -> dict[str, Any]:
-    """Load strict YAML/JSON without custom tags or duplicate keys."""
+def _load_json(path: Path, label: str) -> dict[str, Any]:
     try:
         text = path.read_text(encoding="utf-8")
     except OSError as exc:
-        raise InputValidationError(f"cannot read {path}: {exc}") from exc
+        raise InputValidationError(f"cannot read {label} {path}: {exc}") from exc
 
     try:
-        if path.suffix.lower() == ".json":
-            value = json.loads(text, object_pairs_hook=_unique_json_object)
-        else:
-            value = yaml.load(text, Loader=_UniqueKeyLoader)
+        value = json.loads(text, object_pairs_hook=_unique_json_object)
     except InputValidationError:
         raise
-    except (json.JSONDecodeError, yaml.YAMLError) as exc:
-        raise InputValidationError(f"cannot parse {path}: {exc}") from exc
+    except json.JSONDecodeError as exc:
+        raise InputValidationError(f"cannot parse {label} {path}: {exc}") from exc
 
     if not isinstance(value, dict):
-        raise InputValidationError(f"{path}: document root must be an object")
+        raise InputValidationError(f"{label} must contain a JSON object")
     return value
-
-
-def load_schema(path: Path) -> dict[str, Any]:
-    try:
-        schema = json.loads(path.read_text(encoding="utf-8"))
-        jsonschema.Draft202012Validator.check_schema(schema)
-    except (OSError, json.JSONDecodeError, jsonschema.SchemaError) as exc:
-        raise RuntimeError(f"invalid bundled schema {path}: {exc}") from exc
-    return schema
-
-
-def validate_schema(
-    document: dict[str, Any], schema: dict[str, Any], label: str
-) -> None:
-    validator = jsonschema.Draft202012Validator(schema)
-    errors = sorted(validator.iter_errors(document), key=lambda error: list(error.path))
-    if not errors:
-        return
-    details = "; ".join(
-        f"{_format_json_path(error.absolute_path)}: {error.message}"
-        for error in errors
-    )
-    raise InputValidationError(f"{label} schema validation failed: {details}")
-
-
-def _resolve_path(value: str, base_dir: Path) -> str:
-    path = Path(value)
-    if not path.is_absolute():
-        path = base_dir / path
-    return str(path.resolve(strict=False))
-
-
-def resolve_run_config(config: dict[str, Any], config_path: Path) -> dict[str, Any]:
-    resolved = copy.deepcopy(config)
-    base_dir = config_path.parent
-    resolved.setdefault("mode", "pedigree")
-    resolved["reference"].setdefault("name", "GRCh38")
-    resolved["inheritance"].setdefault("method", "gtg")
-    resolved["methylation"].setdefault("modes", ["model"])
-    resolved["project"]["outdir"] = _resolve_path(
-        resolved["project"]["outdir"], base_dir
-    )
-    resolved["pedigree"]["ped"] = _resolve_path(
-        resolved["pedigree"]["ped"], base_dir
-    )
-    for key in ("fasta", "fasta_index", "fasta_gzi"):
-        if key in resolved["reference"]:
-            resolved["reference"][key] = _resolve_path(
-                resolved["reference"][key], base_dir
-            )
-    resolved["upstream"]["manifest"] = _resolve_path(
-        resolved["upstream"]["manifest"], base_dir
-    )
-    resolved["upstream"].setdefault("allow_unaudited_release", False)
-    return resolved
-
-
-def _resolve_indexed_artifact(
-    artifact: dict[str, Any] | None, base_dir: Path, data_key: str
-) -> None:
-    if artifact is None:
-        return
-    artifact[data_key] = _resolve_path(artifact[data_key], base_dir)
-    artifact["index"] = _resolve_path(artifact["index"], base_dir)
-
-
-def resolve_manifest(
-    manifest: dict[str, Any], manifest_path: Path
-) -> dict[str, Any]:
-    resolved = copy.deepcopy(manifest)
-    base_dir = manifest_path.parent
-    _resolve_indexed_artifact(resolved["joint_small_variants"], base_dir, "vcf")
-    for sample in resolved["samples"]:
-        _resolve_indexed_artifact(sample["phased_small_variants"], base_dir, "vcf")
-        if sample["phase_blocks"] is not None:
-            sample["phase_blocks"] = _resolve_path(sample["phase_blocks"], base_dir)
-        if sample["cpg_model"] is not None:
-            for label in ("combined", "hap1", "hap2"):
-                _resolve_indexed_artifact(sample["cpg_model"][label], base_dir, "bed")
-        for label in ("phase_stats", "phase_haplotags"):
-            if sample.get(label) is not None:
-                sample[label] = _resolve_path(sample[label], base_dir)
-        _resolve_indexed_artifact(sample.get("haplotagged_bam"), base_dir, "bam")
-    provenance = resolved.get("provenance", {})
-    for label in ("outputs_manifest", "metadata"):
-        if provenance.get(label) is not None:
-            provenance[label] = _resolve_path(provenance[label], base_dir)
-    return resolved
 
 
 def _require_file(path_value: str, label: str) -> Path:
@@ -332,34 +219,6 @@ def select_samples(
             + ", ".join(ineligible)
         )
     return list(requested)
-
-
-def validate_release(config: dict[str, Any], manifest: dict[str, Any]) -> list[str]:
-    release = manifest["workflow"]["release"]
-    if release in SUPPORTED_WDL_RELEASES:
-        commit = manifest["workflow"]["commit"].lower()
-        expected_commit = SUPPORTED_WDL_RELEASES[release]
-        if commit != expected_commit:
-            raise InputValidationError(
-                f"upstream release {release!r} must use commit {expected_commit}; "
-                f"manifest names {commit}"
-            )
-        return []
-    allow_unaudited = config["upstream"].get("allow_unaudited_release", False)
-    if not STABLE_V3_RELEASE.fullmatch(release):
-        raise InputValidationError(
-            f"upstream release {release!r} is not a stable PacBio WDL v3.x release"
-        )
-    if not allow_unaudited:
-        raise InputValidationError(
-            f"upstream release {release!r} is unaudited; supported releases are "
-            f"{', '.join(sorted(SUPPORTED_WDL_RELEASES))}. Set "
-            "upstream.allow_unaudited_release: true only for a deliberate evaluation run"
-        )
-    return [
-        f"UNAUDITED WDL RELEASE: {release} was accepted by explicit "
-        "upstream.allow_unaudited_release opt-in"
-    ]
 
 
 def parse_fai(path: Path) -> dict[str, int]:
@@ -647,22 +506,6 @@ def inspect_model_bed(
     }
 
 
-def _iter_manifest_paths(manifest: dict[str, Any]) -> Iterable[tuple[str, str]]:
-    provenance = manifest.get("provenance", {})
-    for key in ("outputs_manifest", "metadata"):
-        if provenance.get(key):
-            yield f"manifest.provenance.{key}", provenance[key]
-    for sample in manifest["samples"]:
-        sample_id = sample["id"]
-        for key in ("phase_stats", "phase_haplotags"):
-            if sample.get(key):
-                yield f"manifest.samples[{sample_id}].{key}", sample[key]
-        bam = sample.get("haplotagged_bam")
-        if bam:
-            yield f"manifest.samples[{sample_id}].haplotagged_bam.bam", bam["bam"]
-            yield f"manifest.samples[{sample_id}].haplotagged_bam.index", bam["index"]
-
-
 def _json_fingerprint(*values: Any) -> str:
     payload = json.dumps(values, sort_keys=True, separators=(",", ":"), ensure_ascii=True)
     return hashlib.sha256(payload.encode("utf-8")).hexdigest()
@@ -775,45 +618,315 @@ def _write_selected_artifacts(
     _write_json(path, {"samples": samples})
 
 
-def validate_run(
-    run_config_path: Path,
-    output_dir: Path,
-    schema_dir: Path | None = None,
-) -> dict[str, Any]:
-    run_config_path = run_config_path.resolve(strict=False)
-    if schema_dir is None:
-        schema_dir = Path(__file__).resolve().parents[1] / "schemas"
-    run_schema = load_schema(schema_dir / "run.schema.json")
-    manifest_schema = load_schema(schema_dir / "upstream-manifest.schema.json")
-
-    raw_config = load_document(run_config_path)
-    validate_schema(raw_config, run_schema, "run config")
-    config = resolve_run_config(raw_config, run_config_path)
-
-    manifest_path = _require_file(config["upstream"]["manifest"], "upstream.manifest")
-    raw_manifest = load_document(manifest_path)
-    validate_schema(raw_manifest, manifest_schema, "upstream manifest")
-    manifest = resolve_manifest(raw_manifest, manifest_path)
-
-    warnings = validate_release(config, manifest)
-    ped_path = _require_file(config["pedigree"]["ped"], "pedigree.ped")
-    records = parse_ped(ped_path)
-    family_id = validate_pedigree(records)
-    if manifest["family_id"] != family_id:
+def _miniwdl_output(outputs: dict[str, Any], name: str) -> Any:
+    matches = [
+        value for key, value in outputs.items() if key.rsplit(".", 1)[-1] == name
+    ]
+    if len(matches) != 1:
         raise InputValidationError(
-            f"manifest.family_id {manifest['family_id']!r} does not equal PED family_id "
-            f"{family_id!r}"
+            f"expected exactly one miniwdl output named {name!r}; found {len(matches)}"
         )
+    return matches[0]
 
-    manifest_ids = [sample["id"] for sample in manifest["samples"]]
-    if len(manifest_ids) != len(set(manifest_ids)):
-        raise InputValidationError("upstream manifest contains duplicate sample IDs")
-    ped_ids = [str(record["sample_id"]) for record in records]
-    if set(manifest_ids) != set(ped_ids):
+
+def _load_miniwdl_outputs(path: Path) -> dict[str, Any]:
+    raw = _load_json(path, "miniwdl outputs")
+    outputs = raw.get("outputs", raw)
+    if not isinstance(outputs, dict):
+        raise InputValidationError("miniwdl 'outputs' value must contain an object")
+    return outputs
+
+
+def _detect_wdl_release(outputs: dict[str, Any]) -> str:
+    matches = [
+        value
+        for key, value in outputs.items()
+        if key.rsplit(".", 1)[-1] == "workflow_version"
+    ]
+    if len(matches) > 1:
         raise InputValidationError(
-            f"manifest sample set {sorted(manifest_ids)} does not equal PED sample set "
+            "found more than one miniwdl workflow_version output"
+        )
+    detected = matches[0] if matches else None
+    if detected is not None and not isinstance(detected, str):
+        raise InputValidationError("miniwdl workflow_version must be a string")
+    if detected is None:
+        raise InputValidationError(
+            "miniwdl outputs do not contain workflow_version"
+        )
+    release = detected
+    if release not in SUPPORTED_WDL_RELEASES:
+        raise InputValidationError(
+            f"miniwdl workflow_version {release!r} is not audited; supported "
+            f"releases: {', '.join(sorted(SUPPORTED_WDL_RELEASES))}"
+        )
+    return release
+
+
+def _miniwdl_artifact(value: Any, outputs_dir: Path, label: str) -> str | None:
+    if value is None:
+        return None
+    if not isinstance(value, str) or not value:
+        raise InputValidationError(
+            f"miniwdl output {label!r} must be a path or null"
+        )
+    path = Path(value).expanduser()
+    if not path.is_absolute():
+        path = outputs_dir / path
+    # Preserve miniwdl's stable out/ symlink rather than recording an
+    # engine-private call/work target.
+    return str(path.absolute())
+
+
+def _paired_miniwdl_artifact(
+    data_path: str | None,
+    index_path: str | None,
+    *,
+    data_key: str,
+    label: str,
+) -> dict[str, str] | None:
+    if data_path is None and index_path is None:
+        return None
+    if data_path is None or index_path is None:
+        raise InputValidationError(
+            f"incomplete {label}: file and index must both be present"
+        )
+    return {data_key: data_path, "index": index_path}
+
+
+def _build_miniwdl_manifest(
+    outputs: dict[str, Any],
+    outputs_path: Path,
+    family_id: str,
+    ped_ids: list[str],
+    release: str,
+) -> dict[str, Any]:
+    sample_ids = _miniwdl_output(outputs, "sample_ids")
+    if not isinstance(sample_ids, list) or not sample_ids or not all(
+        isinstance(sample, str) and sample for sample in sample_ids
+    ):
+        raise InputValidationError(
+            "miniwdl sample_ids must be a non-empty string array"
+        )
+    if len(sample_ids) != len(set(sample_ids)):
+        raise InputValidationError("miniwdl sample_ids contains duplicates")
+    if set(sample_ids) != set(ped_ids):
+        raise InputValidationError(
+            f"miniwdl sample set {sorted(sample_ids)} does not equal PED sample set "
             f"{sorted(ped_ids)}"
         )
+
+    arrays = {name: _miniwdl_output(outputs, name) for name in SAMPLE_OUTPUTS}
+    for name, values in arrays.items():
+        if not isinstance(values, list) or len(values) != len(sample_ids):
+            raise InputValidationError(
+                f"miniwdl output {name!r} must align with sample_ids "
+                f"({len(sample_ids)} entries)"
+            )
+
+    samples: list[dict[str, Any]] = []
+    for index, sample_id in enumerate(sample_ids):
+        artifacts = {
+            name: _miniwdl_artifact(values[index], outputs_path.parent, name)
+            for name, values in arrays.items()
+        }
+        cpg_values = [
+            artifacts[name]
+            for name in (
+                "cpg_combined_bed",
+                "cpg_combined_bed_index",
+                "cpg_hap1_bed",
+                "cpg_hap1_bed_index",
+                "cpg_hap2_bed",
+                "cpg_hap2_bed_index",
+            )
+        ]
+        if any(value is None for value in cpg_values) and not all(
+            value is None for value in cpg_values
+        ):
+            raise InputValidationError(
+                f"incomplete CpG model output set for {sample_id!r}"
+            )
+        cpg_model = None
+        if cpg_values[0] is not None:
+            cpg_model = {
+                "combined": {"bed": cpg_values[0], "index": cpg_values[1]},
+                "hap1": {"bed": cpg_values[2], "index": cpg_values[3]},
+                "hap2": {"bed": cpg_values[4], "index": cpg_values[5]},
+            }
+        samples.append(
+            {
+                "id": sample_id,
+                "phased_small_variants": _paired_miniwdl_artifact(
+                    artifacts["phased_small_variant_vcf"],
+                    artifacts["phased_small_variant_vcf_index"],
+                    data_key="vcf",
+                    label=f"phased small-variant VCF for {sample_id!r}",
+                ),
+                "phase_blocks": artifacts["phase_blocks"],
+                "cpg_model": cpg_model,
+            }
+        )
+
+    joint = _paired_miniwdl_artifact(
+        _miniwdl_artifact(
+            _miniwdl_output(outputs, "joint_small_variants_vcf"),
+            outputs_path.parent,
+            "joint_small_variants_vcf",
+        ),
+        _miniwdl_artifact(
+            _miniwdl_output(outputs, "joint_small_variants_vcf_index"),
+            outputs_path.parent,
+            "joint_small_variants_vcf_index",
+        ),
+        data_key="vcf",
+        label="joint small-variant VCF",
+    )
+    if joint is None:
+        raise InputValidationError("miniwdl run has no joint small-variant VCF")
+    return {
+        "schema_version": 1,
+        "provider": "pacbio_hifi_human_wgs_wdl",
+        "workflow": {
+            "name": "humanwgs_family",
+            "release": release,
+            "commit": SUPPORTED_WDL_RELEASES[release],
+        },
+        "family_id": family_id,
+        "joint_small_variants": joint,
+        "samples": samples,
+        "provenance": {
+            "engine": "miniwdl",
+            "outputs_manifest": str(outputs_path),
+        },
+    }
+
+
+def validate_miniwdl_run(
+    *,
+    outputs_json: Path,
+    ped: Path,
+    reference_fasta: Path,
+    project_outdir: Path,
+    output_dir: Path,
+    reference_index: Path | None = None,
+    reference_gzi: Path | None = None,
+    project_id: str | None = None,
+    samples: list[str] | None = None,
+    regions: str | None = None,
+    map_min_qual: float = 20,
+    map_min_depth: int = 10,
+    min_run_markers: int = 10,
+    concordance_min_qual: float = 20,
+    concordance_min_depth: int = 5,
+    min_coverage: int = 10,
+    mismatch_window_bp: int = 50,
+    bigwig: bool = True,
+) -> dict[str, Any]:
+    """Validate direct miniwdl inputs and publish normalized pipeline records."""
+    outputs_path = outputs_json.expanduser().absolute()
+    ped_path = ped.expanduser().absolute()
+    fasta_path = reference_fasta.expanduser().absolute()
+    outdir = project_outdir.expanduser().absolute()
+    fai_path = (
+        reference_index.expanduser().absolute()
+        if reference_index is not None
+        else Path(f"{fasta_path}.fai")
+    )
+    gzi_path = reference_gzi.expanduser().absolute() if reference_gzi else None
+
+    selected_regions = list(AUTOSOMES)
+    if regions is not None:
+        selected_regions = [region.strip() for region in regions.split(",")]
+        if not selected_regions or any(not region for region in selected_regions):
+            raise InputValidationError("--regions must be a comma-separated list")
+        invalid_regions = sorted(set(selected_regions) - set(AUTOSOMES))
+        if invalid_regions:
+            raise InputValidationError(
+                "--regions contains non-autosomes: " + ", ".join(invalid_regions)
+            )
+        if len(selected_regions) != len(set(selected_regions)):
+            raise InputValidationError("--regions contains duplicates")
+    if samples and len(samples) != len(set(samples)):
+        raise InputValidationError("--sample selects a sample more than once")
+    nonnegative = {
+        "--map-min-qual": map_min_qual,
+        "--map-min-depth": map_min_depth,
+        "--concordance-min-qual": concordance_min_qual,
+        "--concordance-min-depth": concordance_min_depth,
+        "--mismatch-window-bp": mismatch_window_bp,
+    }
+    for option, value in nonnegative.items():
+        if value < 0:
+            raise InputValidationError(f"{option} must be nonnegative")
+    if min_run_markers < 1:
+        raise InputValidationError("--min-run-markers must be at least 1")
+    if min_coverage < 1:
+        raise InputValidationError("--min-coverage must be at least 1")
+
+    _require_file(str(outputs_path), "outputs-json")
+    _require_file(str(ped_path), "pedigree.ped")
+    records = parse_ped(ped_path)
+    family_id = validate_pedigree(records)
+    effective_project_id = project_id or family_id
+    if not re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9._-]*", effective_project_id):
+        raise InputValidationError(
+            "project ID must contain only letters, numbers, '.', '_' or '-'"
+        )
+    outputs = _load_miniwdl_outputs(outputs_path)
+    release = _detect_wdl_release(outputs)
+    manifest = _build_miniwdl_manifest(
+        outputs,
+        outputs_path,
+        family_id,
+        [str(record["sample_id"]) for record in records],
+        release,
+    )
+
+    pipeline_info = outdir / "pipeline_info"
+    published_run_path = pipeline_info / "resolved-run.json"
+    published_manifest_path = pipeline_info / "resolved-manifest.json"
+    config: dict[str, Any] = {
+        "schema_version": 1,
+        "mode": "pedigree",
+        "project": {
+            "id": effective_project_id,
+            "outdir": str(outdir),
+        },
+        "pedigree": {"ped": str(ped_path)},
+        "reference": {
+            "name": "GRCh38",
+            "fasta": str(fasta_path),
+            "fasta_index": str(fai_path),
+        },
+        "upstream": {
+            "manifest": str(published_manifest_path),
+        },
+        "inheritance": {
+            "method": "gtg",
+            "map": {
+                "min_qual": map_min_qual,
+                "min_depth": map_min_depth,
+                "min_run_markers": min_run_markers,
+            },
+            "concordance": {
+                "min_qual": concordance_min_qual,
+                "min_depth": concordance_min_depth,
+            },
+        },
+        "methylation": {
+            "modes": ["model"],
+            "min_coverage": min_coverage,
+            "mismatch_window_bp": mismatch_window_bp,
+        },
+        "regions": {"include": selected_regions},
+        "outputs": {"bigwig": bigwig},
+    }
+    if gzi_path is not None:
+        config["reference"]["fasta_gzi"] = str(gzi_path)
+    if samples:
+        config["samples"] = {"include": samples}
+    ped_ids = [str(record["sample_id"]) for record in records]
     selected = select_samples(config, records)
     config.setdefault("samples", {})["include"] = selected
 
@@ -835,15 +948,13 @@ def validate_run(
     if config["reference"].get("fasta_gzi"):
         _require_file(config["reference"]["fasta_gzi"], "reference.fasta_gzi")
     reference_lengths = parse_fai(fai)
-    regions = config.get("regions", {}).get("include", list(AUTOSOMES))
-    missing_regions = [region for region in regions if region not in reference_lengths]
+    missing_regions = [
+        region for region in selected_regions if region not in reference_lengths
+    ]
     if missing_regions:
         raise InputValidationError(
             f"reference.fasta_index is missing configured autosomes: {missing_regions}"
         )
-
-    for label, path in _iter_manifest_paths(manifest):
-        _require_file(path, label)
 
     joint = manifest["joint_small_variants"]
     joint_stats = inspect_vcf(
@@ -851,7 +962,7 @@ def validate_run(
         Path(joint["index"]),
         "manifest.joint_small_variants",
         ped_ids,
-        regions,
+        selected_regions,
         reference_lengths,
         require_depth=True,
         require_phase_set=False,
@@ -869,7 +980,7 @@ def validate_run(
                 Path(phased["index"]),
                 f"manifest.samples[{sample_id}].phased_small_variants",
                 [sample_id],
-                regions,
+                selected_regions,
                 reference_lengths,
                 require_depth=False,
                 require_phase_set=True,
@@ -879,7 +990,7 @@ def validate_run(
                 Path(sample["phase_blocks"]),
                 f"manifest.samples[{sample_id}].phase_blocks",
                 sample_id,
-                regions,
+                selected_regions,
                 reference_lengths,
             ),
             "cpg_model": {},
@@ -890,7 +1001,7 @@ def validate_run(
                 Path(artifact["bed"]),
                 Path(artifact["index"]),
                 f"manifest.samples[{sample_id}].cpg_model.{model_label}",
-                regions,
+                selected_regions,
                 reference_lengths,
             )
         sample_stats[sample_id] = stats
@@ -904,40 +1015,42 @@ def validate_run(
         },
         config,
         manifest,
-        {region: reference_lengths[region] for region in regions},
+        {region: reference_lengths[region] for region in selected_regions},
     )
     _check_publish_collision(Path(config["project"]["outdir"]), fingerprint)
 
     config["_tapestry"] = {
-        "config_path": str(run_config_path),
-        "manifest_path": str(manifest_path),
-        "selected_autosomes": regions,
+        "config_path": str(published_run_path),
+        "manifest_path": str(published_manifest_path),
+        "selected_autosomes": selected_regions,
         "config_fingerprint": fingerprint,
         "validator_version": VALIDATOR_VERSION,
         "pipeline_version": PIPELINE_VERSION,
         "gtg_commit": GTG_COMMIT,
         "runtime_lock_version": RUNTIME_LOCK_VERSION,
     }
-    manifest["_tapestry"] = {"manifest_path": str(manifest_path)}
+    manifest["_tapestry"] = {"manifest_path": str(published_manifest_path)}
     report = {
         "status": "valid",
-        "warnings": warnings,
         "validator_version": VALIDATOR_VERSION,
         "config_fingerprint": fingerprint,
         "project_id": config["project"]["id"],
         "output_dir": config["project"]["outdir"],
         "family_id": family_id,
         "selected_samples": selected,
-        "selected_autosomes": regions,
+        "selected_autosomes": selected_regions,
         "reference": {
             "name": config["reference"]["name"],
             "fasta": str(fasta),
             "contig_lengths": {
-                region: reference_lengths[region] for region in regions
+                region: reference_lengths[region] for region in selected_regions
             },
         },
         "settings": {
+            "inheritance_map": config["inheritance"]["map"],
+            "inheritance_concordance": config["inheritance"]["concordance"],
             "model_min_coverage": config["methylation"]["min_coverage"],
+            "mismatch_window_bp": config["methylation"]["mismatch_window_bp"],
             "bigwig": config["outputs"]["bigwig"],
         },
         "joint_small_variants": joint_stats,
@@ -948,7 +1061,6 @@ def validate_run(
             "pipeline": PIPELINE_VERSION,
             "gtg_commit": GTG_COMMIT,
             "pysam": pysam.__version__,
-            "jsonschema": importlib.metadata.version("jsonschema"),
         },
     }
 
@@ -966,7 +1078,7 @@ def validate_run(
         config["methylation"]["min_coverage"],
         config["methylation"]["mismatch_window_bp"],
         config["outputs"]["bigwig"],
-        regions,
+        selected_regions,
         config["reference"]["fasta"],
         config["reference"]["fasta_index"],
         config["reference"]["name"],
@@ -982,35 +1094,81 @@ def format_validation_summary(report: dict[str, Any]) -> str:
     """Return a concise human-readable summary of a validated run."""
     regions = report["selected_autosomes"]
     region_text = "chr1-chr22" if regions == list(AUTOSOMES) else ", ".join(regions)
+    inheritance_map = report["settings"]["inheritance_map"]
+    concordance = report["settings"]["inheritance_concordance"]
     lines = [
         "Tapestry validation succeeded",
         f"  Family: {report['family_id']}",
         f"  Samples: {', '.join(report['selected_samples'])}",
         f"  Upstream: PacBio WDL {report['versions']['wdl_release']}",
         f"  Reference: {report['reference']['name']} ({region_text})",
+        "  Inheritance map: "
+        f"QUAL>={inheritance_map['min_qual']:g}, "
+        f"depth>={inheritance_map['min_depth']}, "
+        f"run markers>={inheritance_map['min_run_markers']}",
+        "  Concordance: "
+        f"QUAL>={concordance['min_qual']:g}, "
+        f"depth>={concordance['min_depth']}",
         f"  Model minimum coverage: {report['settings']['model_min_coverage']}",
+        f"  Mismatch window: {report['settings']['mismatch_window_bp']} bp",
         f"  BigWig: {'enabled' if report['settings']['bigwig'] else 'disabled'}",
         f"  Output: {report['output_dir']}",
     ]
-    lines.extend(f"  WARNING: {warning}" for warning in report["warnings"])
     return "\n".join(lines)
 
 
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
-        description="Validate and normalize a Tapestry schema-v1 run configuration."
+        description=(
+            "Validate PacBio family-WDL miniwdl outputs and normalize the "
+            "Tapestry run contract."
+        )
     )
-    parser.add_argument("--run-config", required=True, type=Path)
+    parser.add_argument("--outputs-json", required=True, type=Path)
+    parser.add_argument("--ped", required=True, type=Path)
+    parser.add_argument("--reference-fasta", required=True, type=Path)
+    parser.add_argument("--reference-index", type=Path)
+    parser.add_argument("--reference-gzi", type=Path)
+    parser.add_argument("--project-outdir", required=True, type=Path)
+    parser.add_argument("--project-id")
+    parser.add_argument("--sample", action="append")
+    parser.add_argument("--regions")
+    parser.add_argument("--map-min-qual", type=float, default=20)
+    parser.add_argument("--map-min-depth", type=int, default=10)
+    parser.add_argument("--min-run-markers", type=int, default=10)
+    parser.add_argument("--concordance-min-qual", type=float, default=20)
+    parser.add_argument("--concordance-min-depth", type=int, default=5)
+    parser.add_argument("--min-coverage", type=int, default=10)
+    parser.add_argument("--mismatch-window-bp", type=int, default=50)
+    parser.add_argument("--no-bigwig", action="store_true")
     parser.add_argument("--output-dir", required=True, type=Path)
-    parser.add_argument("--schema-dir", type=Path)
     return parser
 
 
 def main(argv: list[str] | None = None) -> int:
     args = build_parser().parse_args(argv)
     try:
-        report = validate_run(args.run_config, args.output_dir, args.schema_dir)
-    except (InputValidationError, RuntimeError) as exc:
+        report = validate_miniwdl_run(
+            outputs_json=args.outputs_json,
+            ped=args.ped,
+            reference_fasta=args.reference_fasta,
+            reference_index=args.reference_index,
+            reference_gzi=args.reference_gzi,
+            project_outdir=args.project_outdir,
+            output_dir=args.output_dir,
+            project_id=args.project_id,
+            samples=args.sample,
+            regions=args.regions,
+            map_min_qual=args.map_min_qual,
+            map_min_depth=args.map_min_depth,
+            min_run_markers=args.min_run_markers,
+            concordance_min_qual=args.concordance_min_qual,
+            concordance_min_depth=args.concordance_min_depth,
+            min_coverage=args.min_coverage,
+            mismatch_window_bp=args.mismatch_window_bp,
+            bigwig=not args.no_bigwig,
+        )
+    except InputValidationError as exc:
         args.output_dir.mkdir(parents=True, exist_ok=True)
         _write_json(
             args.output_dir / "validation-report.json",

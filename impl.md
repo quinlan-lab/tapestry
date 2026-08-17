@@ -3,6 +3,8 @@
 **Archived implementation plan.** The planned MVP is implemented. See
 `completed.md` for the completion record and `ROADMAP.md` for remaining release
 work. This file retains detailed design rationale and acceptance criteria.
+Its interface examples are historical; `README.md` is the current command
+contract.
 
 ## Goal
 

@@ -5,29 +5,37 @@ The generic autosomal pedigree/model-only workflow is implemented. See
 and verification evidence. This roadmap contains only remaining work and future
 scope.
 
-The current public contract is defined by `schemas/`, documented for users in
-`README.md`, and illustrated in `examples/generic/`. Do not add a competing
-input contract here.
+The public Nextflow parameters are documented in `README.md`. Resolved JSON
+records are pipeline outputs for provenance and downstream stages, not a second
+user workflow.
 
 ## Current product boundary
 
-Tapestry starts after a completed PacBio HiFi human WGS WDL `family` run. One
-YAML run file points to a canonical Tapestry manifest of WDL outputs:
+Tapestry starts after a completed miniwdl run of the PacBio HiFi human WGS WDL
+`family` workflow:
 
 ```bash
 # Validate, then run inheritance, founder phasing, and all-CpG expansion.
 nextflow run . -profile docker \
-  --run-config family.yaml -resume
+  --outputs-json /path/to/outputs.json \
+  --ped /path/to/family.ped \
+  --reference-fasta /path/to/GRCh38.fa \
+  --outdir /path/to/results \
+  -resume
 
 # Optional validation-only preflight.
 nextflow run . -entry validate -profile docker \
-  --run-config family.yaml
+  --outputs-json /path/to/outputs.json \
+  --ped /path/to/family.ped \
+  --reference-fasta /path/to/GRCh38.fa \
+  --outdir /path/to/results
 ```
 
-Schema v1 supports GRCh38 whole autosomes, pedigree mode, model methylation,
-and WDL v3.3.0/v3.3.1. It consumes WDL-produced HiPhase and model-CpG artifacts;
+The workflow supports GRCh38 whole autosomes, pedigree mode, model methylation,
+and WDL v3.3.0/v3.3.1. It consumes WDL-produced HiPhase and
+model-CpG artifacts;
 it does not rerun those upstream tools. Count methylation, sex chromosomes,
-other references, arbitrary intervals, direct engine adapters, and generic trio
+other references, arbitrary intervals, other engine adapters, and generic trio
 orchestration are outside the current boundary.
 
 ## Immediate priority: release readiness
@@ -61,8 +69,8 @@ Exit criteria:
 - Both v3.3.0 and v3.3.1 have recorded fixtures, commands, versions, deltas, and
   dispositions.
 - No unexplained scientific difference remains.
-- The support statement in `README.md` distinguishes validated releases from
-  merely opt-in, unaudited releases.
+- The support statement in `README.md` names the releases with completed parity
+  evidence.
 
 ### 2. Runtime smoke tests
 
@@ -90,10 +98,9 @@ all-CpG memory defaults only from observed traces.
 ## Next functional phase
 
 After release readiness, the recommended next addition is optional count-based
-methylation. It uses WDL haplotagged BAMs without changing the canonical model
-inputs.
+methylation. It uses WDL haplotagged BAMs without changing the model inputs.
 
-Before implementation, settle the smallest schema extension that answers:
+Before implementation, settle the smallest interface extension that answers:
 
 - whether count mode is explicitly enabled or inferred from named inputs;
 - where minimum coverage and MAPQ live;
@@ -107,12 +114,12 @@ paying count-mode compute or I/O costs.
 ## Later decisions
 
 These are intentionally deferred. Resolve them from concrete fixtures rather
-than expanding schema v1 speculatively.
+than expanding the interface speculatively.
 
-1. **Additional WDL releases.** Promote another stable v3.x release from
-   explicit unaudited opt-in only after source audit and parity evidence.
-2. **Workflow-engine adapters.** Add Cromwell, miniwdl, or Terra adapters only
-   when needed. Every adapter must emit the existing canonical Tapestry
+1. **Additional WDL releases.** Add another stable v3.x release only after
+   source audit and parity evidence.
+2. **Workflow-engine adapters.** Add Cromwell or Terra adapters only when
+   needed. Every adapter must emit the existing internal canonical Tapestry
    manifest; engine dialects must not leak into scientific stages.
 3. **Trio support.** Decide whether the generic product retains WhatsHap/pedMEC,
    converges trio and pedigree outputs, or versions trio separately.
@@ -125,13 +132,12 @@ than expanding schema v1 speculatively.
 
 ## Guardrails
 
-- Keep YAML as the recommended human format and JSON as its machine equivalent.
-- Keep fixed product constraints out of the user YAML; record pedigree mode,
-  GRCh38, `gtg`, and model mode in the normalized run instead.
-- Keep `--run-config`; resolve run paths relative to that file and manifest
-  paths relative to the manifest.
-- Keep scientific parameters in the run contract and execution policy in
-  Nextflow profiles.
+- Keep the primary interface to one Nextflow invocation using miniwdl
+  `outputs.json`, PED, reference, output directory, and optional scientific
+  parameter overrides.
+- Record pedigree mode, GRCh38, `gtg`, model mode, and all effective scientific
+  parameters in the normalized run.
+- Keep execution policy in Nextflow profiles.
 - Treat the canonical manifest as the only internal WDL-output contract.
 - Never derive sample IDs, roles, reference labels, or output names from
   hard-coded CEPH/GRCh38 constants in generic workflow code.

@@ -76,7 +76,6 @@ RUN python -m pip install --no-cache-dir \
 COPY --from=gtg-builder /build/gtg/code/rust/target/release/gtg-ped-map /usr/local/bin/gtg-ped-map
 COPY --from=gtg-builder /build/gtg/code/rust/target/release/gtg-concordance /usr/local/bin/gtg-concordance
 COPY src /opt/tapestry/src
-COPY schemas /opt/tapestry/schemas
 
 ENV PYTHONPATH=/opt/tapestry/src:/opt/tapestry/src/util
 

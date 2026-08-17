@@ -10,14 +10,13 @@ from pathlib import Path
 from typing import Any
 
 import pysam
-import yaml
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
 
 from tapestry_validate import (  # noqa: E402
     InputValidationError,
     format_validation_summary,
-    validate_run,
+    validate_miniwdl_run,
 )
 
 
@@ -112,12 +111,10 @@ def make_fixture(
     root: Path,
     *,
     release: str = "v3.3.1",
-    allow_unaudited: bool = False,
     joint_samples: list[str] | None = None,
     selected_artifacts: bool = True,
-    region: str = "chr1",
     inheritance_informative: bool = False,
-) -> Path:
+) -> None:
     data = root / "data"
     data.mkdir()
     fasta = data / "reference.fa"
@@ -233,50 +230,71 @@ def make_fixture(
             child,
         ],
     }
-    manifest_path = root / "manifest.json"
-    manifest_path.write_text(json.dumps(manifest), encoding="utf-8")
-
-    config = {
-        "schema_version": 1,
-        "project": {"id": "fixture", "outdir": "results/fixture"},
-        "pedigree": {"ped": "family.ped"},
-        "reference": {
-            "fasta": "data/reference.fa",
-            "fasta_index": "data/reference.fa.fai",
-        },
-        "upstream": {"manifest": "manifest.json"},
-        "samples": {"include": ["CHILD"]},
-        "inheritance": {
-            "map": {
-                "min_qual": 20,
-                "min_depth": 10,
-                "min_run_markers": 1 if inheritance_informative else 10,
-            },
-            "concordance": {"min_qual": 20, "min_depth": 5},
-        },
-        "methylation": {
-            "min_coverage": 10,
-            "mismatch_window_bp": 50,
-        },
-        "regions": {"include": [region]},
-        "outputs": {"bigwig": True},
+    miniwdl_outputs = {
+        "humanwgs_family.sample_ids": [
+            sample["id"] for sample in manifest["samples"]
+        ],
+        "humanwgs_family.workflow_version": release,
+        "humanwgs_family.joint_small_variants_vcf": manifest[
+            "joint_small_variants"
+        ]["vcf"],
+        "humanwgs_family.joint_small_variants_vcf_index": manifest[
+            "joint_small_variants"
+        ]["index"],
+        "humanwgs_family.phased_small_variant_vcf": [
+            sample["phased_small_variants"]["vcf"]
+            if sample["phased_small_variants"]
+            else None
+            for sample in manifest["samples"]
+        ],
+        "humanwgs_family.phased_small_variant_vcf_index": [
+            sample["phased_small_variants"]["index"]
+            if sample["phased_small_variants"]
+            else None
+            for sample in manifest["samples"]
+        ],
+        "humanwgs_family.phase_blocks": [
+            sample["phase_blocks"] for sample in manifest["samples"]
+        ],
     }
-    if allow_unaudited:
-        config["upstream"]["allow_unaudited_release"] = True
-    config_path = root / "run.yaml"
-    config_path.write_text(yaml.safe_dump(config, sort_keys=False), encoding="utf-8")
-    return config_path
+    for label in ("combined", "hap1", "hap2"):
+        miniwdl_outputs[f"humanwgs_family.cpg_{label}_bed"] = [
+            sample["cpg_model"][label]["bed"] if sample["cpg_model"] else None
+            for sample in manifest["samples"]
+        ]
+        miniwdl_outputs[f"humanwgs_family.cpg_{label}_bed_index"] = [
+            sample["cpg_model"][label]["index"] if sample["cpg_model"] else None
+            for sample in manifest["samples"]
+        ]
+    (root / "miniwdl-outputs.json").write_text(
+        json.dumps(miniwdl_outputs), encoding="utf-8"
+    )
+
+
+def validate_fixture(root: Path, **overrides: Any) -> dict[str, Any]:
+    arguments: dict[str, Any] = {
+        "outputs_json": root / "miniwdl-outputs.json",
+        "ped": root / "family.ped",
+        "reference_fasta": root / "data/reference.fa",
+        "project_outdir": root / "results/fixture",
+        "output_dir": root / "validation",
+        "samples": ["CHILD"],
+        "regions": "chr1",
+    }
+    arguments.update(overrides)
+    return validate_miniwdl_run(**arguments)
 
 
 class ValidateRunTests(unittest.TestCase):
-    def test_valid_run_emits_normalized_contracts(self) -> None:
+    def test_direct_miniwdl_inputs_are_validated_and_normalized(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary)
-            config = make_fixture(root)
+            make_fixture(root)
             output = root / "validation"
-            report = validate_run(config, output)
+            report = validate_fixture(root, output_dir=output)
 
             self.assertEqual(report["status"], "valid")
+            self.assertEqual(report["versions"]["wdl_release"], "v3.3.1")
             self.assertEqual(report["selected_samples"], ["CHILD"])
             self.assertEqual(report["selected_autosomes"], ["chr1"])
             self.assertEqual(report["joint_small_variants"]["records"], 1)
@@ -288,95 +306,67 @@ class ValidateRunTests(unittest.TestCase):
             resolved = json.loads(
                 (output / "resolved-run.json").read_text(encoding="utf-8")
             )
-            self.assertTrue(Path(resolved["reference"]["fasta"]).is_absolute())
             self.assertEqual(resolved["mode"], "pedigree")
             self.assertEqual(resolved["reference"]["name"], "GRCh38")
             self.assertEqual(resolved["inheritance"]["method"], "gtg")
             self.assertEqual(resolved["methylation"]["modes"], ["model"])
-            self.assertFalse(resolved["upstream"]["allow_unaudited_release"])
+            self.assertEqual(resolved["regions"]["include"], ["chr1"])
+            self.assertEqual(
+                resolved["upstream"]["manifest"],
+                str(root / "results/fixture/pipeline_info/resolved-manifest.json"),
+            )
             summary = format_validation_summary(report)
             self.assertIn("Tapestry validation succeeded", summary)
             self.assertIn("Reference: GRCh38 (chr1)", summary)
-            self.assertIn(f"Output: {root / 'results' / 'fixture'}", summary)
+            self.assertIn("Inheritance map: QUAL>=20", summary)
+            self.assertIn("Mismatch window: 50 bp", summary)
 
-    def test_fixed_internal_fields_are_not_public_config_keys(self) -> None:
-        cases = [
-            ("mode", "pedigree"),
-            ("reference.name", "GRCh38"),
-            ("inheritance.method", "gtg"),
-            ("methylation.modes", ["model"]),
-        ]
-        for key, value in cases:
-            with self.subTest(key=key), tempfile.TemporaryDirectory() as temporary:
-                root = Path(temporary)
-                config = make_fixture(root)
-                parsed = yaml.safe_load(config.read_text(encoding="utf-8"))
-                target = parsed
-                parts = key.split(".")
-                for part in parts[:-1]:
-                    target = target[part]
-                target[parts[-1]] = value
-                config.write_text(yaml.safe_dump(parsed), encoding="utf-8")
-                with self.assertRaisesRegex(InputValidationError, "run config schema"):
-                    validate_run(config, root / "validation")
-
-    def test_json_and_yaml_have_the_same_fingerprint(self) -> None:
+    def test_direct_miniwdl_inputs_reject_partial_cpg_outputs(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary)
-            yaml_config = make_fixture(root)
-            yaml_report = validate_run(yaml_config, root / "yaml-validation")
-            json_config = root / "run.json"
-            json_config.write_text(
-                json.dumps(yaml.safe_load(yaml_config.read_text(encoding="utf-8"))),
-                encoding="utf-8",
-            )
-            json_report = validate_run(json_config, root / "json-validation")
-            self.assertEqual(
-                yaml_report["config_fingerprint"],
-                json_report["config_fingerprint"],
-            )
+            make_fixture(root)
+            outputs_path = root / "miniwdl-outputs.json"
+            outputs = json.loads(outputs_path.read_text(encoding="utf-8"))
+            outputs["humanwgs_family.cpg_hap2_bed"][-1] = None
+            outputs_path.write_text(json.dumps(outputs), encoding="utf-8")
 
-    def test_unknown_and_duplicate_config_keys_are_rejected(self) -> None:
+            with self.assertRaisesRegex(
+                InputValidationError, "incomplete CpG model output set"
+            ):
+                validate_fixture(root)
+
+    def test_miniwdl_outputs_require_workflow_version(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary)
-            config = make_fixture(root)
-            parsed = yaml.safe_load(config.read_text(encoding="utf-8"))
-            parsed["unexpected"] = True
-            config.write_text(yaml.safe_dump(parsed), encoding="utf-8")
-            with self.assertRaisesRegex(InputValidationError, "run config schema"):
-                validate_run(config, root / "validation")
-
-        with tempfile.TemporaryDirectory() as temporary:
-            root = Path(temporary)
-            config = make_fixture(root)
-            config.write_text(
-                config.read_text(encoding="utf-8") + "schema_version: 1\n",
-                encoding="utf-8",
-            )
-            with self.assertRaisesRegex(InputValidationError, "duplicate YAML key"):
-                validate_run(config, root / "validation")
+            make_fixture(root)
+            outputs_path = root / "miniwdl-outputs.json"
+            outputs = json.loads(outputs_path.read_text(encoding="utf-8"))
+            del outputs["humanwgs_family.workflow_version"]
+            outputs_path.write_text(json.dumps(outputs), encoding="utf-8")
+            with self.assertRaisesRegex(InputValidationError, "workflow_version"):
+                validate_fixture(root)
 
     def test_missing_index_and_output_collision_are_rejected(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary)
-            config = make_fixture(root)
+            make_fixture(root)
             (root / "data" / "family.vcf.gz.tbi").unlink()
             with self.assertRaisesRegex(InputValidationError, "does not exist"):
-                validate_run(config, root / "validation")
+                validate_fixture(root)
 
         with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary)
-            config = make_fixture(root)
+            make_fixture(root)
             fingerprint = root / "results" / "fixture" / "pipeline_info" / "config-fingerprint.txt"
             fingerprint.parent.mkdir(parents=True)
             fingerprint.write_text("different-run\n", encoding="utf-8")
             with self.assertRaisesRegex(InputValidationError, "different configuration fingerprint"):
-                validate_run(config, root / "validation")
+                validate_fixture(root)
 
     def test_pedigree_cycle_is_rejected(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary)
-            config = make_fixture(root)
+            make_fixture(root)
             (root / "family.ped").write_text(
                 "FAM FATHER CHILD NA 1 0\n"
                 "FAM MOTHER NA NA 2 0\n"
@@ -384,63 +374,55 @@ class ValidateRunTests(unittest.TestCase):
                 encoding="utf-8",
             )
             with self.assertRaisesRegex(InputValidationError, "cycle"):
-                validate_run(config, root / "validation")
+                validate_fixture(root)
 
     def test_v330_is_supported_without_opt_in(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary)
-            report = validate_run(
-                make_fixture(root, release="v3.3.0"), root / "validation"
-            )
-            self.assertEqual(report["warnings"], [])
+            make_fixture(root, release="v3.3.0")
+            report = validate_fixture(root)
+            self.assertEqual(report["versions"]["wdl_release"], "v3.3.0")
 
-    def test_supported_release_commit_must_match_tag(self) -> None:
+    def test_other_wdl_release_is_rejected(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary)
-            config = make_fixture(root)
-            manifest_path = root / "manifest.json"
-            manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
-            manifest["workflow"]["commit"] = "0" * 40
-            manifest_path.write_text(json.dumps(manifest), encoding="utf-8")
-            with self.assertRaisesRegex(InputValidationError, "must use commit"):
-                validate_run(config, root / "validation")
+            make_fixture(root, release="v3.4.0")
+            with self.assertRaisesRegex(InputValidationError, "not audited"):
+                validate_fixture(root)
 
-    def test_other_v3_release_requires_explicit_opt_in(self) -> None:
+    def test_non_autosomal_and_duplicate_regions_are_rejected(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary)
-            config = make_fixture(root, release="v3.4.0")
-            with self.assertRaisesRegex(InputValidationError, "unaudited"):
-                validate_run(config, root / "validation")
-
-        with tempfile.TemporaryDirectory() as temporary:
-            root = Path(temporary)
-            config = make_fixture(
-                root, release="v3.4.0", allow_unaudited=True
-            )
-            report = validate_run(config, root / "validation")
-            self.assertEqual(len(report["warnings"]), 1)
-            self.assertIn("UNAUDITED", report["warnings"][0])
-
-    def test_non_autosomal_region_is_rejected_by_schema(self) -> None:
-        with tempfile.TemporaryDirectory() as temporary:
-            root = Path(temporary)
-            config = make_fixture(root, region="chrX")
-            with self.assertRaisesRegex(InputValidationError, "run config schema"):
-                validate_run(config, root / "validation")
+            make_fixture(root)
+            with self.assertRaisesRegex(InputValidationError, "non-autosomes"):
+                validate_fixture(root, regions="chrX")
+            with self.assertRaisesRegex(InputValidationError, "duplicates"):
+                validate_fixture(root, regions="chr1,chr1")
 
     def test_joint_vcf_sample_set_must_equal_ped(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary)
-            config = make_fixture(root, joint_samples=["FATHER", "CHILD"])
+            make_fixture(root, joint_samples=["FATHER", "CHILD"])
             with self.assertRaisesRegex(InputValidationError, "VCF sample set"):
-                validate_run(config, root / "validation")
+                validate_fixture(root)
 
     def test_selected_sample_artifacts_may_not_be_null(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary)
-            config = make_fixture(root, selected_artifacts=False)
+            make_fixture(root, selected_artifacts=False)
             with self.assertRaisesRegex(InputValidationError, "selected but has null"):
-                validate_run(config, root / "validation")
+                validate_fixture(root)
+
+    def test_invalid_direct_settings_are_rejected(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            make_fixture(root)
+            with self.assertRaisesRegex(InputValidationError, "project ID"):
+                validate_fixture(root, project_id="bad id")
+            with self.assertRaisesRegex(InputValidationError, "at least 1"):
+                validate_fixture(root, min_coverage=-1)
+            with self.assertRaisesRegex(InputValidationError, "more than once"):
+                validate_fixture(root, samples=["CHILD", "CHILD"])
 
 
 if __name__ == "__main__":

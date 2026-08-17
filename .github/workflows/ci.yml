@@ -40,17 +40,6 @@ jobs:
       - name: Type check maintained workflow modules
         run: .venv/bin/pyright
 
-      - name: Parse JSON schemas
-        run: |
-          python - <<'PY'
-          import json
-          from pathlib import Path
-
-          for path in sorted(Path("schemas").glob("*.json")):
-              json.loads(path.read_text())
-              print(f"valid JSON: {path}")
-          PY
-
       - name: Check workflow shell syntax
         run: bash -n tests/run_nextflow_e2e.sh
 

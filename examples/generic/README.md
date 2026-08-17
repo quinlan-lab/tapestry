@@ -1,22 +1,20 @@
-# Generic run-config example
+# PED example
 
-`family.yaml` and `pacbio-wdl.tapestry.json` demonstrate the schema-v1 public
-contracts. Paths are resolved relative to the document containing them.
+`family.ped` is a minimal six-column PED example. Tapestry reads the PacBio WDL
+miniwdl `outputs.json` directly; users do not create a run configuration or
+manifest.
 
-The `data/` artifacts are intentionally not included: replace those paths with
-the localized outputs from a PacBio HiFi human WGS WDL v3.3.0 or v3.3.1 family
-run. The canonical manifest is Tapestry-owned JSON, not raw Cromwell, miniwdl,
-or Terra metadata.
-
-Run a populated copy with:
+The public miniwdl entry point is:
 
 ```bash
 nextflow run . -profile docker \
-  --run-config /path/to/family.yaml \
+  --outputs-json /path/to/miniwdl-run/outputs.json \
+  --ped /path/to/family.ped \
+  --reference-fasta /path/to/GRCh38.fa \
+  --outdir /path/to/tapestry-results \
   -resume
 ```
 
-Validation is always the first stage. To stop after the optional preflight, add
-`-entry validate`. The compact YAML contains only user inputs and scientific
-choices; the resolved run records the fixed pedigree/GRCh38/`gtg`/model
-constraints.
+Validation always runs first and publishes `resolved-run.json` and
+`resolved-manifest.json` under `<outdir>/pipeline_info/`. Add
+`-entry validate` to stop after that preflight.

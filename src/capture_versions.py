@@ -32,7 +32,6 @@ def capture_versions(
     for package in (
         "bioframe",
         "cyvcf2",
-        "jsonschema",
         "numpy",
         "pandas",
         "polars",
