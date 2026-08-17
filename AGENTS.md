@@ -12,10 +12,11 @@ Treat those as a worked deployment, not portable API contracts.
 
 Tapestry now includes a generic downstream workflow for the
 [PacBio HiFi human WGS WDL](https://github.com/PacificBiosciences/HiFi-human-WGS-WDL),
-driven by one versioned YAML run file and a canonical WDL-output manifest. See
-[`ROADMAP.md`](ROADMAP.md) for the schema and remaining release gates and
-[`impl.md`](impl.md) for the implementation/acceptance plan. The legacy
-site-specific shell paths remain available but are not the generic API.
+driven by one versioned YAML run file and a canonical WDL-output manifest. The
+machine contracts are in `schemas/`, current commands are in `README.md`,
+remaining work is in `ROADMAP.md`, and completed decisions and evidence are in
+`completed.md`. `impl.md` is the original detailed implementation plan. The
+legacy site-specific shell paths remain available but are not the generic API.
 
 ### Generic pedigree/model-only path
 
@@ -70,8 +71,10 @@ paths; its data-creation scripts still depend on site-local source data.
   Apptainer/Slurm profiles. Scientific inputs come from `--run-config`; executor
   and resource policy belong in profiles.
 - `schemas/`, `examples/generic/`: authoritative machine contracts and portable
-  human-authored examples. `ROADMAP.md` remains the source of truth for schema
-  intent.
+  human-authored examples.
+- `ROADMAP.md`, `completed.md`, `impl.md`: remaining work, completed work, and
+  the archived detailed implementation plan, respectively. Do not copy the
+  current schema into planning documents.
 - `src/tapestry_validate.py`: strict YAML/JSON, manifest, PED, reference, VCF,
   HiPhase-table, model-BED, release, and output-collision validation.
 - `src/normalize_joint_vcf.py`, `src/run_gtg_inheritance.py`: deterministic
@@ -81,6 +84,11 @@ paths; its data-creation scripts still depend on site-local source data.
   publication.
 - `Dockerfile`, `requirements-pipeline.txt`, `containers/gtg.Cargo.lock`: pinned
   generic runtime; do not update the `gtg` commit or Cargo lock independently.
+- `.github/workflows/ci.yml`, `requirements-ci.txt`, `pyrightconfig.json`: the
+  small GitHub CI contract. It runs targeted static checks, builds the pinned
+  image, runs all containerized tests, and exercises the nine-stage workflow
+  twice to prove complete `-resume` caching. Keep actions and CI-only tools
+  pinned; do not add a runtime matrix without a supported compatibility need.
 - `README.md`: authoritative user-facing description, workflow details, and
   final output-column definitions.
 - `docs/pedigree_workflow.mmd`: pedigree workflow/data-flow diagram.
@@ -98,8 +106,9 @@ paths; its data-creation scripts still depend on site-local source data.
   (`logging.sh` for shell, `logging_util.py` for Python), phase helpers,
   diagnostics.
 - Top-level `*.sh`: current end-to-end orchestration and deployment settings.
-- `tests/test_recombination_dedup.py`: regression test for nested phase sets and
-  duplicate hap-map blocks.
+- `tests/`: unit and regression coverage for validation, normalization,
+  inheritance, phasing, all-CpG publication, and nested phase-set handling;
+  `tests/run_nextflow_e2e.sh` runs the informative Docker/resume fixture.
 - `wiki/`: code-linked conceptual walkthrough with reproducible figures.
 - `manuscript/`: paper text, analyses, figure sources; not pipeline code.
 - `Snakefile`: an incomplete experiment, not the working workflow or a source of
@@ -131,6 +140,10 @@ paths; its data-creation scripts still depend on site-local source data.
   the trio workflow.
 - Count-based and model-based methylation are distinct measurements. Never
   conflate them.
+- In generic code, derive reference-dependent filenames from
+  `config.reference.name`. A completed sample may still have phasing status
+  `no_inheritance_phase`; preserve that status and the valid null-founder
+  outputs.
 - Large inputs are normal. Prefer Polars/lazy or streaming operations, avoid
   unnecessary pandas conversions, and do not materialize genome-wide Cartesian
   joins.
@@ -163,34 +176,26 @@ paths; its data-creation scripts still depend on site-local source data.
 
 ## Verification
 
-Run the checks that match the change. The lightweight regression test needs no
-production data:
-
-```bash
-PYTHONPATH=src:src/util .venv/bin/python tests/test_recombination_dedup.py
-```
-
-The generic suite is designed for the pipeline container:
+Run the checks that match the change. The generic suite is designed for the
+pipeline container:
 
 ```bash
 docker run --rm -v "$PWD:/work" -w /work \
   -e PYTHONDONTWRITEBYTECODE=1 \
   -e PYTHONPATH=/work/src:/work/src/util \
   tapestry:dev python -m unittest discover -v -s tests -p 'test_*.py'
-
-docker run --rm -v "$PWD:/work" -w /work \
-  -e PYTHONDONTWRITEBYTECODE=1 \
-  -e PYTHONPATH=/work/src:/work/src/util \
-  tapestry:dev python tests/test_recombination_dedup.py
 ```
 
-For workflow changes, run both `-entry validate` and the synthetic informative
-family through the Docker profile, then repeat with `-resume` and confirm every
-task is cached. Real WDL v3.3.0 and v3.3.1 CEPH fixtures and the
-scientific parity comparison remain mandatory release gates even when synthetic
-tests pass. The deterministic `pyBigWig`/`bedGraphToBigWig` migration test runs
-against the checksum-pinned UCSC binary included in the container and must not
-be skipped in container test runs.
+For workflow changes, run `tests/run_nextflow_e2e.sh`; it executes the synthetic
+informative family twice and requires every process to be cached on `-resume`.
+On CI failure, its synthetic fixture and lifecycle reports are retained under
+`.test-work/e2e.*` for artifact upload; successful and ordinary local runs clean
+up automatically. Fixture generation and scientific tests run in the pipeline
+container, so the GitHub runner does not become a second scientific runtime.
+Real WDL v3.3.0/v3.3.1 CEPH parity and cluster-runtime checks remain release
+gates as listed in `ROADMAP.md`. The deterministic
+`pyBigWig`/`bedGraphToBigWig` migration test uses the checksum-pinned UCSC binary
+in the container and must not be skipped.
 
 For Python changes, also run `.venv/bin/pyright`. For changed shell entry points,
 run `bash -n <script>`. For workflow changes, prefer the smallest

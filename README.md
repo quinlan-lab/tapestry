@@ -6,7 +6,8 @@ A pipeline to phase DNA methylation from HiFi reads in a human pedigree (includi
 
 The generic Nextflow workflow consumes outputs from the PacBio HiFi human WGS
 WDL through the schema-v1 YAML/JSON run configuration and Tapestry canonical
-manifest documented in [`ROADMAP.md`](ROADMAP.md). The current contract supports
+manifest defined in [`schemas/`](schemas/) and illustrated in
+[`examples/generic/`](examples/generic/). The current contract supports
 GRCh38 autosomes, pedigree mode, model methylation, and WDL v3.3.0 or v3.3.1.
 It does not call HiPhase or pb-CpG-tools: those products come from the WDL.
 

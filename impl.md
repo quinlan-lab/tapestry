@@ -1,11 +1,8 @@
 # Generic autosomal pedigree/model-only MVP
 
-**Implementation status (2026-08-14):** Milestones 1-4 are implemented and a
-clean synthetic Docker run plus full `-resume` run pass. Milestone 5 remains in
-progress: CI, released image digest, real WDL v3.3.0/v3.3.1 CEPH parity,
-and representative Slurm/Apptainer smoke runs are still release gates. The
-synthetic BigWig generator-parity gate passes against the checksum-pinned UCSC
-`bedGraphToBigWig` v2.10 binary.
+**Archived implementation plan.** The planned MVP is implemented. See
+`completed.md` for the completion record and `ROADMAP.md` for remaining release
+work. This file retains detailed design rationale and acceptance criteria.
 
 ## Goal
 
@@ -30,9 +27,9 @@ model-only operation.
 
 ## User interface
 
-The normative schema-v1 contract and canonical-manifest shape live in
-`ROADMAP.md` under "Run format and interface." The implementation must consume
-that contract directly; this plan does not define a second manifest dialect.
+The normative schema-v1 contracts live in `schemas/run.schema.json` and
+`schemas/upstream-manifest.schema.json`; `examples/generic/` contains portable
+examples. This historical plan does not define a second manifest dialect.
 
 The public entry point is `--run-config`, rather than Nextflow's
 `-params-file`. This lets Tapestry resolve paths relative to the YAML or JSON

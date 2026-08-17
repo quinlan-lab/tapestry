@@ -11,12 +11,28 @@ case "${fixture_root}" in
     "${repo_root}/.test-work"/e2e.*) ;;
     *) echo "refusing unsafe test directory: ${fixture_root}" >&2; exit 2 ;;
 esac
-trap 'rm -rf "${fixture_root}"' EXIT
+
+test_succeeded=false
+cleanup() {
+    if [[ "${test_succeeded}" == true || -z "${CI:-}" ]]; then
+        rm -rf "${fixture_root}"
+    else
+        echo "CI failure diagnostics retained in ${fixture_root}" >&2
+    fi
+}
+trap cleanup EXIT
 
 mkdir -p "${fixture_root}/fixture"
-PYTHONPATH="${repo_root}/src" python3 -c \
+fixture_name="$(basename "${fixture_root}")"
+docker run --rm \
+    --user "$(id -u):$(id -g)" \
+    --volume "${repo_root}:/work" \
+    --workdir /work \
+    --env PYTHONDONTWRITEBYTECODE=1 \
+    --env PYTHONPATH=/work/src:/work/src/util \
+    "${container_image}" python -c \
     'from pathlib import Path; from tests.test_tapestry_validate import make_fixture; import sys; make_fixture(Path(sys.argv[1]), inheritance_informative=True)' \
-    "${fixture_root}/fixture"
+    "/work/.test-work/${fixture_name}/fixture"
 
 common=(
     run "${repo_root}"
@@ -26,13 +42,15 @@ common=(
     -work-dir "${fixture_root}/work"
 )
 
-NXF_OFFLINE=true "${nextflow_bin}" "${common[@]}" \
+NXF_OFFLINE=true "${nextflow_bin}" -log "${fixture_root}/nextflow.first.log" \
+    "${common[@]}" \
     -with-report "${fixture_root}/report.first.html" \
     -with-trace "${fixture_root}/trace.first.tsv" \
     -with-timeline "${fixture_root}/timeline.first.html" \
     -with-dag "${fixture_root}/dag.first.html"
 
-NXF_OFFLINE=true "${nextflow_bin}" "${common[@]}" -resume \
+NXF_OFFLINE=true "${nextflow_bin}" -log "${fixture_root}/nextflow.resume.log" \
+    "${common[@]}" -resume \
     -with-report "${fixture_root}/report.resume.html" \
     -with-trace "${fixture_root}/trace.resume.tsv" \
     -with-timeline "${fixture_root}/timeline.resume.html" \
@@ -64,5 +82,14 @@ if listed != published:
     raise SystemExit(f"manifest mismatch: missing={sorted(listed-published)} unlisted={sorted(published-listed)}")
 ' "${results}"
 
-awk -F '\t' 'NR > 1 && $5 != "CACHED" {exit 1}' "${fixture_root}/trace.resume.tsv"
+awk -F '\t' '
+    NR > 1 {
+        process_count++
+        if ($5 != "CACHED") exit 1
+    }
+    END {
+        if (process_count != 9) exit 1
+    }
+' "${fixture_root}/trace.resume.tsv"
+test_succeeded=true
 echo "PASS: full Docker workflow and -resume cache"

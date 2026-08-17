@@ -3,11 +3,22 @@
     "venvPath": ".",
     "venv": ".venv",
     "typeCheckingMode": "basic",
-    "executionEnvironments": [
-        {
-          "root": ".",
-          "extraPaths": ["src", "src/util"]
-        }
-      ]
-    
-} 
+    "reportMissingImports": false,
+    "reportMissingModuleSource": false,
+    "extraPaths": ["src", "src/util"],
+    "include": [
+        "src/capture_versions.py",
+        "src/expand_model_to_all_cpgs.py",
+        "src/filter_model_beds.py",
+        "src/generate_reference_cpgs.py",
+        "src/hap_map_pedigree.py",
+        "src/normalize_joint_vcf.py",
+        "src/phase_meth_to_founder_haps.py",
+        "src/phasing_pedigree.py",
+        "src/run_gtg_inheritance.py",
+        "src/tapestry_validate.py",
+        "src/util/hap_map.py",
+        "src/util/write_data.py",
+        "src/write_results_manifest.py"
+    ]
+}
