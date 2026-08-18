@@ -5,7 +5,6 @@ from __future__ import annotations
 
 import argparse
 import copy
-import csv
 import gzip
 import hashlib
 import json
@@ -17,7 +16,7 @@ from typing import Any, TextIO
 import pysam
 
 
-VALIDATOR_VERSION = "0.1.0"
+VALIDATOR_VERSION = "0.2.0"
 PIPELINE_VERSION = "0.1.0-dev"
 GTG_COMMIT = "e12aca6b49ee7208952467db4a2a9e2f79b98efb"
 RUNTIME_LOCK_VERSION = 1
@@ -267,7 +266,7 @@ def _check_indexed_file(data: Path, index: Path, label: str) -> None:
         ) from exc
 
 
-def inspect_vcf(
+def inspect_vcf_header(
     vcf_path: Path,
     index_path: Path,
     label: str,
@@ -277,8 +276,8 @@ def inspect_vcf(
     *,
     require_depth: bool,
     require_phase_set: bool,
-    require_numeric_qual: bool,
 ) -> dict[str, Any]:
+    """Validate an indexed VCF contract without scanning its records."""
     _check_indexed_file(vcf_path, index_path, label)
     try:
         vcf = pysam.VariantFile(str(vcf_path), index_filename=str(index_path))
@@ -315,54 +314,12 @@ def inspect_vcf(
                     f"length {reference_lengths[contig]}"
                 )
 
-        region_rank = {contig: rank for rank, contig in enumerate(regions)}
-        previous: tuple[int, int] | None = None
-        stats: dict[str, Any] = {
-            "records": 0,
-            "non_pass_records": 0,
-            "multiallelic_records": 0,
-            "records_missing_qual": 0,
+        return {
+            "inspection": "header-and-index",
             "depth_fields": depth_fields,
             "samples": samples,
-            "sample_called_genotypes": {sample: 0 for sample in samples},
-            "sample_missing_genotypes": {sample: 0 for sample in samples},
+            "autosomes": regions,
         }
-        try:
-            for record in vcf:
-                if record.contig not in region_rank:
-                    continue
-                current = (region_rank[record.contig], record.pos)
-                if previous is not None and current < previous:
-                    raise InputValidationError(
-                        f"{label}: records are not sorted at {record.contig}:{record.pos}"
-                    )
-                previous = current
-                if record.pos > reference_lengths[record.contig]:
-                    raise InputValidationError(
-                        f"{label}: record {record.contig}:{record.pos} is outside the reference"
-                    )
-                stats["records"] += 1
-                if record.qual is None:
-                    stats["records_missing_qual"] += 1
-                    if require_numeric_qual:
-                        raise InputValidationError(
-                            f"{label}: record {record.contig}:{record.pos} has missing QUAL"
-                        )
-                if record.filter.keys() and "PASS" not in record.filter.keys():
-                    stats["non_pass_records"] += 1
-                if len(record.alts or ()) > 1:
-                    stats["multiallelic_records"] += 1
-                for sample in samples:
-                    genotype = record.samples[sample].get("GT")
-                    if genotype is None or any(allele is None for allele in genotype):
-                        stats["sample_missing_genotypes"][sample] += 1
-                    else:
-                        stats["sample_called_genotypes"][sample] += 1
-        except (OSError, ValueError) as exc:
-            if isinstance(exc, InputValidationError):
-                raise
-            raise InputValidationError(f"{label}: failed while reading VCF: {exc}") from exc
-    return stats
 
 
 def _open_text(path: Path) -> TextIO:
@@ -371,13 +328,11 @@ def _open_text(path: Path) -> TextIO:
     return path.open(encoding="utf-8")
 
 
-def inspect_phase_blocks(
+def inspect_phase_blocks_header(
     path: Path,
     label: str,
-    expected_sample: str,
-    regions: list[str],
-    reference_lengths: dict[str, int],
 ) -> dict[str, Any]:
+    """Validate the HiPhase table header without scanning genome-wide blocks."""
     _require_file(str(path), label)
     with _open_text(path) as handle:
         header_line = handle.readline().rstrip("\n")
@@ -389,56 +344,20 @@ def inspect_phase_blocks(
             raise InputValidationError(
                 f"{label}: HiPhase block header is missing columns {missing}"
             )
-        reader = csv.DictReader(handle, fieldnames=fieldnames, delimiter="\t")
-        region_rank = {contig: rank for rank, contig in enumerate(regions)}
-        previous: tuple[int, int] | None = None
-        records = 0
-        for line_number, row in enumerate(reader, 2):
-            if row["sample_name"] != expected_sample:
-                raise InputValidationError(
-                    f"{label} line {line_number}: sample_name {row['sample_name']!r} "
-                    f"does not equal {expected_sample!r}"
-                )
-            chrom = str(row["chrom"])
-            if chrom not in region_rank:
-                continue
-            try:
-                start = int(str(row["start"]))
-                end = int(str(row["end"]))
-                int(str(row["num_variants"]))
-            except ValueError as exc:
-                raise InputValidationError(
-                    f"{label} line {line_number}: start/end/num_variants must be integers"
-                ) from exc
-            if start < 1 or end < start or end > reference_lengths[chrom]:
-                raise InputValidationError(
-                    f"{label} line {line_number}: invalid 1-based block {chrom}:{start}-{end}"
-                )
-            current = (region_rank[chrom], start)
-            if previous is not None and current < previous:
-                raise InputValidationError(
-                    f"{label}: blocks are not sorted at line {line_number}"
-                )
-            previous = current
-            records += 1
-    return {"records": records, "sample": expected_sample}
+    return {"inspection": "header", "columns": fieldnames}
 
 
-def inspect_model_bed(
+def inspect_model_bed_header(
     bed_path: Path,
     index_path: Path,
     label: str,
-    regions: list[str],
-    reference_lengths: dict[str, int],
 ) -> dict[str, Any]:
+    """Validate an indexed model BED contract without scanning CpG records."""
     _check_indexed_file(bed_path, index_path, label)
     metadata: dict[str, str] = {}
     header: list[str] | None = None
-    records = 0
-    region_rank = {contig: rank for rank, contig in enumerate(regions)}
-    previous: tuple[int, int, int] | None = None
     with _open_text(bed_path) as handle:
-        for line_number, line in enumerate(handle, 1):
+        for line in handle:
             stripped = line.rstrip("\n")
             if stripped.startswith("##"):
                 key, separator, value = stripped[2:].partition("=")
@@ -452,47 +371,10 @@ def inspect_model_bed(
                     raise InputValidationError(
                         f"{label}: model BED header is missing columns {missing}"
                     )
-                continue
+                break
             if not stripped:
                 continue
-            if header is None:
-                raise InputValidationError(
-                    f"{label} line {line_number}: data appears before the header"
-                )
-            values = stripped.split("\t")
-            if len(values) != len(header):
-                raise InputValidationError(
-                    f"{label} line {line_number}: expected {len(header)} columns, "
-                    f"found {len(values)}"
-                )
-            row = dict(zip(header, values))
-            chrom = row["chrom"]
-            if chrom not in region_rank:
-                continue
-            try:
-                start = int(row["begin"])
-                end = int(row["end"])
-                float(row["mod_score"])
-                coverage = int(row["cov"])
-            except ValueError as exc:
-                raise InputValidationError(
-                    f"{label} line {line_number}: invalid coordinate, mod_score, or cov"
-                ) from exc
-            if start < 0 or end <= start or end > reference_lengths[chrom]:
-                raise InputValidationError(
-                    f"{label} line {line_number}: invalid BED interval {chrom}:{start}-{end}"
-                )
-            if coverage < 0:
-                raise InputValidationError(
-                    f"{label} line {line_number}: cov must be non-negative"
-                )
-            current = (region_rank[chrom], start, end)
-            if previous is not None and current < previous:
-                raise InputValidationError(
-                    f"{label}: records are not sorted at line {line_number}"
-                )
-            previous = current
-            records += 1
+            raise InputValidationError(f"{label}: data appears before the header")
     if header is None:
         raise InputValidationError(f"{label}: model BED is missing a # header line")
     if metadata.get("pileup-mode") != "model":
@@ -500,7 +382,8 @@ def inspect_model_bed(
             f"{label}: expected ##pileup-mode=model, found {metadata.get('pileup-mode')!r}"
         )
     return {
-        "records": records,
+        "inspection": "header-and-index",
+        "columns": header,
         "pileup_mode": metadata["pileup-mode"],
         "upstream_min_coverage": metadata.get("min-coverage"),
     }
@@ -957,7 +840,7 @@ def validate_miniwdl_run(
         )
 
     joint = manifest["joint_small_variants"]
-    joint_stats = inspect_vcf(
+    joint_stats = inspect_vcf_header(
         Path(joint["vcf"]),
         Path(joint["index"]),
         "manifest.joint_small_variants",
@@ -966,7 +849,6 @@ def validate_miniwdl_run(
         reference_lengths,
         require_depth=True,
         require_phase_set=False,
-        require_numeric_qual=True,
     )
 
     sample_stats: dict[str, Any] = {}
@@ -975,7 +857,7 @@ def validate_miniwdl_run(
         phased = sample["phased_small_variants"]
         model = sample["cpg_model"]
         stats: dict[str, Any] = {
-            "phased_small_variants": inspect_vcf(
+            "phased_small_variants": inspect_vcf_header(
                 Path(phased["vcf"]),
                 Path(phased["index"]),
                 f"manifest.samples[{sample_id}].phased_small_variants",
@@ -984,25 +866,19 @@ def validate_miniwdl_run(
                 reference_lengths,
                 require_depth=False,
                 require_phase_set=True,
-                require_numeric_qual=False,
             ),
-            "phase_blocks": inspect_phase_blocks(
+            "phase_blocks": inspect_phase_blocks_header(
                 Path(sample["phase_blocks"]),
                 f"manifest.samples[{sample_id}].phase_blocks",
-                sample_id,
-                selected_regions,
-                reference_lengths,
             ),
             "cpg_model": {},
         }
         for model_label in ("combined", "hap1", "hap2"):
             artifact = model[model_label]
-            stats["cpg_model"][model_label] = inspect_model_bed(
+            stats["cpg_model"][model_label] = inspect_model_bed_header(
                 Path(artifact["bed"]),
                 Path(artifact["index"]),
                 f"manifest.samples[{sample_id}].cpg_model.{model_label}",
-                selected_regions,
-                reference_lengths,
             )
         sample_stats[sample_id] = stats
 

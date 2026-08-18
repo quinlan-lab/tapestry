@@ -145,7 +145,7 @@ write permissions:
 - `Static checks` creates a Python 3.11 virtual environment, installs pinned
   runtime and CI dependencies, type-checks the maintained generic modules, and
   checks the E2E shell syntax.
-- `Workflow` uses Java 17 and Nextflow 25.04.8, builds `tapestry:ci` with cached
+- `Workflow` uses Java 17 and Nextflow 24.04.2, builds `tapestry:ci` with cached
   Docker layers, runs all containerized unit/regression tests, and executes the
   informative workflow twice.
 - The resume assertion requires exactly nine trace rows and requires every row
@@ -175,6 +175,9 @@ Implemented 2026-08-17.
   regions, inheritance and methylation thresholds, BigWig choice, and output
   directory.
 - Completion prints the results-manifest path and per-sample status counts.
+- Startup validation checks contracts, headers, indexes, samples, contigs, and
+  metadata without scanning genome-wide VCF/BED records. Record-level checks
+  remain with the scientific stages that already read those records.
 
 These tests establish the implemented contract on deterministic fixtures. They
 do not replace the real WDL/CEPH, cluster-runtime, hosted-CI, and

@@ -79,8 +79,9 @@ paths; its data-creation scripts still depend on site-local source data.
   interface details into planning documents.
 - `src/tapestry_validate.py`: converts family-WDL miniwdl `outputs.json`, PED,
   and direct workflow settings into private canonical contracts, then performs
-  strict manifest, reference, VCF, HiPhase-table, model-BED, release, and
-  output-collision validation.
+  strict manifest, reference, artifact-header/index, release, and
+  output-collision validation. It avoids genome-wide record scans; consuming
+  stages own record-level checks.
 - `src/normalize_joint_vcf.py`, `src/run_gtg_inheritance.py`: deterministic
   all-site/complete-family VCF branches and pinned `gtg` orchestration.
 - `src/filter_model_beds.py`, `src/generate_reference_cpgs.py`,

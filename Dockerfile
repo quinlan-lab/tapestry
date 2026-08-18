@@ -37,6 +37,49 @@ RUN cargo build \
       --bin gtg-concordance
 
 
+FROM ${PYTHON_IMAGE} AS python-deps-builder
+
+RUN apt-get update \
+    && apt-get install --yes --no-install-recommends \
+        autoconf \
+        automake \
+        build-essential \
+        libbz2-dev \
+        libcurl4-openssl-dev \
+        liblzma-dev \
+        libssl-dev \
+        pkg-config \
+        zlib1g-dev \
+    && rm -rf /var/lib/apt/lists/*
+
+COPY requirements-pipeline.txt /opt/tapestry/requirements-pipeline.txt
+
+# The PyPI wheels for pysam and cyvcf2 bundle Red Hat-patched OpenSSL
+# libraries that abort when an Apptainer container runs on a FIPS-enabled
+# host. Build just these two packages from source so their bundled HTSlib
+# implementations use the base image's system libraries instead.
+ENV CYVCF2_HTSLIB_MODE=BUILTIN \
+    PIP_DEFAULT_TIMEOUT=30 \
+    PIP_RETRIES=5
+RUN python -m pip wheel \
+      --wheel-dir /opt/tapestry/wheels \
+      --no-binary=pysam,cyvcf2 \
+      --requirement /opt/tapestry/requirements-pipeline.txt
+
+
+FROM ${PYTHON_IMAGE} AS python-deps-installer
+
+COPY requirements-pipeline.txt /opt/tapestry/requirements-pipeline.txt
+COPY --from=python-deps-builder /opt/tapestry/wheels /opt/tapestry/wheels
+RUN python -m pip install \
+      --no-cache-dir \
+      --no-index \
+      --find-links=/opt/tapestry/wheels \
+      --target=/opt/tapestry/site-packages \
+      --requirement /opt/tapestry/requirements-pipeline.txt \
+    && rm -rf /opt/tapestry/wheels
+
+
 FROM ${PYTHON_IMAGE} AS runtime
 
 ARG GTG_COMMIT=e12aca6b49ee7208952467db4a2a9e2f79b98efb
@@ -56,6 +99,7 @@ RUN apt-get update \
         libbz2-1.0 \
         libcurl4 \
         liblzma5 \
+        libssl3 \
         procps \
         tabix \
         zlib1g \
@@ -70,8 +114,22 @@ RUN curl --fail --location --output /usr/local/bin/bedGraphToBigWig \
     && chmod 0755 /usr/local/bin/bedGraphToBigWig
 
 COPY requirements-pipeline.txt /opt/tapestry/requirements-pipeline.txt
-RUN python -m pip install --no-cache-dir \
-      --requirement /opt/tapestry/requirements-pipeline.txt
+COPY --from=python-deps-installer \
+     /opt/tapestry/site-packages \
+     /usr/local/lib/python3.11/site-packages
+
+# Guard the FIPS-host portability invariant: neither HTSlib binding may
+# reintroduce a private OpenSSL library through a binary PyPI wheel.
+RUN bundled_crypto="$(find /usr/local/lib/python3.11/site-packages \
+        -type f \( \
+          -path '*/pysam.libs/libcrypto*' \
+          -o -path '*/cyvcf2.libs/libcrypto*' \
+        \) -print)" \
+    && if [ -n "${bundled_crypto}" ]; then \
+         echo "Unexpected bundled OpenSSL libraries:" >&2; \
+         echo "${bundled_crypto}" >&2; \
+         exit 1; \
+       fi
 
 COPY --from=gtg-builder /build/gtg/code/rust/target/release/gtg-ped-map /usr/local/bin/gtg-ped-map
 COPY --from=gtg-builder /build/gtg/code/rust/target/release/gtg-concordance /usr/local/bin/gtg-concordance

@@ -297,7 +297,20 @@ class ValidateRunTests(unittest.TestCase):
             self.assertEqual(report["versions"]["wdl_release"], "v3.3.1")
             self.assertEqual(report["selected_samples"], ["CHILD"])
             self.assertEqual(report["selected_autosomes"], ["chr1"])
-            self.assertEqual(report["joint_small_variants"]["records"], 1)
+            self.assertEqual(
+                report["joint_small_variants"]["inspection"], "header-and-index"
+            )
+            self.assertNotIn("records", report["joint_small_variants"])
+            self.assertEqual(
+                report["samples"]["CHILD"]["phase_blocks"]["inspection"],
+                "header",
+            )
+            self.assertEqual(
+                report["samples"]["CHILD"]["cpg_model"]["combined"][
+                    "inspection"
+                ],
+                "header-and-index",
+            )
             self.assertTrue((output / "validation.success").is_file())
             self.assertEqual(
                 (output / "normalized.ped").read_text(encoding="utf-8").splitlines()[0],
@@ -404,6 +417,29 @@ class ValidateRunTests(unittest.TestCase):
             root = Path(temporary)
             make_fixture(root, joint_samples=["FATHER", "CHILD"])
             with self.assertRaisesRegex(InputValidationError, "VCF sample set"):
+                validate_fixture(root)
+
+    def test_non_vcf_artifact_headers_are_checked(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            make_fixture(root)
+            (root / "data" / "CHILD.blocks.tsv").write_text(
+                "sample_name\tchrom\tstart\tend\n", encoding="utf-8"
+            )
+            with self.assertRaisesRegex(InputValidationError, "missing columns"):
+                validate_fixture(root)
+
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            make_fixture(root)
+            _write_bgzip(
+                root / "data" / "CHILD.combined.bed.gz",
+                "##pileup-mode=count\n"
+                "#chrom\tbegin\tend\tmod_score\ttype\tcov\n"
+                "chr1\t1\t2\t75\tCG\t12\n",
+                "bed",
+            )
+            with self.assertRaisesRegex(InputValidationError, "pileup-mode=model"):
                 validate_fixture(root)
 
     def test_selected_sample_artifacts_may_not_be_null(self) -> None:

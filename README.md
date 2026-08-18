@@ -43,11 +43,12 @@ nextflow run . -entry validate -profile docker \
 
 Validation converts miniwdl outputs into Tapestry's internal canonical manifest,
 verifies the PED and exact VCF/output sample sets, checks reference and indexed
-artifact contracts, and publishes `resolved-run.json`,
+artifact headers and indexes without scanning genome-wide records, and publishes `resolved-run.json`,
 `resolved-manifest.json`, normalized inputs, and a validation report under
 `<outdir>/pipeline_info/`. It also prints the selected family, samples, WDL
 release, reference regions, coverage threshold, BigWig choice, and output
-directory. Users do not author an intermediate run configuration or manifest.
+directory. Record-level checks happen in the scientific stage that consumes each
+artifact. Users do not author an intermediate run configuration or manifest.
 
 The full workflow publishes `pipeline_info/`, `reference/`, `inheritance/`, one
 directory under `samples/` for each selected eligible pedigree member, and
