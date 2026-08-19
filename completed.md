@@ -182,6 +182,13 @@ Implemented 2026-08-17.
   a time, appends a stable-schema BED in canonical order, and writes BigWigs in
   bounded chunks. A whole-genome-versus-chromosome regression covers reversed
   region order, empty chromosomes, and haplotype-specific CpGs.
+- Founder variant reconciliation fetches the read-backed and inheritance VCFs
+  one autosome at a time and retains only compact hap-map blocks, mismatch
+  sites, and counts across chromosomes. A two-chromosome CLI fixture reuses the
+  same phase-set ID with opposite orientations to verify chromosome isolation.
+- BigWig publication collapses duplicate interval/value rows while rejecting
+  intervals with conflicting methylation values; the detailed BED retains its
+  existing overlap multiplicity.
 
 These tests establish the implemented contract on deterministic fixtures. They
 do not replace the real WDL/CEPH, cluster-runtime, hosted-CI, and

@@ -270,10 +270,10 @@ class ModelOnlyFounderTests(unittest.TestCase):
             fai.write_text("chr1\t20\t6\t20\t21\n", encoding="utf-8")
             data = pl.DataFrame(
                 {
-                    "chrom": ["chr1", "chr1"],
-                    "start": [1, 5],
-                    "end": [2, 6],
-                    "methylation_level_pat_model": [0.75, None],
+                    "chrom": ["chr1", "chr1", "chr1"],
+                    "start": [1, 1, 5],
+                    "end": [2, 2, 6],
+                    "methylation_level_pat_model": [0.75, 0.75, None],
                 },
                 schema_overrides={"methylation_level_pat_model": pl.Float64},
             )
@@ -291,6 +291,33 @@ class ModelOnlyFounderTests(unittest.TestCase):
                 self.assertEqual(bigwig.chroms(), {"chr1": 20})
                 self.assertAlmostEqual(bigwig.values("chr1", 1, 2)[0], 0.75)
                 self.assertTrue(bigwig.values("chr1", 5, 6)[0] != bigwig.values("chr1", 5, 6)[0])
+
+    def test_bigwig_rejects_conflicting_values_at_one_interval(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            fai = root / "reference.fa.fai"
+            fai.write_text("chr1\t20\t6\t20\t21\n", encoding="utf-8")
+            data = pl.DataFrame(
+                {
+                    "chrom": ["chr1", "chr1"],
+                    "start": [1, 1],
+                    "end": [2, 2],
+                    "methylation_level_pat_model": [0.75, 0.25],
+                }
+            )
+            with self.assertRaisesRegex(
+                ValueError,
+                r"Conflicting pat model BigWig values.*chr1:1-2",
+            ):
+                write_bigwig(
+                    data,
+                    "CHILD",
+                    "pat",
+                    "model",
+                    root,
+                    reference_fai=fai,
+                    reference_name="GRCh38",
+                )
 
     @unittest.skipUnless(
         shutil.which("bedGraphToBigWig"),

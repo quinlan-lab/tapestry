@@ -31,31 +31,37 @@ class FounderPhasingCliTests(unittest.TestCase):
                 root / "child.vcf.gz",
                 "##fileformat=VCFv4.2\n"
                 "##contig=<ID=chr1,length=20>\n"
+                "##contig=<ID=chr2,length=20>\n"
                 '##FORMAT=<ID=GT,Number=1,Type=String,Description="Genotype">\n'
                 '##FORMAT=<ID=PS,Number=1,Type=Integer,Description="Phase set">\n'
                 "#CHROM\tPOS\tID\tREF\tALT\tQUAL\tFILTER\tINFO\tFORMAT\tCHILD\n"
-                "chr1\t2\t.\tC\tT\t50\tPASS\t.\tGT:PS\t0|1:2\n",
+                "chr1\t2\t.\tC\tT\t50\tPASS\t.\tGT:PS\t0|1:2\n"
+                "chr2\t4\t.\tG\tA\t50\tPASS\t.\tGT:PS\t1|0:2\n",
                 "vcf",
             )
             inheritance_vcf = _bgzip(
                 root / "inheritance.vcf.gz",
                 "##fileformat=VCFv4.2\n"
                 "##contig=<ID=chr1,length=20>\n"
+                "##contig=<ID=chr2,length=20>\n"
                 '##FORMAT=<ID=GT,Number=1,Type=String,Description="Genotype">\n'
                 "#CHROM\tPOS\tID\tREF\tALT\tQUAL\tFILTER\tINFO\tFORMAT\tFATHER\tMOTHER\tCHILD\n"
-                "chr1\t2\t.\tC\tT\t50\tPASS\t.\tGT\t0/0\t1/1\t0|1\n",
+                "chr1\t2\t.\tC\tT\t50\tPASS\t.\tGT\t0/0\t1/1\t0|1\n"
+                "chr2\t4\t.\tG\tA\t50\tPASS\t.\tGT\t0/0\t1/1\t0|1\n",
                 "vcf",
             )
             blocks = root / "blocks.tsv"
             blocks.write_text(
                 "source_block_index\tsample_name\tphase_block_id\tchrom\tstart\tend\tnum_variants\n"
-                "0\tCHILD\t2\tchr1\t1\t20\t1\n",
+                "0\tCHILD\t2\tchr1\t1\t20\t1\n"
+                "1\tCHILD\t2\tchr2\t1\t20\t1\n",
                 encoding="utf-8",
             )
             iht = root / "family.iht.txt"
             iht.write_text(
                 "#chrom start end FATHER MOTHER CHILD marker_count len markers\n"
-                "chr1 0 20 0/1 2/3 0|2 1 20 marker\n",
+                "chr1 0 20 0/1 2/3 0|2 1 20 marker\n"
+                "chr2 0 20 0/1 2/3 1|3 1 20 marker\n",
                 encoding="utf-8",
             )
             beds = []
@@ -66,12 +72,17 @@ class FounderPhasingCliTests(unittest.TestCase):
                         "##pileup-mode=model\n"
                         "##min-coverage=10\n"
                         "#chrom\tbegin\tend\tmod_score\ttype\tcov\n"
-                        f"chr1\t1\t2\t{score}\tCG\t12\n",
+                        f"chr1\t1\t2\t{score}\tCG\t12\n"
+                        f"chr2\t3\t4\t{score - 10}\tCG\t12\n",
                         "bed",
                     )
                 )
             fai = root / "reference.fa.fai"
-            fai.write_text("chr1\t20\t6\t20\t21\n", encoding="utf-8")
+            fai.write_text(
+                "chr1\t20\t6\t20\t21\n"
+                "chr2\t20\t32\t20\t21\n",
+                encoding="utf-8",
+            )
             output = root / "output"
             command = [
                 sys.executable,
@@ -95,7 +106,7 @@ class FounderPhasingCliTests(unittest.TestCase):
                 "--reference_name",
                 "GRCh38",
                 "--regions",
-                "chr1",
+                "chr2,chr1",
                 "--output_dir",
                 str(output),
             ]
@@ -110,12 +121,25 @@ class FounderPhasingCliTests(unittest.TestCase):
             qc = json.loads((output / "CHILD.phasing-qc.json").read_text(encoding="utf-8"))
             self.assertEqual(qc["status"], "complete")
             self.assertEqual(qc["enabled_modes"], ["model"])
+            self.assertEqual(qc["hap_map_blocks"], 2)
+            self.assertEqual(qc["informative_sites"], 2)
             self.assertTrue((output / "CHILD.bit-vector-sites-mismatches.vcf.gz.tbi").is_file())
             self.assertTrue((output / "CHILD.dna-methylation.bed").is_file())
+            hap_map_rows = [
+                line.split("\t")
+                for line in (output / "CHILD.hap-map-blocks.bed")
+                .read_text(encoding="utf-8")
+                .splitlines()
+            ]
+            self.assertEqual(
+                [(row[0], row[3], row[4]) for row in hap_map_rows],
+                [("chr1", "0_hap1", "2_hap2"), ("chr2", "1_hap2", "3_hap1")],
+            )
             with pyBigWig.open(
                 str(output / "CHILD.dna-methylation.pat.model.GRCh38.bw")
             ) as bigwig:
                 self.assertAlmostEqual(bigwig.values("chr1", 1, 2)[0], 0.8)
+                self.assertAlmostEqual(bigwig.values("chr2", 3, 4)[0], 0.1)
 
             no_bigwig_output = root / "output-no-bigwig"
             no_bigwig_command = command[:-1] + [str(no_bigwig_output), "--no-bigwig"]

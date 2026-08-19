@@ -55,11 +55,15 @@ directory under `samples/` for each selected eligible pedigree member, and
 `results-manifest.json` beneath `<outdir>`. The manifest contains only
 published relative paths, identifies indexed artifacts, and records count mode
 as disabled. Completion prints the manifest path and per-sample status counts.
-Founder phasing reads indexed hap1/hap2 model BEDs one configured autosome at a
-time, appends rows in canonical chromosome order, and writes BigWigs in bounded
-chunks. Peak methylation memory therefore scales with the largest selected
-chromosome rather than the whole genome, without changing the output schema or
-interval-overlap semantics.
+Founder phasing fetches read-backed and inheritance VCF records one configured
+autosome at a time, retaining only compact hap-map and mismatch results between
+chromosomes. It then reads indexed hap1/hap2 model BEDs by autosome, appends rows
+in canonical order, and writes BigWigs in bounded chunks. Peak variant and
+methylation working memory therefore scale with the largest selected chromosome
+rather than the whole genome, without changing output schemas or overlap
+semantics. BigWig projection collapses repeated intervals only when their
+non-null methylation values agree; conflicting values fail explicitly rather
+than being averaged or selected arbitrarily.
 Docker, Apptainer, and Slurm profiles are defined in
 [`nextflow.config`](nextflow.config); site-specific queues and resource policy
 should be supplied by a local profile.

@@ -31,28 +31,6 @@ from util.version_sort import version_sort
 
 REFERENCE_GENOME = "hg38"
 
-def get_all_phasing_wrapper(uid, vcf_read_phased, tsv_read_phase_blocks, vcf_iht_phased, txt_iht_blocks, logger):
-    df_read_phasing = get_read_phasing(vcf_read_phased)
-    logger.info(f"Got read-based phasing data: {len(df_read_phasing)} rows, {len(df_read_phasing.columns)} columns")
-    
-    df_read_phase_blocks = get_read_phase_blocks(tsv_read_phase_blocks)
-    logger.info(f"Got read-based phase blocks: {len(df_read_phase_blocks)} rows, {len(df_read_phase_blocks.columns)} columns")
-
-    df_iht_phasing = get_iht_phasing(uid, vcf_iht_phased)
-    logger.info(f"Got inheritance-based phasing data: {len(df_iht_phasing)} rows, {len(df_iht_phasing.columns)} columns")
-
-    df_iht_blocks = get_iht_blocks(uid, txt_iht_blocks)
-    logger.info(f"Got inheritance-based phase blocks: {len(df_iht_blocks)} rows, {len(df_iht_blocks.columns)} columns")
-
-    df_all_phasing = get_all_phasing(
-        df_read_phasing, 
-        df_read_phase_blocks, 
-        df_iht_phasing, 
-        df_iht_blocks
-    )
-    
-    return df_all_phasing
-
 def phase_meth_to_founder_haps(df_meth_hap1_hap2, df_hap_map):
     if df_hap_map.is_empty() or df_meth_hap1_hap2.is_empty():
         return (
@@ -168,28 +146,42 @@ def _read_fai_chromsizes(reference_fai):
 
 
 def add_bigwig_entries(bigwig, df, parental, pb_cpg_tool_mode, chunk_size=100_000):
-    """Append sorted, non-null methylation entries in bounded Python lists."""
+    """Append one unambiguous value per interval in bounded Python lists."""
+    value_column = f"methylation_level_{parental}_{pb_cpg_tool_mode}"
+    interval_columns = ["chrom", "start", "end"]
     df_bed_graph = (
-        df 
-        .filter(pl.col(f"methylation_level_{parental}_{pb_cpg_tool_mode}").is_not_null())        
-        .select([
-            pl.col("chrom"),
-            pl.col("start"),
-            pl.col("end"),
-            pl.col(f"methylation_level_{parental}_{pb_cpg_tool_mode}")
-        ])
+        df
+        .filter(pl.col(value_column).is_not_null())
+        .select(interval_columns + [value_column])
+        .group_by(interval_columns)
+        .agg(
+            pl.col(value_column).first().alias(value_column),
+            pl.col(value_column).n_unique().alias("_distinct_values"),
+        )
         .sort(["chrom", "start", "end"])
     )
 
+    conflicts = df_bed_graph.filter(pl.col("_distinct_values") > 1)
+    if not conflicts.is_empty():
+        examples = ", ".join(
+            f"{chrom}:{start}-{end}"
+            for chrom, start, end in conflicts.select(interval_columns)
+            .head(5)
+            .iter_rows()
+        )
+        raise ValueError(
+            f"Conflicting {parental} {pb_cpg_tool_mode} BigWig values at "
+            f"{len(conflicts)} interval(s); examples: {examples}"
+        )
+
+    df_bed_graph = df_bed_graph.drop("_distinct_values")
     for offset in range(0, len(df_bed_graph), chunk_size):
         chunk = df_bed_graph.slice(offset, chunk_size)
         bigwig.addEntries(
             chunk["chrom"].to_list(),
             chunk["start"].to_list(),
             ends=chunk["end"].to_list(),
-            values=chunk[
-                f"methylation_level_{parental}_{pb_cpg_tool_mode}"
-            ].to_list(),
+            values=chunk[value_column].to_list(),
         )
 
 
@@ -294,6 +286,96 @@ def _autosome_sort_key(chrom: str) -> int:
     return number
 
 
+def _ordered_autosomes(regions: list[str]) -> list[str]:
+    ordered = sorted(regions, key=_autosome_sort_key)
+    if len(ordered) != len(set(ordered)):
+        raise ValueError("Regions contain duplicates")
+    return ordered
+
+
+def _phase_one_chromosome(
+    *,
+    uid: str,
+    chrom: str,
+    vcf_read_phased: str,
+    vcf_iht_phased: str,
+    read_phase_blocks: pl.DataFrame,
+    iht_blocks: pl.DataFrame,
+) -> tuple[pl.DataFrame, pl.DataFrame, int, int, int]:
+    """Build compact hap-map outputs while large chromosome tables are local."""
+    read_phasing = get_read_phasing(vcf_read_phased, chrom)
+    iht_phasing = get_iht_phasing(uid, vcf_iht_phased, chrom)
+    all_phasing = get_all_phasing(
+        read_phasing,
+        read_phase_blocks.filter(pl.col("chrom") == chrom),
+        iht_phasing,
+        iht_blocks.filter(pl.col("chrom") == chrom),
+    )
+    hap_map, informative_sites, mismatches = get_hap_map(all_phasing)
+    return (
+        hap_map,
+        mismatches,
+        len(informative_sites),
+        len(read_phasing),
+        len(iht_phasing),
+    )
+
+
+def build_hap_map_by_chromosome(
+    *,
+    uid: str,
+    regions: list[str],
+    vcf_read_phased: str,
+    tsv_read_phase_blocks: str,
+    vcf_iht_phased: str,
+    txt_iht_blocks: str,
+    logger: logging.Logger,
+) -> tuple[pl.DataFrame, pl.DataFrame, int]:
+    """Reconcile VCF phasing in chromosome-sized batches."""
+    ordered_regions = _ordered_autosomes(regions)
+    read_phase_blocks = get_read_phase_blocks(tsv_read_phase_blocks)
+    iht_blocks = get_iht_blocks(uid, txt_iht_blocks)
+    logger.info(
+        "Loaded %s HiPhase blocks and %s inheritance blocks",
+        len(read_phase_blocks),
+        len(iht_blocks),
+    )
+
+    hap_maps: list[pl.DataFrame] = []
+    mismatch_frames: list[pl.DataFrame] = []
+    informative_site_count = 0
+    for chrom in ordered_regions:
+        hap_map, mismatches, informative, read_hets, inheritance_hets = (
+            _phase_one_chromosome(
+                uid=uid,
+                chrom=chrom,
+                vcf_read_phased=vcf_read_phased,
+                vcf_iht_phased=vcf_iht_phased,
+                read_phase_blocks=read_phase_blocks,
+                iht_blocks=iht_blocks,
+            )
+        )
+        hap_maps.append(hap_map)
+        mismatch_frames.append(mismatches)
+        informative_site_count += informative
+        logger.info(
+            "%s: read-phased hets=%s, inheritance hets=%s, informative "
+            "sites=%s, hap-map blocks=%s, mismatches=%s",
+            chrom,
+            read_hets,
+            inheritance_hets,
+            informative,
+            len(hap_map),
+            len(mismatches),
+        )
+
+    return (
+        version_sort(pl.concat(hap_maps, rechunk=True)),
+        version_sort(pl.concat(mismatch_frames, rechunk=True)),
+        informative_site_count,
+    )
+
+
 def phase_methylation_by_chromosome(
     *,
     uid: str,
@@ -310,9 +392,7 @@ def phase_methylation_by_chromosome(
     count_hap2: str | None = None,
 ) -> tuple[list[str], int]:
     """Phase and publish methylation one chromosome at a time."""
-    ordered_regions = sorted(regions, key=_autosome_sort_key)
-    if len(ordered_regions) != len(set(ordered_regions)):
-        raise ValueError("Regions contain duplicates")
+    ordered_regions = _ordered_autosomes(regions)
     if (count_hap1 is None) != (count_hap2 is None):
         raise ValueError("Count hap1 and hap2 BEDs must be provided together")
     enabled_modes = ["model"] if count_hap1 is None else ["count", "model"]
@@ -444,12 +524,19 @@ def main():
     if not regions:
         parser.error("--regions must contain at least one autosome")
     
-    df_all_phasing = get_all_phasing_wrapper(args.uid, args.vcf_read_phased, args.tsv_read_phase_blocks, args.vcf_iht_phased, args.txt_iht_blocks, logger)
-    logger.info(f"Got all phasing data: {len(df_all_phasing)} rows, {len(df_all_phasing.columns)} columns")
-    
-    df_hap_map, df_sites, df_sites_mismatch = get_hap_map(df_all_phasing)
+    df_hap_map, df_sites_mismatch, informative_site_count = (
+        build_hap_map_by_chromosome(
+            uid=args.uid,
+            regions=regions,
+            vcf_read_phased=args.vcf_read_phased,
+            tsv_read_phase_blocks=args.tsv_read_phase_blocks,
+            vcf_iht_phased=args.vcf_iht_phased,
+            txt_iht_blocks=args.txt_iht_blocks,
+            logger=logger,
+        )
+    )
     logger.info(f"Got hap map: {len(df_hap_map)} rows, {len(df_hap_map.columns)} columns")
-    logger.info(f"Got heterozygous sites: {len(df_sites)} rows, {len(df_sites.columns)} columns")
+    logger.info("Got %s informative heterozygous sites", informative_site_count)
     logger.info(f"Got heterozygous sites where read-based and inheritance-based bit vectors don't match: {len(df_sites_mismatch)} rows, {len(df_sites_mismatch.columns)} columns")
     
     write_hap_map_blocks(df_hap_map, args.uid, "paternal", args.output_dir)
@@ -462,9 +549,7 @@ def main():
     write_bit_vector_mismatches_vcf(args.output_dir, df_sites_mismatch, logger, uid=args.uid)
     write_bit_vector_mismatches_bed(args.output_dir, df_sites_mismatch, logger, uid=args.uid)    
 
-    informative_site_count = len(df_sites)
     mismatch_site_count = len(df_sites_mismatch)
-    del df_all_phasing, df_sites
 
     enabled_modes, methylation_rows = phase_methylation_by_chromosome(
         uid=args.uid,

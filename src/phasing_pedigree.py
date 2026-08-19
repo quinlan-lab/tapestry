@@ -10,32 +10,40 @@ import bioframe as bf # https://bioframe.readthedocs.io/en/latest/index.html
 
 from phasing import stringify, is_snv_het
 
-# NUMBER_VARIANTS = 100000 # testing 
+READ_PHASING_SCHEMA = {
+    "chrom": pl.String,
+    "start": pl.Int64,
+    "end": pl.Int64,
+    "REF": pl.String,
+    "ALT": pl.String,
+    "phase_block_id": pl.String,
+    "allele_hap1": pl.String,
+    "allele_hap2": pl.String,
+}
 
-def get_read_phasing(vcf):
-    # assume vcf follows this phasing format: hap1 | hap2 
+IHT_PHASING_SCHEMA = {
+    "chrom": pl.String,
+    "start": pl.Int64,
+    "end": pl.Int64,
+    "REF": pl.String,
+    "ALT": pl.String,
+    "allele_pat": pl.String,
+    "allele_mat": pl.String,
+}
 
-    records = []
-    with closing(VCF(vcf, strict_gt=True)) as vcf_reader: # cyvcf2 handles .vcf.gz directly
-        # # assume multi-sample vcf:
-        # samples = vcf_reader.samples
-        # sample_index = samples.index(uid) if uid in samples else None
 
-        # assume single-sample vcf: 
+def get_read_phasing(vcf, chrom):
+    """Read phased heterozygous SNVs from one indexed VCF chromosome."""
+    columns = {name: [] for name in READ_PHASING_SCHEMA}
+    with closing(VCF(vcf, strict_gt=True)) as vcf_reader:
         samples = vcf_reader.samples
         assert len(samples) == 1, f"Expected single sample in VCF, found {len(samples)} samples: {samples}"
         sample_index = 0
 
-        for variant in vcf_reader:
-        # for variant in tqdm(vcf_reader, total=vcf_reader.num_records): # testing 
-        # for i, variant in enumerate(vcf_reader): # testing
-        #     if i >= NUMBER_VARIANTS: # testing
-        #         break # testing
-
+        for variant in vcf_reader(chrom):
             if not is_snv_het(variant, sample_index):
                 continue
-        
-            chrom = variant.CHROM
+
             pos = variant.POS # pos is 1-based
             start = pos - 1 
             end = pos 
@@ -67,30 +75,16 @@ def get_read_phasing(vcf):
             if not phased: 
                 continue 
 
-            records.append({ 
-                "chrom": chrom,
-                "start": start,
-                "end": end,
-                "REF": REF,
-                "ALT": ALT,
-                "phase_block_id": phase_block_id,
-                "allele_hap1": allele_hap1,
-                "allele_hap2": allele_hap2,
-            })
+            columns["chrom"].append(variant.CHROM)
+            columns["start"].append(start)
+            columns["end"].append(end)
+            columns["REF"].append(REF)
+            columns["ALT"].append(ALT)
+            columns["phase_block_id"].append(phase_block_id)
+            columns["allele_hap1"].append(allele_hap1)
+            columns["allele_hap2"].append(allele_hap2)
 
-    return pl.DataFrame(
-        records,
-        schema={
-            "chrom": pl.String,
-            "start": pl.Int64,
-            "end": pl.Int64,
-            "REF": pl.String,
-            "ALT": pl.String,
-            "phase_block_id": pl.String,
-            "allele_hap1": pl.String,
-            "allele_hap2": pl.String,
-        },
-    )
+    return pl.DataFrame(columns, schema=READ_PHASING_SCHEMA)
 
 def get_read_phase_blocks(tsv): 
     df = (
@@ -111,27 +105,19 @@ def get_read_phase_blocks(tsv):
     )
     return df
 
-def get_iht_phasing(uid, vcf): 
-    # assume vcf is phased as: "paternal | maternal" 
-    # https://quinlangroup.slack.com/archives/C08U7NLC9PZ/p1748885496941579
-
-    records = []
-    with closing(VCF(vcf, strict_gt=True)) as vcf_reader: # cyvcf2 handles .vcf.gz directly
+def get_iht_phasing(uid, vcf, chrom):
+    """Read inheritance-phased heterozygous SNVs for one chromosome."""
+    columns = {name: [] for name in IHT_PHASING_SCHEMA}
+    with closing(VCF(vcf, strict_gt=True)) as vcf_reader:
         samples = vcf_reader.samples
         if uid not in samples:
             raise ValueError(f"Sample {uid!r} is absent from inheritance VCF: {samples}")
         sample_index = samples.index(uid)
 
-        # for variant in tqdm(vcf_reader, total=vcf_reader.num_records): # testing 
-        for variant in vcf_reader:
-        # for i, variant in enumerate(vcf_reader): # testing
-        #     if i >= NUMBER_VARIANTS: # testing
-        #         break # testing
-
+        for variant in vcf_reader(chrom):
             if not is_snv_het(variant, sample_index):
                 continue
 
-            chrom = variant.CHROM
             pos = variant.POS # pos is 1-based
             start = pos - 1 
             end = pos
@@ -154,28 +140,15 @@ def get_iht_phasing(uid, vcf):
             if not phased: 
                 raise ValueError(f"Expected phased genotype, but found unphased: {genotype}")
 
-            records.append({ 
-                "chrom": chrom,
-                "start": start,
-                "end": end,
-                "REF": REF,
-                "ALT": ALT,
-                "allele_pat": allele_pat,
-                "allele_mat": allele_mat,
-            })
- 
-    return pl.DataFrame(
-        records,
-        schema={
-            "chrom": pl.String,
-            "start": pl.Int64,
-            "end": pl.Int64,
-            "REF": pl.String,
-            "ALT": pl.String,
-            "allele_pat": pl.String,
-            "allele_mat": pl.String,
-        },
-    )
+            columns["chrom"].append(variant.CHROM)
+            columns["start"].append(start)
+            columns["end"].append(end)
+            columns["REF"].append(REF)
+            columns["ALT"].append(ALT)
+            columns["allele_pat"].append(allele_pat)
+            columns["allele_mat"].append(allele_mat)
+
+    return pl.DataFrame(columns, schema=IHT_PHASING_SCHEMA)
 
 def get_iht_blocks(uid, txt):
     records = []
