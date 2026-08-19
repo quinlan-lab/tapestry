@@ -55,6 +55,11 @@ directory under `samples/` for each selected eligible pedigree member, and
 `results-manifest.json` beneath `<outdir>`. The manifest contains only
 published relative paths, identifies indexed artifacts, and records count mode
 as disabled. Completion prints the manifest path and per-sample status counts.
+Founder phasing reads indexed hap1/hap2 model BEDs one configured autosome at a
+time, appends rows in canonical chromosome order, and writes BigWigs in bounded
+chunks. Peak methylation memory therefore scales with the largest selected
+chromosome rather than the whole genome, without changing the output schema or
+interval-overlap semantics.
 Docker, Apptainer, and Slurm profiles are defined in
 [`nextflow.config`](nextflow.config); site-specific queues and resource policy
 should be supplied by a local profile.
@@ -131,6 +136,7 @@ bed_meth_count_hap1="${meth_count_read_phased_dir}/${uid}.GRCh38.haplotagged.hap
 bed_meth_count_hap2="${meth_count_read_phased_dir}/${uid}.GRCh38.haplotagged.hap2.bed.gz" # bed file of count-based methylation from aligned_bam_to_cpg_scores for hap2
 bed_meth_model_hap1="${meth_model_read_phased_dir}/${uid}.GRCh38.haplotagged.hap1.bed.gz" # bed file of model-based methylation from aligned_bam_to_cpg_scores for hap1
 bed_meth_model_hap2="${meth_model_read_phased_dir}/${uid}.GRCh38.haplotagged.hap2.bed.gz" # bed file of model-based methylation from aligned_bam_to_cpg_scores for hap2
+regions="chr1,chr2,chr3,chr4,chr5,chr6,chr7,chr8,chr9,chr10,chr11,chr12,chr13,chr14,chr15,chr16,chr17,chr18,chr19,chr20,chr21,chr22"
 
 nohup python src/phase_meth_to_founder_haps.py \
     --uid ${uid} \
@@ -142,6 +148,7 @@ nohup python src/phase_meth_to_founder_haps.py \
     --bed_meth_count_hap2 ${bed_meth_count_hap2} \
     --bed_meth_model_hap1 ${bed_meth_model_hap1} \
     --bed_meth_model_hap2 ${bed_meth_model_hap2} \
+    --regions ${regions} \
     --output_dir ${output_dir} \
     > ${output_dir}/${uid}.log 2>&1 &
 

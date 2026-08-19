@@ -7,6 +7,7 @@ work/
 work-*/
 .test-work/
 .trash
+.reasonix/
 .DS_Store
 ~ai-*.tmp
 

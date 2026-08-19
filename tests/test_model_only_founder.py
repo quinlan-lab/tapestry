@@ -2,28 +2,195 @@
 
 from __future__ import annotations
 
+import logging
 import sys
 import shutil
 import subprocess
 import tempfile
 import unittest
 from pathlib import Path
+from unittest.mock import patch
 
 import polars as pl
+from polars.testing import assert_frame_equal
 import pyBigWig
+import pysam
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src" / "util"))
 
 from hap_map_pedigree import get_hap_map  # noqa: E402
+from get_meth_hap1_hap2 import read_meth_hap1_hap2  # noqa: E402
 from phase_meth_to_founder_haps import (  # noqa: E402
     combine_count_and_model_based_methylation_levels,
+    phase_methylation_by_chromosome,
     phase_meth_to_founder_haps,
     write_bigwig,
 )
+from util.read_data import read_bed_and_header  # noqa: E402
+
+
+def _methylation_bed(path: Path, mode: str, rows: list[str]) -> Path:
+    plain = path.with_suffix("")
+    plain.write_text(
+        f"##pileup-mode={mode}\n"
+        "##min-coverage=10\n"
+        "#chrom\tbegin\tend\tmod_score\ttype\tcov\n"
+        + "\n".join(rows)
+        + "\n",
+        encoding="utf-8",
+    )
+    pysam.tabix_compress(str(plain), str(path), force=True)
+    pysam.tabix_index(str(path), preset="bed", force=True)
+    plain.unlink()
+    return path
 
 
 class ModelOnlyFounderTests(unittest.TestCase):
+    def test_chromosome_batches_match_whole_genome_in_count_and_model_modes(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            model_hap1 = _methylation_bed(
+                root / "model-hap1.bed.gz",
+                "model",
+                [
+                    "chr1\t1\t2\t80\tCG\t12",
+                    "chr2\t3\t4\t70\tCG\t13",
+                    "chr2\t6\t7\t60\tCG\t14",
+                ],
+            )
+            model_hap2 = _methylation_bed(
+                root / "model-hap2.bed.gz",
+                "model",
+                [
+                    "chr1\t1\t2\t20\tCG\t11",
+                    "chr1\t5\t6\t40\tCG\t10",
+                    "chr2\t3\t4\t30\tCG\t15",
+                ],
+            )
+            count_hap1 = _methylation_bed(
+                root / "count-hap1.bed.gz",
+                "count",
+                [
+                    "chr1\t1\t2\t75\tCG\t12",
+                    "chr2\t3\t4\t65\tCG\t13",
+                    "chr2\t6\t7\t55\tCG\t14",
+                ],
+            )
+            count_hap2 = _methylation_bed(
+                root / "count-hap2.bed.gz",
+                "count",
+                [
+                    "chr1\t1\t2\t25\tCG\t11",
+                    "chr1\t5\t6\t45\tCG\t10",
+                    "chr2\t3\t4\t35\tCG\t15",
+                ],
+            )
+            hap_map = pl.DataFrame(
+                {
+                    "chrom": ["chr1", "chr2"],
+                    "start": [0, 0],
+                    "end": [10, 10],
+                    "paternal_haplotype": ["A_hap1", "B_hap2"],
+                    "maternal_haplotype": ["C_hap2", "D_hap1"],
+                    "haplotype_concordance": [1.0, 0.9],
+                    "num_het_SNVs": [2, 3],
+                }
+            )
+            expected = combine_count_and_model_based_methylation_levels(
+                phase_meth_to_founder_haps(
+                    read_meth_hap1_hap2("count", count_hap1, count_hap2), hap_map
+                ),
+                phase_meth_to_founder_haps(
+                    read_meth_hap1_hap2("model", model_hap1, model_hap2), hap_map
+                ),
+            )
+            fai = root / "reference.fa.fai"
+            fai.write_text(
+                "chr1\t20\t6\t20\t21\n"
+                "chr2\t20\t32\t20\t21\n"
+                "chr3\t20\t58\t20\t21\n",
+                encoding="utf-8",
+            )
+            output = root / "output"
+            output.mkdir()
+            modes, rows = phase_methylation_by_chromosome(
+                uid="CHILD",
+                regions=["chr2", "chr3", "chr1"],
+                df_hap_map=hap_map,
+                model_hap1=str(model_hap1),
+                model_hap2=str(model_hap2),
+                count_hap1=str(count_hap1),
+                count_hap2=str(count_hap2),
+                output_dir=output,
+                reference_fai=str(fai),
+                reference_name="GRCh38",
+                write_bigwigs=True,
+                logger=logging.getLogger(__name__),
+            )
+            observed = read_bed_and_header(output / "CHILD.dna-methylation.bed")
+            observed = observed.cast(expected.schema).select(expected.columns)
+
+            self.assertEqual(modes, ["count", "model"])
+            self.assertEqual(rows, len(expected))
+            assert_frame_equal(
+                observed,
+                expected,
+                check_exact=False,
+                rel_tol=1e-12,
+                abs_tol=1e-12,
+            )
+            self.assertEqual(
+                observed["chrom"].to_list(), ["chr1", "chr1", "chr2", "chr2"]
+            )
+            with pyBigWig.open(
+                str(output / "CHILD.dna-methylation.pat.model.GRCh38.bw")
+            ) as bigwig:
+                self.assertAlmostEqual(bigwig.values("chr1", 1, 2)[0], 0.8)
+                self.assertAlmostEqual(bigwig.values("chr2", 3, 4)[0], 0.3)
+            with pyBigWig.open(
+                str(output / "CHILD.dna-methylation.pat.count.GRCh38.bw")
+            ) as bigwig:
+                self.assertAlmostEqual(bigwig.values("chr1", 1, 2)[0], 0.75)
+                self.assertAlmostEqual(bigwig.values("chr2", 3, 4)[0], 0.35)
+
+            no_bigwig_output = root / "no-bigwig-output"
+            no_bigwig_output.mkdir()
+            with patch(
+                "phase_meth_to_founder_haps.bf.fetch_chromsizes",
+                side_effect=AssertionError("chromsizes must not be fetched"),
+            ):
+                no_bigwig_modes, no_bigwig_rows = phase_methylation_by_chromosome(
+                    uid="CHILD",
+                    regions=["chr2", "chr3", "chr1"],
+                    df_hap_map=hap_map,
+                    model_hap1=str(model_hap1),
+                    model_hap2=str(model_hap2),
+                    count_hap1=str(count_hap1),
+                    count_hap2=str(count_hap2),
+                    output_dir=no_bigwig_output,
+                    reference_fai=None,
+                    reference_name="GRCh38",
+                    write_bigwigs=False,
+                    logger=logging.getLogger(__name__),
+                )
+            no_bigwig_observed = read_bed_and_header(
+                no_bigwig_output / "CHILD.dna-methylation.bed"
+            )
+            no_bigwig_observed = no_bigwig_observed.cast(expected.schema).select(
+                expected.columns
+            )
+            self.assertEqual(no_bigwig_modes, ["count", "model"])
+            self.assertEqual(no_bigwig_rows, len(expected))
+            self.assertEqual(list(no_bigwig_output.glob("*.bw")), [])
+            assert_frame_equal(
+                no_bigwig_observed,
+                expected,
+                check_exact=False,
+                rel_tol=1e-12,
+                abs_tol=1e-12,
+            )
+
     def test_model_only_keeps_typed_null_count_columns(self) -> None:
         model = pl.DataFrame(
             {

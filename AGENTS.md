@@ -102,7 +102,9 @@ paths; its data-creation scripts still depend on site-local source data.
 - `src/phasing_trio.py`, `src/hap_map_trio.py`: parse per-sample phase sets and
   build paternal/maternal maps for a trio.
 - `src/phase_meth_to_founder_haps.py`, `src/phase_meth_to_parent_haps.py`: main
-  phase-to-methylation programs.
+  phase-to-methylation programs. The generic founder path reads indexed model
+  BEDs and publishes methylation chromosome-by-chromosome to bound peak memory;
+  preserve canonical chromosome ordering and existing overlap multiplicity.
 - `src/expand_to_all_cpgs.py`, `src/expand_to_all_cpgs_trio.py`: final expansion,
   variant annotation, QC, output generation.
 - `src/get_meth_hap1_hap2.py`: combines hap1/hap2 pb-CpG-tools BEDs.

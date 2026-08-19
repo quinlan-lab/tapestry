@@ -468,6 +468,7 @@ process PHASE_MODEL_TO_FOUNDERS {
       --bed_meth_model_hap2 "${hap2_bed}" \\
       --reference_fai "${reference_fai}" \\
       --reference_name "${reference_name}" \\
+      --regions "${regions}" \\
       --output_dir . ${bigwig_option}
     """
 }

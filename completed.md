@@ -178,6 +178,10 @@ Implemented 2026-08-17.
 - Startup validation checks contracts, headers, indexes, samples, contigs, and
   metadata without scanning genome-wide VCF/BED records. Record-level checks
   remain with the scientific stages that already read those records.
+- Founder methylation phasing reads tabix-indexed hap1/hap2 BEDs one autosome at
+  a time, appends a stable-schema BED in canonical order, and writes BigWigs in
+  bounded chunks. A whole-genome-versus-chromosome regression covers reversed
+  region order, empty chromosomes, and haplotype-specific CpGs.
 
 These tests establish the implemented contract on deterministic fixtures. They
 do not replace the real WDL/CEPH, cluster-runtime, hosted-CI, and

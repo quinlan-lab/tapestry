@@ -1,4 +1,5 @@
 import argparse
+from contextlib import ExitStack
 import json
 import logging
 from pathlib import Path
@@ -16,8 +17,16 @@ from phasing_pedigree import (
 )
 from hap_map_pedigree import get_hap_map
 from util.hap_map import write_hap_map_blocks
-from get_meth_hap1_hap2 import read_meth_hap1_hap2
-from util.write_data import write_bed, write_bit_vector_mismatches_bed, write_bit_vector_mismatches_vcf
+from get_meth_hap1_hap2 import (
+    IndexedMethylationBed,
+    read_meth_hap1_hap2_chromosome,
+)
+from util.write_data import (
+    write_bed,
+    write_bit_vector_mismatches_bed,
+    write_bit_vector_mismatches_vcf,
+    write_header,
+)
 from util.version_sort import version_sort
 
 REFERENCE_GENOME = "hg38"
@@ -45,7 +54,7 @@ def get_all_phasing_wrapper(uid, vcf_read_phased, tsv_read_phase_blocks, vcf_iht
     return df_all_phasing
 
 def phase_meth_to_founder_haps(df_meth_hap1_hap2, df_hap_map):
-    if df_hap_map.is_empty():
+    if df_hap_map.is_empty() or df_meth_hap1_hap2.is_empty():
         return (
             df_meth_hap1_hap2
             .with_columns(
@@ -158,19 +167,8 @@ def _read_fai_chromsizes(reference_fai):
     return chromsizes
 
 
-def write_bigwig(
-    df,
-    uid,
-    parental,
-    pb_cpg_tool_mode,
-    output_dir,
-    logger=None,
-    reference_fai=None,
-    reference_name=REFERENCE_GENOME,
-):
-    """
-    Write a bigwig file for a given parental haplotype and given pb-cpg-tools pileup mode
-    """
+def add_bigwig_entries(bigwig, df, parental, pb_cpg_tool_mode, chunk_size=100_000):
+    """Append sorted, non-null methylation entries in bounded Python lists."""
     df_bed_graph = (
         df 
         .filter(pl.col(f"methylation_level_{parental}_{pb_cpg_tool_mode}").is_not_null())        
@@ -183,6 +181,30 @@ def write_bigwig(
         .sort(["chrom", "start", "end"])
     )
 
+    for offset in range(0, len(df_bed_graph), chunk_size):
+        chunk = df_bed_graph.slice(offset, chunk_size)
+        bigwig.addEntries(
+            chunk["chrom"].to_list(),
+            chunk["start"].to_list(),
+            ends=chunk["end"].to_list(),
+            values=chunk[
+                f"methylation_level_{parental}_{pb_cpg_tool_mode}"
+            ].to_list(),
+        )
+
+
+def write_bigwig(
+    df,
+    uid,
+    parental,
+    pb_cpg_tool_mode,
+    output_dir,
+    logger=None,
+    reference_fai=None,
+    reference_name=REFERENCE_GENOME,
+):
+    """Write one complete BigWig, adding entries in bounded chunks."""
+
     file_path = f"{output_dir}/{uid}.dna-methylation.{parental}.{pb_cpg_tool_mode}.{reference_name}.bw"
     if reference_fai is not None:
         chromsizes = _read_fai_chromsizes(reference_fai)
@@ -192,22 +214,14 @@ def write_bigwig(
         chromsizes = list(zip(legacy_sizes.index, legacy_sizes.values))
 
     size_by_chrom = dict(chromsizes)
-    unknown = sorted(set(df_bed_graph["chrom"].to_list()) - set(size_by_chrom))
+    unknown = sorted(set(df["chrom"].unique().to_list()) - set(size_by_chrom))
     if unknown:
         raise ValueError(f"BigWig records use contigs absent from the FASTA index: {unknown}")
 
     bigwig = pyBigWig.open(file_path, "w")
     try:
         bigwig.addHeader(chromsizes)
-        if not df_bed_graph.is_empty():
-            bigwig.addEntries(
-                df_bed_graph["chrom"].to_list(),
-                df_bed_graph["start"].to_list(),
-                ends=df_bed_graph["end"].to_list(),
-                values=df_bed_graph[
-                    f"methylation_level_{parental}_{pb_cpg_tool_mode}"
-                ].to_list(),
-            )
+        add_bigwig_entries(bigwig, df, parental, pb_cpg_tool_mode)
     finally:
         bigwig.close()
 
@@ -270,6 +284,129 @@ def combine_count_and_model_based_methylation_levels(
 
     return version_sort(df)
 
+
+def _autosome_sort_key(chrom: str) -> int:
+    if not chrom.startswith("chr") or not chrom[3:].isdigit():
+        raise ValueError(f"Expected an autosome named chrN, found {chrom!r}")
+    number = int(chrom[3:])
+    if number < 1 or number > 22:
+        raise ValueError(f"Expected chr1-chr22, found {chrom!r}")
+    return number
+
+
+def phase_methylation_by_chromosome(
+    *,
+    uid: str,
+    regions: list[str],
+    df_hap_map: pl.DataFrame,
+    model_hap1: str,
+    model_hap2: str,
+    output_dir: Path,
+    reference_fai: str | None,
+    reference_name: str,
+    write_bigwigs: bool,
+    logger: logging.Logger,
+    count_hap1: str | None = None,
+    count_hap2: str | None = None,
+) -> tuple[list[str], int]:
+    """Phase and publish methylation one chromosome at a time."""
+    ordered_regions = sorted(regions, key=_autosome_sort_key)
+    if len(ordered_regions) != len(set(ordered_regions)):
+        raise ValueError("Regions contain duplicates")
+    if (count_hap1 is None) != (count_hap2 is None):
+        raise ValueError("Count hap1 and hap2 BEDs must be provided together")
+    enabled_modes = ["model"] if count_hap1 is None else ["count", "model"]
+    output_path = output_dir / f"{uid}.dna-methylation.bed"
+    header_path = output_dir / f"{uid}.dna-methylation.bed.header"
+    output_columns: list[str] | None = None
+    total_rows = 0
+
+    chromsizes: list[tuple[str, int]] = []
+    if write_bigwigs:
+        if reference_fai is not None:
+            chromsizes = _read_fai_chromsizes(reference_fai)
+        else:
+            legacy_sizes = bf.fetch_chromsizes(db=REFERENCE_GENOME)
+            chromsizes = list(zip(legacy_sizes.index, legacy_sizes.values))
+        size_by_chrom = dict(chromsizes)
+        missing_regions = [
+            region for region in ordered_regions if region not in size_by_chrom
+        ]
+        if missing_regions:
+            raise ValueError(f"Regions are absent from the FASTA index: {missing_regions}")
+
+    with ExitStack() as stack:
+        model_hap1_reader = stack.enter_context(
+            IndexedMethylationBed(model_hap1, "model")
+        )
+        model_hap2_reader = stack.enter_context(
+            IndexedMethylationBed(model_hap2, "model")
+        )
+        count_hap1_reader = None
+        count_hap2_reader = None
+        if count_hap1 is not None and count_hap2 is not None:
+            count_hap1_reader = stack.enter_context(
+                IndexedMethylationBed(count_hap1, "count")
+            )
+            count_hap2_reader = stack.enter_context(
+                IndexedMethylationBed(count_hap2, "count")
+            )
+
+        output_handle = stack.enter_context(output_path.open("w", encoding="utf-8"))
+        bigwigs: dict[tuple[str, str], object] = {}
+        if write_bigwigs:
+            for parental in ("pat", "mat"):
+                for mode in enabled_modes:
+                    path = output_dir / (
+                        f"{uid}.dna-methylation.{parental}.{mode}."
+                        f"{reference_name}.bw"
+                    )
+                    handle = pyBigWig.open(str(path), "w")
+                    handle.addHeader(chromsizes)
+                    stack.callback(handle.close)
+                    bigwigs[(parental, mode)] = handle
+
+        for chrom in ordered_regions:
+            model = read_meth_hap1_hap2_chromosome(
+                model_hap1_reader, model_hap2_reader, chrom
+            )
+            chrom_hap_map = df_hap_map.filter(pl.col("chrom") == chrom)
+            model_founder = phase_meth_to_founder_haps(model, chrom_hap_map)
+
+            count_founder = None
+            if count_hap1_reader is not None and count_hap2_reader is not None:
+                count = read_meth_hap1_hap2_chromosome(
+                    count_hap1_reader, count_hap2_reader, chrom
+                )
+                count_founder = phase_meth_to_founder_haps(count, chrom_hap_map)
+
+            combined = combine_count_and_model_based_methylation_levels(
+                count_founder, model_founder
+            )
+            if output_columns is None:
+                output_columns = combined.columns
+                write_header(header_path, output_columns)
+            elif set(combined.columns) != set(output_columns):
+                raise ValueError(
+                    f"Output schema changed while processing {chrom}: {combined.columns}"
+                )
+            else:
+                combined = combined.select(output_columns)
+
+            combined.write_csv(output_handle, separator="\t", include_header=False)
+            total_rows += len(combined)
+            for (parental, mode), bigwig in bigwigs.items():
+                add_bigwig_entries(bigwig, combined, parental, mode)
+            logger.info(
+                "Phased %s model CpGs to founder haplotypes on %s",
+                len(combined),
+                chrom,
+            )
+
+    if output_columns is None:
+        raise ValueError("At least one autosome is required")
+    return enabled_modes, total_rows
+
 def main():
     parser = argparse.ArgumentParser(description='Phase HiFi-based DNA methylation data to founder haplotypes')
     parser.add_argument('--uid', required=True, help='Sample UID in joint-called multi-sample vcf')
@@ -283,6 +420,7 @@ def main():
     parser.add_argument('--bed_meth_model_hap2', required=True, help='Bed file of model-based methylation levels from aligned_bam_to_cpg_scores for hap2')
     parser.add_argument('--reference_fai', help='FASTA index used for BigWig chromosome lengths')
     parser.add_argument('--reference_name', default=REFERENCE_GENOME, help='Reference label used in BigWig filenames')
+    parser.add_argument('--regions', required=True, help='Comma-separated autosomes to process')
     parser.add_argument('--no-bigwig', action='store_true', help='Do not write BigWig outputs')
     parser.add_argument('--output_dir', required=True, help='Output directory')
     args = parser.parse_args()
@@ -300,7 +438,11 @@ def main():
     logger.info(f"Starting '{__file__}'")
     logger.info("Script started with the following arguments: %s", vars(args))
 
-    Path(args.output_dir).mkdir(parents=True, exist_ok=True)
+    output_dir = Path(args.output_dir)
+    output_dir.mkdir(parents=True, exist_ok=True)
+    regions = [region.strip() for region in args.regions.split(",") if region.strip()]
+    if not regions:
+        parser.error("--regions must contain at least one autosome")
     
     df_all_phasing = get_all_phasing_wrapper(args.uid, args.vcf_read_phased, args.tsv_read_phase_blocks, args.vcf_iht_phased, args.txt_iht_blocks, logger)
     logger.info(f"Got all phasing data: {len(df_all_phasing)} rows, {len(df_all_phasing.columns)} columns")
@@ -320,33 +462,29 @@ def main():
     write_bit_vector_mismatches_vcf(args.output_dir, df_sites_mismatch, logger, uid=args.uid)
     write_bit_vector_mismatches_bed(args.output_dir, df_sites_mismatch, logger, uid=args.uid)    
 
-    df_meth_count_hap1_hap2 = None
-    if args.bed_meth_count_hap1:
-        df_meth_count_hap1_hap2 = read_meth_hap1_hap2(
-            pb_cpg_tool_mode='count',
-            bed_hap1=args.bed_meth_count_hap1,
-            bed_hap2=args.bed_meth_count_hap2
-        )
-        logger.info(f"Got read-based phasing of count-based methylation levels: {len(df_meth_count_hap1_hap2)} rows, {len(df_meth_count_hap1_hap2.columns)} columns")
-    df_meth_model_hap1_hap2 = read_meth_hap1_hap2(
-        pb_cpg_tool_mode='model', 
-        bed_hap1=args.bed_meth_model_hap1, 
-        bed_hap2=args.bed_meth_model_hap2
-    )    
-    logger.info(f"Got read-based phasing of model-based methylation levels: {len(df_meth_model_hap1_hap2)} rows, {len(df_meth_model_hap1_hap2.columns)} columns")
-    
-    df_meth_count_founder_phased = None
-    if df_meth_count_hap1_hap2 is not None:
-        df_meth_count_founder_phased = phase_meth_to_founder_haps(df_meth_count_hap1_hap2, df_hap_map)
-        logger.info(f"Phased count-based methylation levels to founder haplotypes: {len(df_meth_count_founder_phased)} rows, {len(df_meth_count_founder_phased.columns)} columns")
-    df_meth_model_founder_phased = phase_meth_to_founder_haps(df_meth_model_hap1_hap2, df_hap_map)
-    logger.info(f"Phased model-based methylation levels to founder haplotypes: {len(df_meth_model_founder_phased)} rows, {len(df_meth_model_founder_phased.columns)} columns")
-    df_meth_founder_phased = combine_count_and_model_based_methylation_levels(df_meth_count_founder_phased, df_meth_model_founder_phased)
-    enabled_modes = ['model'] if df_meth_count_founder_phased is None else ['count', 'model']
-    logger.info(f"Combined enabled methylation levels {enabled_modes}: {len(df_meth_founder_phased)} rows, {len(df_meth_founder_phased.columns)} columns")
+    informative_site_count = len(df_sites)
+    mismatch_site_count = len(df_sites_mismatch)
+    del df_all_phasing, df_sites
 
-    write_bed(args.output_dir, df_meth_founder_phased, filename_stem=f"{args.uid}.dna-methylation")
-    logger.info(f"Wrote enabled methylation levels, phased to founder haplotypes, to: '{args.output_dir}'")
+    enabled_modes, methylation_rows = phase_methylation_by_chromosome(
+        uid=args.uid,
+        regions=regions,
+        df_hap_map=df_hap_map,
+        model_hap1=args.bed_meth_model_hap1,
+        model_hap2=args.bed_meth_model_hap2,
+        count_hap1=args.bed_meth_count_hap1,
+        count_hap2=args.bed_meth_count_hap2,
+        output_dir=output_dir,
+        reference_fai=args.reference_fai,
+        reference_name=args.reference_name,
+        write_bigwigs=not args.no_bigwig,
+        logger=logger,
+    )
+    logger.info(
+        "Wrote %s enabled methylation rows in chromosome-sized batches to %s",
+        methylation_rows,
+        output_dir,
+    )
 
     qc_status = "no_inheritance_phase" if df_hap_map.is_empty() else "complete"
     qc = {
@@ -354,27 +492,13 @@ def main():
         "status": qc_status,
         "enabled_modes": enabled_modes,
         "hap_map_blocks": len(df_hap_map),
-        "informative_sites": len(df_sites),
-        "mismatch_sites": len(df_sites_mismatch),
+        "informative_sites": informative_site_count,
+        "mismatch_sites": mismatch_site_count,
     }
     (Path(args.output_dir) / f"{args.uid}.phasing-qc.json").write_text(
         json.dumps(qc, indent=2, sort_keys=True) + "\n"
     )
     
-    if not args.no_bigwig:
-        for parental in ['pat', 'mat']:
-            for pb_cpg_tool_mode in enabled_modes:
-                write_bigwig(
-                    df_meth_founder_phased,
-                    args.uid,
-                    parental,
-                    pb_cpg_tool_mode,
-                    args.output_dir,
-                    logger,
-                    reference_fai=args.reference_fai,
-                    reference_name=args.reference_name,
-                )
-
     logger.info(f"Done running '{__file__}'")
 
 if __name__ == "__main__":

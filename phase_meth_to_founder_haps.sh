@@ -7,6 +7,7 @@ meth_model_read_phased_dir="/scratch/ucgd/lustre-labs/quinlan/data-shared/dna-me
 # OUTPUT DIRS 
 output_dir="/scratch/ucgd/lustre-labs/quinlan/data-shared/dna-methylation/CEPH1463.GRCh38.hifi.founder-phased" # output dir of phase_meth_to_founder_haps.py
 # output_dir="/scratch/ucgd/lustre-labs/quinlan/data-shared/dna-methylation/CEPH1463.GRCh38.hifi.founder-phased.test" # TESTING
+regions="chr1,chr2,chr3,chr4,chr5,chr6,chr7,chr8,chr9,chr10,chr11,chr12,chr13,chr14,chr15,chr16,chr17,chr18,chr19,chr20,chr21,chr22"
 
 mkdir -p ${output_dir}
 
@@ -39,6 +40,7 @@ for prefix in $prefixes; do
         --bed_meth_count_hap2 ${bed_meth_count_hap2} \
         --bed_meth_model_hap1 ${bed_meth_model_hap1} \
         --bed_meth_model_hap2 ${bed_meth_model_hap2} \
+        --regions ${regions} \
         --output_dir ${output_dir} \
         > ${output_dir}/${uid}.log 2>&1 &
 

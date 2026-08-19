@@ -94,6 +94,8 @@ class FounderPhasingCliTests(unittest.TestCase):
                 str(fai),
                 "--reference_name",
                 "GRCh38",
+                "--regions",
+                "chr1",
                 "--output_dir",
                 str(output),
             ]
