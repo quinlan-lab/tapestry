@@ -67,6 +67,8 @@ results="${fixture_root}/fixture/results/fixture"
 test -s "${results}/results-manifest.json"
 test -s "${results}/pipeline_info/versions.json"
 test -s "${results}/inheritance/fixture.pass.vcf.gz.tbi"
+test -s "${results}/visualizations/haplotype-ancestry/index.html"
+test -s "${results}/visualizations/haplotype-ancestry/bundle-manifest.json"
 test -s "${results}/samples/CHILD/CHILD.dna-methylation.all-cpgs.bed.gz.tbi"
 
 python3 -c '
@@ -76,15 +78,22 @@ import sys
 root = Path(sys.argv[1])
 document = json.loads((root / "results-manifest.json").read_text())
 listed = {"results-manifest.json"}
+bundles = set()
 stack = [document]
 while stack:
     value = stack.pop()
     if isinstance(value, dict):
         listed.update(value[key] for key in ("path", "index") if key in value)
+        bundles.update(value[key] for key in ("bundle",) if key in value)
         stack.extend(value.values())
     elif isinstance(value, list):
         stack.extend(value)
 published = {str(path.relative_to(root)) for path in root.rglob("*") if path.is_file()}
+covered_by_bundle = {
+    path for path in published
+    if any(path == bundle or path.startswith(bundle + "/") for bundle in bundles)
+}
+published -= covered_by_bundle - listed
 if listed != published:
     raise SystemExit(f"manifest mismatch: missing={sorted(listed-published)} unlisted={sorted(published-listed)}")
 ' "${results}"
@@ -95,7 +104,7 @@ awk -F '\t' '
         if ($5 != "CACHED") exit 1
     }
     END {
-        if (process_count != 9) exit 1
+        if (process_count != 10) exit 1
     }
 ' "${fixture_root}/trace.resume.tsv"
 test_succeeded=true

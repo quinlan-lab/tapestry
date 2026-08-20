@@ -411,6 +411,35 @@ process GENERATE_REFERENCE_CPGS {
 }
 
 
+process BUILD_HAPLOTYPE_ANCESTRY {
+    tag 'interactive pedigree blocks'
+    publishDir "${publish_root}/visualizations", mode: 'copy', overwrite: true
+
+    input:
+    path normalized_ped
+    path selected_samples
+    path iht
+    path validation_success
+    val publish_root
+    path visualizer
+    path pedigree_plotter
+
+    output:
+    path 'haplotype-ancestry', emit: visualization
+
+    script:
+    """
+    set -euo pipefail
+    test -s validation.success
+    python3 "${visualizer}" \\
+      --ped "${normalized_ped}" \\
+      --iht "${iht}" \\
+      --selected-samples "${selected_samples}" \\
+      --output haplotype-ancestry
+    """
+}
+
+
 process PHASE_MODEL_TO_FOUNDERS {
     tag "${sample_id}"
     publishDir "${publish_root}/samples/${sample_id}", mode: 'copy', overwrite: true
@@ -537,6 +566,7 @@ process WRITE_RESULTS_MANIFEST {
     path reference_qc
     path runtime_versions
     path sample_qc
+    path haplotype_visualization
     path validation_success
     val publish_root
     path manifest_writer
@@ -667,6 +697,15 @@ workflow {
         Channel.value(settings.publishRoot),
         Channel.value(file("${projectDir}/src/run_gtg_inheritance.py", checkIfExists: true))
     )
+    BUILD_HAPLOTYPE_ANCESTRY(
+        RUN_VALIDATION.out.normalized_ped,
+        RUN_VALIDATION.out.selected_samples,
+        RUN_GTG_INHERITANCE.out.iht,
+        validation_gate,
+        Channel.value(settings.publishRoot),
+        Channel.value(file("${projectDir}/src/plot_haplotype_ancestry.py", checkIfExists: true)),
+        Channel.value(file("${projectDir}/src/plot_pedigree_haplotypes.py", checkIfExists: true))
+    )
 
     GENERATE_REFERENCE_CPGS(
         reference_artifact,
@@ -730,6 +769,7 @@ workflow {
         GENERATE_REFERENCE_CPGS.out.reference_qc,
         CAPTURE_RUNTIME_VERSIONS.out.versions,
         completed_sample_qc,
+        BUILD_HAPLOTYPE_ANCESTRY.out.visualization,
         validation_gate,
         Channel.value(settings.publishRoot),
         Channel.value(file("${projectDir}/src/write_results_manifest.py", checkIfExists: true))

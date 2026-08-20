@@ -162,6 +162,14 @@ class AllCpgWorkflowTests(unittest.TestCase):
                 manifest["samples"]["CHILD"]["founder_phasing"]["paternal_bigwig"]["path"],
                 "samples/CHILD/CHILD.dna-methylation.pat.model.TESTREF.bw",
             )
+            self.assertEqual(
+                manifest["visualizations"]["haplotype_ancestry"]["path"],
+                "visualizations/haplotype-ancestry/index.html",
+            )
+            self.assertEqual(
+                manifest["visualizations"]["haplotype_ancestry"]["bundle"],
+                "visualizations/haplotype-ancestry",
+            )
             self.assertNotIn(str(root), output.read_text(encoding="utf-8"))
             summary = format_completion_summary(manifest, root / "published")
             self.assertIn("Tapestry completed", summary)

@@ -50,11 +50,31 @@ release, reference regions, coverage threshold, BigWig choice, and output
 directory. Record-level checks happen in the scientific stage that consumes each
 artifact. Users do not author an intermediate run configuration or manifest.
 
-The full workflow publishes `pipeline_info/`, `reference/`, `inheritance/`, one
-directory under `samples/` for each selected eligible pedigree member, and
-`results-manifest.json` beneath `<outdir>`. The manifest contains only
+The full workflow publishes `pipeline_info/`, `reference/`, `inheritance/`,
+`visualizations/`, one directory under `samples/` for each selected eligible
+pedigree member, and `results-manifest.json` beneath `<outdir>`. The manifest contains only
 published relative paths, identifies indexed artifacts, and records count mode
 as disabled. Completion prints the manifest path and per-sample status counts.
+Open `<outdir>/visualizations/haplotype-ancestry/index.html` for an offline
+interactive chromosome painting of the raw `gtg` inheritance blocks. Copy the
+entire `haplotype-ancestry/` directory when moving the visualization between
+systems. Select a
+sample to see its two haplotype stripes across every configured chromosome,
+then click a block to paint that chromosome across the PDF-style pedigree. The
+clicked founder haplotype is emphasized wherever it occurs in the family while
+unrelated blocks are muted. Adjacent map intervals with the same label are
+merged visually into one inherited run, while coordinates and labels remain
+those of the published `.iht.sorted.txt`. Blank chromosome spans mean that the
+inheritance map contains no block there, not that a particular sample lacks
+sequencing. Internal `gtg` founder codes such as `A` and `B` are displayed as
+the corresponding PED sample haplotypes (for example, `FOUNDER hap1` and
+`FOUNDER hap2`). The bundle stores one data shard per sample for the overview
+and one per chromosome for the pedigree, loading each only when requested. The
+sample selector prefixes every ID with its pedigree generation (`F0`, `F1`, and
+so on), aligning married-in individuals with their partners. Downstream targets
+have no status suffix; other pedigree members are marked `inheritance map only`,
+which describes Tapestry output status rather than sequencing status. The
+bundle can be opened locally without a web server or network connection.
 Founder phasing fetches read-backed and inheritance VCF records one configured
 autosome at a time, retaining only compact hap-map and mismatch results between
 chromosomes. It then reads indexed hap1/hap2 model BEDs by autosome, appends rows

@@ -182,6 +182,16 @@ def build_results_manifest(
                 f"{inheritance_prefix}.gtg-concordance.log"
             ),
         },
+        "visualizations": {
+            "haplotype_ancestry": {
+                "path": "visualizations/haplotype-ancestry/index.html",
+                "bundle": "visualizations/haplotype-ancestry",
+                "bundle_manifest": (
+                    "visualizations/haplotype-ancestry/bundle-manifest.json"
+                ),
+                "status": "complete",
+            }
+        },
         "selected_samples": sample_ids,
         "samples": samples,
         "disabled_output_modes": ["count"],

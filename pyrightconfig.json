@@ -15,6 +15,7 @@
         "src/normalize_joint_vcf.py",
         "src/phase_meth_to_founder_haps.py",
         "src/phasing_pedigree.py",
+        "src/plot_haplotype_ancestry.py",
         "src/run_gtg_inheritance.py",
         "src/tapestry_validate.py",
         "src/util/hap_map.py",

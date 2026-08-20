@@ -6,6 +6,7 @@ __pycache__
 work/
 work-*/
 .test-work/
+ex/haplotype-ancestry/
 .trash
 .reasonix/
 .DS_Store

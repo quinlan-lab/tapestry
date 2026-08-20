@@ -145,6 +145,7 @@ RUN gtg-ped-map --version \
     && python /opt/tapestry/src/filter_model_beds.py --help \
     && python /opt/tapestry/src/normalize_joint_vcf.py --help \
     && python /opt/tapestry/src/run_gtg_inheritance.py --help \
+    && python /opt/tapestry/src/plot_haplotype_ancestry.py --help \
     && python /opt/tapestry/src/capture_versions.py --help \
     && python /opt/tapestry/src/generate_reference_cpgs.py --help \
     && python /opt/tapestry/src/phase_meth_to_founder_haps.py --help \
