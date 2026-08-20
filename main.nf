@@ -431,6 +431,7 @@ process BUILD_HAPLOTYPE_ANCESTRY {
     """
     set -euo pipefail
     test -s validation.success
+    export PYTHONDONTWRITEBYTECODE=1
     python3 "${visualizer}" \\
       --ped "${normalized_ped}" \\
       --iht "${iht}" \\

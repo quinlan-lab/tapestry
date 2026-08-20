@@ -229,7 +229,7 @@ def build_payload(
     # Retain the explicit ancestry-cycle check for standalone visualizer use.
     for sample in samples:
         _generation(sample, people)
-    plotted_people = {
+    plotted_people: dict[str, dict[str, Any]] = {
         sample: {**people[sample]}
         for sample in samples
     }
