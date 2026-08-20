@@ -69,6 +69,9 @@ test -s "${results}/pipeline_info/versions.json"
 test -s "${results}/inheritance/fixture.pass.vcf.gz.tbi"
 test -s "${results}/visualizations/haplotype-ancestry/index.html"
 test -s "${results}/visualizations/haplotype-ancestry/bundle-manifest.json"
+test -s "${results}/visualizations/haplotype-ancestry/data/methylation/chromosomes/"*.js
+test -s "${results}/visualizations/haplotype-ancestry/transmission-qc.html"
+test -s "${results}/visualizations/haplotype-ancestry/transmission-qc.js"
 test -s "${results}/samples/CHILD/CHILD.dna-methylation.all-cpgs.bed.gz.tbi"
 
 python3 -c '
@@ -104,7 +107,7 @@ awk -F '\t' '
         if ($5 != "CACHED") exit 1
     }
     END {
-        if (process_count != 10) exit 1
+        if (process_count != 12) exit 1
     }
 ' "${fixture_root}/trace.resume.tsv"
 test_succeeded=true

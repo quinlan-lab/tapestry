@@ -704,6 +704,8 @@ def validate_miniwdl_run(
     concordance_min_depth: int = 5,
     min_coverage: int = 10,
     mismatch_window_bp: int = 50,
+    qc_discordance_threshold: float = 0.4,
+    qc_min_paired_cpgs: int = 100,
     bigwig: bool = True,
 ) -> dict[str, Any]:
     """Validate direct miniwdl inputs and publish normalized pipeline records."""
@@ -746,6 +748,10 @@ def validate_miniwdl_run(
         raise InputValidationError("--min-run-markers must be at least 1")
     if min_coverage < 1:
         raise InputValidationError("--min-coverage must be at least 1")
+    if not 0.0 <= qc_discordance_threshold <= 1.0:
+        raise InputValidationError("--qc-discordance-threshold must be in [0, 1]")
+    if qc_min_paired_cpgs < 1:
+        raise InputValidationError("--qc-min-paired-cpgs must be at least 1")
 
     _require_file(str(outputs_path), "outputs-json")
     _require_file(str(ped_path), "pedigree.ped")
@@ -801,6 +807,10 @@ def validate_miniwdl_run(
             "modes": ["model"],
             "min_coverage": min_coverage,
             "mismatch_window_bp": mismatch_window_bp,
+            "transmission_qc": {
+                "discordance_threshold": qc_discordance_threshold,
+                "minimum_paired_cpgs": qc_min_paired_cpgs,
+            },
         },
         "regions": {"include": selected_regions},
         "outputs": {"bigwig": bigwig},
@@ -927,6 +937,7 @@ def validate_miniwdl_run(
             "inheritance_concordance": config["inheritance"]["concordance"],
             "model_min_coverage": config["methylation"]["min_coverage"],
             "mismatch_window_bp": config["methylation"]["mismatch_window_bp"],
+            "transmission_qc": config["methylation"]["transmission_qc"],
             "bigwig": config["outputs"]["bigwig"],
         },
         "joint_small_variants": joint_stats,
@@ -987,6 +998,9 @@ def format_validation_summary(report: dict[str, Any]) -> str:
         f"depth>={concordance['min_depth']}",
         f"  Model minimum coverage: {report['settings']['model_min_coverage']}",
         f"  Mismatch window: {report['settings']['mismatch_window_bp']} bp",
+        "  Transmission QC: "
+        f"difference>={report['settings']['transmission_qc']['discordance_threshold']:g}, "
+        f"paired CpGs>={report['settings']['transmission_qc']['minimum_paired_cpgs']}",
         f"  BigWig: {'enabled' if report['settings']['bigwig'] else 'disabled'}",
         f"  Output: {report['output_dir']}",
     ]
@@ -1016,6 +1030,8 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--concordance-min-depth", type=int, default=5)
     parser.add_argument("--min-coverage", type=int, default=10)
     parser.add_argument("--mismatch-window-bp", type=int, default=50)
+    parser.add_argument("--qc-discordance-threshold", type=float, default=0.4)
+    parser.add_argument("--qc-min-paired-cpgs", type=int, default=100)
     parser.add_argument("--no-bigwig", action="store_true")
     parser.add_argument("--output-dir", required=True, type=Path)
     return parser
@@ -1042,6 +1058,8 @@ def main(argv: list[str] | None = None) -> int:
             concordance_min_depth=args.concordance_min_depth,
             min_coverage=args.min_coverage,
             mismatch_window_bp=args.mismatch_window_bp,
+            qc_discordance_threshold=args.qc_discordance_threshold,
+            qc_min_paired_cpgs=args.qc_min_paired_cpgs,
             bigwig=not args.no_bigwig,
         )
     except InputValidationError as exc:

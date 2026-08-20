@@ -15,6 +15,7 @@ from typing import Any
 from plotly.offline import get_plotlyjs
 
 from plot_pedigree_haplotypes import layout as pedigree_layout
+from plot_transmission_qc import TransmissionPlotError, write_qc_page
 
 
 class HaplotypePlotError(ValueError):
@@ -303,12 +304,15 @@ select { min-width: 210px; padding: 7px 30px 7px 9px; border: 1px solid #cbd2df;
 .detail strong { color: #111827; }
 .badge { display: inline-block; padding: 2px 8px; border-radius: 999px; background: #edf1f8; font-size: 12px; }
 .loading { color: #536174; }
+.nav { display: flex; gap: 8px; margin: 0 0 18px; }
+.nav a { color: #334e91; background: white; border: 1px solid #ccd5e5; border-radius: 6px; padding: 6px 10px; text-decoration: none; font-size: 13px; }
 </style>
 </head>
 <body>
 <main class="page">
   <h1>Haplotype ancestry across the pedigree</h1>
   <p class="lede">Start with one person's whole-genome chromosome painting, then click a block to paint that chromosome and inherited founder haplotype across the family.</p>
+  <nav class="nav"><a href="index.html" aria-current="page">Haplotype ancestry</a><a href="transmission-qc.html">Transmission QC</a></nav>
   <div class="controls">
     <label>Overview sample<select id="sample"></select></label>
     <span id="source" class="badge"></span>
@@ -319,7 +323,7 @@ select { min-width: 210px; padding: 7px 30px 7px 9px; border: 1px solid #cbd2df;
   <div id="overview" class="card"></div>
   <div id="detail" class="card detail"></div>
   <h2>Selected chromosome painted onto the pedigree</h2>
-  <p class="subtle">The clicked founder haplotype remains saturated and outlined wherever it occurs; other inherited haplotypes are muted.</p>
+  <p id="pedigree-note" class="subtle">The clicked founder haplotype remains saturated and outlined wherever it occurs; other inherited haplotypes are muted.</p>
   <div id="pedigree" class="card"></div>
 </main>
 <script>
@@ -335,9 +339,14 @@ colors['?'] = '#c7ccd5';
 let selectedBlock = null;
 let activeSampleBlocks = [];
 let activeChromosomeBlocks = [];
+let activeMethylationRows = [];
 const sampleCache = new Map();
 const chromosomeCache = new Map();
+const methylationCache = new Map();
 const CACHE_LIMIT = 3;
+const query = new URLSearchParams(location.search);
+const requestedSample = query.get('sample');
+const requestedChromosome = query.get('chrom');
 
 function naturalCompare(a, b) { return a.localeCompare(b, undefined, {numeric: true, sensitivity: 'base'}); }
 function labelName(label) { return DATA.labelNames[label] || `founder ${label}`; }
@@ -384,9 +393,43 @@ function loadShard(kind, key) {
     document.head.appendChild(script);
   });
 }
+function loadMethylationShard(chromosome) {
+  const cached = cacheGet(methylationCache, chromosome);
+  if (cached) return Promise.resolve(cached);
+  const file = DATA.methylationChromosomeFiles[chromosome];
+  if (!file) return Promise.resolve([]);
+  loading.textContent = `Loading ${chromosome} methylation…`;
+  return new Promise((resolve, reject) => {
+    const script = document.createElement('script');
+    script.src = file; script.async = true;
+    script.onload = () => {
+      const rows = window.TAPESTRY_METHYLATION_SHARDS?.[chromosome];
+      if (!rows) { reject(new Error(`Methylation shard did not define ${chromosome}`)); return; }
+      const decoded = rows.map(row => ({
+        sample: DATA.samples[row[0]], start: row[1], end: row[2],
+        patLabel: DATA.blockLabels[row[3]], matLabel: DATA.blockLabels[row[4]],
+        patSum: row[5], patN: row[6], matSum: row[7], matN: row[8],
+        unphasedSum: row[9], unphasedN: row[10], deltaSum: row[11], deltaN: row[12],
+        mismatchN: row[13], alleleSpecificN: row[14], cpgN: row[15]
+      }));
+      delete window.TAPESTRY_METHYLATION_SHARDS[chromosome]; script.remove();
+      cachePut(methylationCache, chromosome, decoded); loading.textContent = 'Ready';
+      resolve(decoded);
+    };
+    script.onerror = () => {
+      script.remove(); loading.textContent = 'Load failed';
+      reject(new Error(`Could not load ${file}`));
+    };
+    document.head.appendChild(script);
+  });
+}
 function chooseInitialBlock() {
   const resolved = activeSampleBlocks.filter(block => block.label !== '?');
-  selectedBlock = resolved[0] || activeSampleBlocks[0] || null;
+  const requested = requestedChromosome
+    ? resolved.find(block => block.chrom === requestedChromosome)
+      || activeSampleBlocks.find(block => block.chrom === requestedChromosome)
+    : null;
+  selectedBlock = requested || resolved[0] || activeSampleBlocks[0] || null;
 }
 
 function renderOverview() {
@@ -431,7 +474,9 @@ function renderOverview() {
       if (!block) return;
       selectedBlock = block;
       renderOverview();
-      activeChromosomeBlocks = await loadShard('chromosome', block.chrom);
+      [activeChromosomeBlocks, activeMethylationRows] = await Promise.all([
+        loadShard('chromosome', block.chrom), loadMethylationShard(block.chrom)
+      ]);
       renderPedigree();
     });
   });
@@ -462,6 +507,37 @@ function pedigreeConnectors() {
     }
   }
   return {type: 'scatter', mode: 'lines', x, y, line: {color: '#7c8491', width: 1.2}, hoverinfo: 'skip', showlegend: false};
+}
+
+function overlapsLocus(item, start, end) { return item.start < end && item.end > start; }
+function methylationAtLocus(sample, label, start, end) {
+  const result = {
+    carrier: false, selectedSum: 0, selectedN: 0, otherSum: 0, otherN: 0,
+    deltaSum: 0, deltaN: 0, mismatchN: 0, alleleSpecificN: 0, cpgN: 0
+  };
+  for (const row of activeMethylationRows) {
+    if (row.sample !== sample || !overlapsLocus(row, start, end)) continue;
+    if (row.patLabel === label) {
+      result.carrier = true;
+      result.selectedSum += row.patSum; result.selectedN += row.patN;
+      result.otherSum += row.matSum; result.otherN += row.matN;
+      result.deltaSum += row.deltaSum; result.deltaN += row.deltaN;
+    } else if (row.matLabel === label) {
+      result.carrier = true;
+      result.selectedSum += row.matSum; result.selectedN += row.matN;
+      result.otherSum += row.patSum; result.otherN += row.patN;
+      result.deltaSum -= row.deltaSum; result.deltaN += row.deltaN;
+    } else {
+      continue;
+    }
+    result.mismatchN += row.mismatchN;
+    result.alleleSpecificN += row.alleleSpecificN;
+    result.cpgN += row.cpgN;
+  }
+  result.selectedMean = result.selectedN ? result.selectedSum / result.selectedN : null;
+  result.otherMean = result.otherN ? result.otherSum / result.otherN : null;
+  result.deltaMean = result.deltaN ? result.deltaSum / result.deltaN : null;
+  return result;
 }
 
 function renderPedigree() {
@@ -497,21 +573,86 @@ function renderPedigree() {
     marker: {size: 52, color: 'white', line: {color: '#20242b', width: 1.5}, symbol: people.map(person => DATA.people[person].sex === '1' ? 'square' : 'circle')},
     customdata: people, hovertemplate: '<b>%{customdata}</b><extra></extra>', showlegend: false
   };
-  const carriers = [...new Set(chromosomeBlocks.filter(block => block.label === selectedLabel).map(block => block.sample))].sort(naturalCompare);
+  const carrierSet = new Set(chromosomeBlocks.filter(block =>
+    block.label === selectedLabel && overlapsLocus(block, selectedBlock.start, selectedBlock.end)
+  ).map(block => block.sample));
+  const carriers = [...carrierSet].sort(naturalCompare);
+  const glyphLineX = [], glyphLineY = [];
+  const selectedX = [], selectedY = [], selectedCustom = [], selectedText = [];
+  const otherX = [], otherY = [], otherCustom = [];
+  const statusX = [], statusY = [], statusText = [];
+  const glyphWidth = 1.55;
+  if (DATA.methylationSamples.length) {
+    for (const sample of carriers) {
+      const position = DATA.positions[sample];
+      if (!position) continue;
+      const glyphY = position.y - 1.7;
+      if (!DATA.methylationSamples.includes(sample)) {
+        statusX.push(position.x); statusY.push(glyphY); statusText.push('no methylation output');
+        continue;
+      }
+      const summary = methylationAtLocus(sample, selectedLabel, selectedBlock.start, selectedBlock.end);
+      if (!summary.carrier || summary.selectedMean === null) {
+        statusX.push(position.x); statusY.push(glyphY); statusText.push('no phased CpGs');
+        continue;
+      }
+      const left = position.x - glyphWidth / 2;
+      const right = position.x + glyphWidth / 2;
+      const selectedPosition = left + summary.selectedMean * glyphWidth;
+      glyphLineX.push(left, right, null); glyphLineY.push(glyphY, glyphY, null);
+      if (summary.otherMean !== null) {
+        const otherPosition = left + summary.otherMean * glyphWidth;
+        glyphLineX.push(otherPosition, selectedPosition, null);
+        glyphLineY.push(glyphY, glyphY, null);
+        otherX.push(otherPosition); otherY.push(glyphY);
+        otherCustom.push([sample, summary.otherMean, summary.otherN]);
+      }
+      selectedX.push(selectedPosition); selectedY.push(glyphY);
+      selectedText.push(`${Math.round(summary.selectedMean * 100)}%`);
+      selectedCustom.push([
+        sample, summary.selectedMean, summary.selectedN, summary.otherMean,
+        summary.otherN, summary.deltaMean, summary.deltaN, summary.mismatchN,
+        summary.alleleSpecificN, summary.cpgN
+      ]);
+    }
+  }
+  const glyphLines = {
+    type: 'scatter', mode: 'lines', x: glyphLineX, y: glyphLineY,
+    line: {color: '#9aa3b2', width: 1.4}, hoverinfo: 'skip', showlegend: false
+  };
+  const otherDots = {
+    type: 'scatter', mode: 'markers', x: otherX, y: otherY,
+    marker: {size: 8, color: 'white', line: {color: '#667085', width: 1.8}},
+    customdata: otherCustom,
+    hovertemplate: '<b>%{customdata[0]} · other haplotype</b><br>Mean model methylation: %{customdata[1]:.3f}<br>Phased CpGs: %{customdata[2]:,}<extra></extra>',
+    showlegend: false
+  };
+  const selectedDots = {
+    type: 'scatter', mode: 'markers+text', x: selectedX, y: selectedY,
+    text: selectedText, textposition: 'bottom center', textfont: {size: 8, color: '#344054'},
+    marker: {size: 9, color: colors[selectedLabel], line: {color: '#111827', width: 1}},
+    customdata: selectedCustom,
+    hovertemplate: `<b>%{customdata[0]} · ${labelName(selectedLabel)}</b><br>Mean model methylation: %{customdata[1]:.3f}<br>Phased CpGs: %{customdata[2]:,}<br>Other haplotype: %{customdata[3]:.3f} (%{customdata[4]:,} CpGs)<br>Mean paired difference: %{customdata[5]:+.3f} (%{customdata[6]:,} CpGs)<br>Mismatch-proximal CpGs: %{customdata[7]:,}<br>Allele-specific CpGs: %{customdata[8]:,}<extra></extra>`,
+    showlegend: false
+  };
+  const statusTrace = {
+    type: 'scatter', mode: 'text', x: statusX, y: statusY, text: statusText,
+    textfont: {size: 8, color: '#7c8491'}, hoverinfo: 'skip', showlegend: false
+  };
   const generations = Math.max(...people.map(person => DATA.people[person].generation), 0) + 1;
   const height = Math.max(520, generations * 185 + 150);
   pedigree.style.height = `${height}px`;
   const xs = people.map(person => DATA.positions[person].x);
   const ys = people.map(person => DATA.positions[person].y);
-  Plotly.newPlot(pedigree, [pedigreeConnectors(), nodeTrace], {
+  Plotly.newPlot(pedigree, [pedigreeConnectors(), nodeTrace, glyphLines, otherDots, selectedDots, statusTrace], {
     template: 'plotly_white', height, shapes,
     margin: {l: 35, r: 35, t: 65, b: 35},
     title: {text: `${chromosome} · ${labelName(selectedLabel)}`, x: 0.01, xanchor: 'left'},
     xaxis: {visible: false, range: [Math.min(...xs) - 1.5, Math.max(...xs) + 1.5], fixedrange: true},
-    yaxis: {visible: false, range: [Math.min(...ys) - 1.65, Math.max(...ys) + 0.8], fixedrange: true, scaleanchor: 'x', scaleratio: 1},
+    yaxis: {visible: false, range: [Math.min(...ys) - 2.05, Math.max(...ys) + 0.8], fixedrange: true, scaleanchor: 'x', scaleratio: 1},
     hovermode: 'closest', uirevision: `${chromosome}|${selectedLabel}`
   }, {responsive: true, displaylogo: false});
-  detail.innerHTML = `<strong>${selectedBlock.sample} · ${chromosome} · ${selectedBlock.phased ? (selectedBlock.hap === 1 ? 'paternal' : 'maternal') : `hap${selectedBlock.hap}`} · ${labelName(selectedLabel)}</strong> &nbsp; ${selectedBlock.start.toLocaleString()}–${selectedBlock.end.toLocaleString()} bp<br><span class="subtle">Carried on this chromosome by ${carriers.length} sample${carriers.length === 1 ? '' : 's'}: ${carriers.join(', ')}</span>`;
+  detail.innerHTML = `<strong>${selectedBlock.sample} · ${chromosome} · ${selectedBlock.phased ? (selectedBlock.hap === 1 ? 'paternal' : 'maternal') : `hap${selectedBlock.hap}`} · ${labelName(selectedLabel)}</strong> &nbsp; ${selectedBlock.start.toLocaleString()}–${selectedBlock.end.toLocaleString()} bp<br><span class="subtle">Carried at this locus by ${carriers.length} sample${carriers.length === 1 ? '' : 's'}: ${carriers.join(', ')}</span>`;
 }
 
 for (const sample of [...DATA.samples].sort(naturalCompare)) {
@@ -522,13 +663,23 @@ for (const sample of [...DATA.samples].sort(naturalCompare)) {
     : `${generation} ${sample} (inheritance map only)`;
   sampleSelect.appendChild(option);
 }
-sampleSelect.value = DATA.initialSample;
+sampleSelect.value = requestedSample && DATA.samples.includes(requestedSample)
+  ? requestedSample : DATA.initialSample;
 document.getElementById('source').textContent = `${DATA.sources.inheritanceMap} + ${DATA.sources.ped}`;
+document.getElementById('pedigree-note').textContent = DATA.methylationSamples.length
+  ? 'The clicked founder haplotype remains saturated. Beneath each carrier, the solid dot is its mean model methylation and the hollow dot is the other haplotype on a shared 0–1 scale; percentages label the selected founder.'
+  : 'The clicked founder haplotype remains saturated and outlined wherever it occurs; this bundle contains no methylation summaries.';
 async function selectSample(sample) {
   try {
     activeSampleBlocks = await loadShard('sample', sample);
     chooseInitialBlock();
-    activeChromosomeBlocks = selectedBlock ? await loadShard('chromosome', selectedBlock.chrom) : [];
+    if (selectedBlock) {
+      [activeChromosomeBlocks, activeMethylationRows] = await Promise.all([
+        loadShard('chromosome', selectedBlock.chrom), loadMethylationShard(selectedBlock.chrom)
+      ]);
+    } else {
+      activeChromosomeBlocks = []; activeMethylationRows = [];
+    }
     renderOverview(); renderPedigree();
   } catch (error) {
     detail.innerHTML = `<strong>Could not load visualization data.</strong> ${error.message}`;
@@ -557,7 +708,65 @@ def _javascript_assignment(global_name: str, key: str, value: Any) -> str:
     )
 
 
-def write_visualization(payload: dict[str, Any], output: Path) -> None:
+def _methylation_rows(
+    paths: list[Path],
+    sample_indexes: dict[str, int],
+    chromosomes: list[str],
+    label_indexes: dict[str, int],
+) -> tuple[dict[str, list[list[Any]]], list[str]]:
+    rows: dict[str, list[list[Any]]] = {chromosome: [] for chromosome in chromosomes}
+    summary_samples: list[str] = []
+    seen: set[str] = set()
+    for path in paths:
+        document = json.loads(path.read_text(encoding="utf-8"))
+        if document.get("schema_version") != 1:
+            raise HaplotypePlotError(f"{path}: unsupported methylation summary schema")
+        sample = document.get("sample_id")
+        if not isinstance(sample, str) or sample not in sample_indexes:
+            raise HaplotypePlotError(f"{path}: invalid methylation summary sample {sample!r}")
+        if sample in seen:
+            raise HaplotypePlotError(f"duplicate methylation summary for {sample!r}")
+        seen.add(sample)
+        summary_samples.append(sample)
+        chromosome_values = document.get("chromosomes")
+        if not isinstance(chromosome_values, dict):
+            raise HaplotypePlotError(f"{path}: missing methylation chromosomes")
+        for chromosome, values in chromosome_values.items():
+            if chromosome not in rows:
+                continue
+            if not isinstance(values, list):
+                raise HaplotypePlotError(f"{path}: invalid rows for {chromosome}")
+            for value in values:
+                if not isinstance(value, list) or len(value) != 15:
+                    raise HaplotypePlotError(
+                        f"{path}: invalid methylation row for {chromosome}"
+                    )
+                pat_label = "?" if value[2] is None else str(value[2])
+                mat_label = "?" if value[3] is None else str(value[3])
+                if pat_label not in label_indexes or mat_label not in label_indexes:
+                    raise HaplotypePlotError(
+                        f"{path}: unknown founder label in {chromosome} row"
+                    )
+                rows[chromosome].append(
+                    [
+                        sample_indexes[sample],
+                        int(value[0]),
+                        int(value[1]),
+                        label_indexes[pat_label],
+                        label_indexes[mat_label],
+                        *value[4:],
+                    ]
+                )
+    summary_samples.sort(key=lambda sample: sample_indexes[sample])
+    return rows, summary_samples
+
+
+def write_visualization(
+    payload: dict[str, Any],
+    output: Path,
+    methylation_summaries: list[Path] | None = None,
+    transmission_qc_summary: Path | None = None,
+) -> None:
     """Write an offline bundle with lazily loaded sample/chromosome shards."""
     output.parent.mkdir(parents=True, exist_ok=True)
     if output.exists():
@@ -571,6 +780,9 @@ def write_visualization(payload: dict[str, Any], output: Path) -> None:
         chromosome: index for index, chromosome in enumerate(chromosomes)
     }
     label_indexes = {label: index for index, label in enumerate(block_labels)}
+    methylation_rows, methylation_samples = _methylation_rows(
+        methylation_summaries or [], sample_indexes, chromosomes, label_indexes
+    )
     sample_rows: dict[str, list[list[int]]] = {sample: [] for sample in samples}
     chromosome_rows: dict[str, list[list[int]]] = {
         chromosome: [] for chromosome in chromosomes
@@ -597,6 +809,11 @@ def write_visualization(payload: dict[str, Any], output: Path) -> None:
         chromosome: f"data/chromosomes/{_filename('chromosome', chromosome)}"
         for chromosome in chromosomes
     }
+    methylation_files = {
+        chromosome: f"data/methylation/chromosomes/{_filename('methylation', chromosome)}"
+        for chromosome in chromosomes
+        if methylation_rows[chromosome]
+    }
     metadata = {
         key: value
         for key, value in payload.items()
@@ -608,6 +825,8 @@ def write_visualization(payload: dict[str, Any], output: Path) -> None:
             "blockLabels": block_labels,
             "sampleFiles": sample_files,
             "chromosomeFiles": chromosome_files,
+            "methylationChromosomeFiles": methylation_files,
+            "methylationSamples": methylation_samples,
         }
     )
 
@@ -615,6 +834,8 @@ def write_visualization(payload: dict[str, Any], output: Path) -> None:
         temporary = Path(tmp)
         (temporary / "data" / "samples").mkdir(parents=True)
         (temporary / "data" / "chromosomes").mkdir(parents=True)
+        if methylation_files:
+            (temporary / "data" / "methylation" / "chromosomes").mkdir(parents=True)
         (temporary / "index.html").write_text(HTML_TEMPLATE, encoding="utf-8")
         (temporary / "plotly.min.js").write_text(get_plotlyjs(), encoding="utf-8")
         (temporary / "metadata.js").write_text(
@@ -622,6 +843,9 @@ def write_visualization(payload: dict[str, Any], output: Path) -> None:
             + json.dumps(metadata, separators=(",", ":")).replace("</", "<\\/")
             + ";\n",
             encoding="utf-8",
+        )
+        transmission_qc = write_qc_page(
+            temporary, metadata, transmission_qc_summary
         )
         for sample, relative in sample_files.items():
             (temporary / relative).write_text(
@@ -639,6 +863,15 @@ def write_visualization(payload: dict[str, Any], output: Path) -> None:
                 ),
                 encoding="utf-8",
             )
+        for chromosome, relative in methylation_files.items():
+            (temporary / relative).write_text(
+                _javascript_assignment(
+                    "TAPESTRY_METHYLATION_SHARDS",
+                    chromosome,
+                    methylation_rows[chromosome],
+                ),
+                encoding="utf-8",
+            )
         files = sorted(
             str(path.relative_to(temporary))
             for path in temporary.rglob("*")
@@ -651,6 +884,8 @@ def write_visualization(payload: dict[str, Any], output: Path) -> None:
             "samples": samples,
             "chromosomes": chromosomes,
             "blocks": len(payload["blocks"]),
+            "methylation_samples": methylation_samples,
+            "transmission_qc_comparisons": len(transmission_qc["comparisons"]),
         }
         (temporary / "bundle-manifest.json").write_text(
             json.dumps(bundle_manifest, indent=2, sort_keys=True) + "\n",
@@ -660,12 +895,8 @@ def write_visualization(payload: dict[str, Any], output: Path) -> None:
         # publisher and cleanup run as the invoking user. Make every generated
         # directory writable across that boundary; unlinking the root-owned
         # files only requires write permission on their parent directories.
-        for directory in (
-            temporary,
-            temporary / "data",
-            temporary / "data" / "samples",
-            temporary / "data" / "chromosomes",
-        ):
+        directories = [temporary, *(path for path in temporary.rglob("*") if path.is_dir())]
+        for directory in directories:
             directory.chmod(0o777)
         temporary.replace(output)
 
@@ -679,6 +910,18 @@ def build_parser() -> argparse.ArgumentParser:
         type=Path,
         help="optional selected-samples.tsv used to choose the initial sample",
     )
+    parser.add_argument(
+        "--methylation-summaries",
+        nargs="*",
+        type=Path,
+        default=[],
+        help="optional per-sample methylation summary JSON files",
+    )
+    parser.add_argument(
+        "--transmission-qc-summary",
+        type=Path,
+        help="optional chromosome-level parent-child methylation QC JSON",
+    )
     parser.add_argument("--output", required=True, type=Path, help="output bundle directory")
     return parser
 
@@ -687,8 +930,13 @@ def main(argv: list[str] | None = None) -> int:
     args = build_parser().parse_args(argv)
     try:
         payload = build_payload(args.ped, args.iht, args.selected_samples)
-        write_visualization(payload, args.output)
-    except (HaplotypePlotError, OSError, ValueError) as exc:
+        write_visualization(
+            payload,
+            args.output,
+            args.methylation_summaries,
+            args.transmission_qc_summary,
+        )
+    except (HaplotypePlotError, TransmissionPlotError, OSError, ValueError) as exc:
         print(f"haplotype ancestry visualization failed: {exc}", file=sys.stderr)
         return 2
     print(

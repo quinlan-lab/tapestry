@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import tempfile
 import unittest
+import json
 from pathlib import Path
 
 from plot_haplotype_ancestry import build_payload, write_visualization
@@ -108,10 +109,73 @@ class HaplotypeAncestryPlotTests(unittest.TestCase):
                 encoding="utf-8",
             )
             output = root / "haplotype-ancestry"
+            methylation = root / "CHILD.methylation-summary.json"
+            methylation.write_text(
+                json.dumps(
+                    {
+                        "schema_version": 1,
+                        "sample_id": "CHILD",
+                        "chromosomes": {
+                            "chr1": [
+                                [0, 20, "A", "C", 1.5, 2, 0.5, 2, 2.0, 3, 1.0, 2, 1, 0, 3]
+                            ]
+                        },
+                    }
+                ),
+                encoding="utf-8",
+            )
+            transmission_qc = root / "transmission-qc-summary.json"
+            transmission_qc.write_text(
+                json.dumps(
+                    {
+                        "schema_version": 1,
+                        "measurement": "model-based methylation",
+                        "discordance_threshold": 0.4,
+                        "minimum_paired_cpgs": 1,
+                        "samples": ["FATHER", "CHILD"],
+                        "edges": [
+                            {
+                                "family_id": "FAM",
+                                "parent_id": "FATHER",
+                                "child_id": "CHILD",
+                                "relationship": "paternal",
+                                "has_methylation_outputs": True,
+                            }
+                        ],
+                        "comparisons": [
+                            {
+                                "family_id": "FAM",
+                                "parent_id": "FATHER",
+                                "child_id": "CHILD",
+                                "relationship": "paternal",
+                                "chromosome": "chr1",
+                                "eligible_cpgs": 3,
+                                "mismatch_excluded_cpgs": 1,
+                                "evaluated_cpgs": 2,
+                                "paired_cpgs": 2,
+                                "callable_fraction": 1.0,
+                                "agreement": 0.875,
+                                "mean_difference": 0.025,
+                                "discordant_fraction": 0.0,
+                                "specificity_cpgs": 2,
+                                "inherited_specificity": 0.3,
+                            }
+                        ],
+                        "unavailable_edges": [],
+                    }
+                ),
+                encoding="utf-8",
+            )
 
-            write_visualization(build_payload(ped, iht), output)
+            write_visualization(
+                build_payload(ped, iht), output, [methylation], transmission_qc
+            )
             document = (output / "index.html").read_text(encoding="utf-8")
             metadata = (output / "metadata.js").read_text(encoding="utf-8")
+            qc_document = (output / "transmission-qc.html").read_text(
+                encoding="utf-8"
+            )
+            qc_data = (output / "transmission-qc.js").read_text(encoding="utf-8")
 
             self.assertIn("Plotly.newPlot", document)
             self.assertIn("plotly_click", document)
@@ -122,12 +186,33 @@ class HaplotypeAncestryPlotTests(unittest.TestCase):
             self.assertNotIn("(pipeline sample)", document)
             self.assertIn("F${DATA.people[sample].generation}", document)
             self.assertIn("Blank spans have no inheritance-map block", document)
+            self.assertIn("loadMethylationShard", document)
+            self.assertIn("Mean model methylation", document)
+            self.assertIn("Transmission QC", document)
+            self.assertIn("Inherited-haplotype agreement", qc_document)
+            self.assertIn("Parent–child pair", qc_document)
+            self.assertIn("All pairs", qc_document)
+            self.assertIn("Missing transmission comparisons", qc_document)
+            self.assertIn("insufficient contributing CpGs", qc_document)
+            self.assertIn("plotly_click", qc_document)
+            self.assertIn('"agreement":0.875', qc_data)
             self.assertIn('"labelNames":{"A":"FATHER hap1"', metadata)
+            self.assertIn('"methylationSamples":["CHILD"]', metadata)
             self.assertIn('src="plotly.min.js"', document)
             self.assertIn('"initialSample":"CHILD"', metadata)
             self.assertEqual(len(list((output / "data" / "samples").glob("*.js"))), 3)
             self.assertEqual(
                 len(list((output / "data" / "chromosomes").glob("*.js"))), 1
+            )
+            self.assertEqual(
+                len(
+                    list(
+                        (output / "data" / "methylation" / "chromosomes").glob(
+                            "*.js"
+                        )
+                    )
+                ),
+                1,
             )
             self.assertGreater((output / "plotly.min.js").stat().st_size, 1_000_000)
             self.assertLess((output / "index.html").stat().st_size, 100_000)

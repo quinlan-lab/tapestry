@@ -323,6 +323,10 @@ class ValidateRunTests(unittest.TestCase):
             self.assertEqual(resolved["reference"]["name"], "GRCh38")
             self.assertEqual(resolved["inheritance"]["method"], "gtg")
             self.assertEqual(resolved["methylation"]["modes"], ["model"])
+            self.assertEqual(
+                resolved["methylation"]["transmission_qc"],
+                {"discordance_threshold": 0.4, "minimum_paired_cpgs": 100},
+            )
             self.assertEqual(resolved["regions"]["include"], ["chr1"])
             self.assertEqual(
                 resolved["upstream"]["manifest"],
@@ -459,6 +463,10 @@ class ValidateRunTests(unittest.TestCase):
                 validate_fixture(root, min_coverage=-1)
             with self.assertRaisesRegex(InputValidationError, "more than once"):
                 validate_fixture(root, samples=["CHILD", "CHILD"])
+            with self.assertRaisesRegex(InputValidationError, "must be in"):
+                validate_fixture(root, qc_discordance_threshold=1.1)
+            with self.assertRaisesRegex(InputValidationError, "at least 1"):
+                validate_fixture(root, qc_min_paired_cpgs=0)
 
 
 if __name__ == "__main__":

@@ -24,6 +24,7 @@ The FASTA index defaults to `<reference-fasta>.fai`; override it with
 selects every PED member with both parents present, and processes `chr1` through
 `chr22`. Optional overrides include `--samples CHILD1,CHILD2`,
 `--regions chr1,chr2`, `--min-coverage 10`, `--mismatch-window-bp 50`, and
+`--qc-discordance-threshold 0.4`, `--qc-min-paired-cpgs 100`, and
 `--bigwig false`. Inheritance thresholds are exposed as `--map-min-qual`,
 `--map-min-depth`, `--min-run-markers`, `--concordance-min-qual`, and
 `--concordance-min-depth`; their respective defaults are 20, 10, 10, 20, and
@@ -62,19 +63,51 @@ systems. Select a
 sample to see its two haplotype stripes across every configured chromosome,
 then click a block to paint that chromosome across the PDF-style pedigree. The
 clicked founder haplotype is emphasized wherever it occurs in the family while
-unrelated blocks are muted. Adjacent map intervals with the same label are
-merged visually into one inherited run, while coordinates and labels remain
-those of the published `.iht.sorted.txt`. Blank chromosome spans mean that the
+unrelated blocks are muted. At the clicked genomic interval, carriers with
+downstream methylation output also receive a compact 0-to-1 dumbbell: the solid
+point is mean model-based methylation on the selected founder haplotype, the
+hollow point is the other haplotype, and the percentage labels the selected
+founder. Hovering reports the means, phased-CpG counts, paired difference, and
+mismatch/allele-specific counts. Inheritance-map-only carriers and selected
+samples without phased CpGs are labeled explicitly. Adjacent map intervals with
+the same label are merged visually into one inherited run, while coordinates
+and labels remain those of the published `.iht.sorted.txt`. Blank chromosome spans mean that the
 inheritance map contains no block there, not that a particular sample lacks
 sequencing. Internal `gtg` founder codes such as `A` and `B` are displayed as
 the corresponding PED sample haplotypes (for example, `FOUNDER hap1` and
-`FOUNDER hap2`). The bundle stores one data shard per sample for the overview
-and one per chromosome for the pedigree, loading each only when requested. The
+`FOUNDER hap2`). The bundle stores one data shard per sample for the overview,
+one inheritance shard per chromosome, and one compact methylation-summary shard
+per chromosome, loading each only when requested. The
 sample selector prefixes every ID with its pedigree generation (`F0`, `F1`, and
 so on), aligning married-in individuals with their partners. Downstream targets
 have no status suffix; other pedigree members are marked `inheritance map only`,
 which describes Tapestry output status rather than sequencing status. The
 bundle can be opened locally without a web server or network connection.
+
+Use the **Transmission QC** link in that bundle to compare model-based
+methylation on parent-to-child transmitted haplotypes. The chromosome heatmap
+defaults to `1 - mean absolute difference` at exact shared CpGs and can instead
+show signed child-minus-parent difference, the fraction differing by at least
+0.4, callable fraction, or inherited specificity relative to the parent's
+non-transmitted haplotype. A parent-child selector filters both QC plots to one
+transmission pair or shows the full pedigree. Hovering reports
+paired/evaluable CpG counts and the
+number excluded near phase mismatches. A companion stacked bar plot reports the
+number of missing parent-child comparisons per chromosome, separating edges
+without methylation output for both samples from edges with fewer than the
+configured minimum number of contributing callable CpGs. Cells below that minimum are
+not assigned a concordance colour. Both members of a pedigree edge must be selected for downstream
+processing before that edge can receive a concordance estimate. These are
+measurements on genetically inherited haplotypes and do not alone establish
+inheritance of methylation state.
+
+For transmission QC, CpGs are paired only when chromosome, start, and end
+coordinates match and the child's paternal or maternal founder label occurs on
+the corresponding parent. The callable fraction is the number with both model
+measurements divided by label-matched CpGs after mismatch-window exclusions.
+Inherited specificity uses the stricter subset with child, transmitted-parent,
+and non-transmitted-parent measurements all present.
+
 Founder phasing fetches read-backed and inheritance VCF records one configured
 autosome at a time, retaining only compact hap-map and mismatch results between
 chromosomes. It then reads indexed hap1/hap2 model BEDs by autosome, appends rows

@@ -17,6 +17,8 @@ params.concordanceMinQual = 20
 params.concordanceMinDepth = 5
 params.minCoverage = 10
 params.mismatchWindowBp = 50
+params.qcDiscordanceThreshold = 0.4
+params.qcMinPairedCpgs = 100
 params.bigwig = true
 params.container = null
 
@@ -159,6 +161,8 @@ def resolveRunSettings() {
         concordanceMinDepth: params.concordanceMinDepth,
         minCoverage: params.minCoverage,
         mismatchWindowBp: params.mismatchWindowBp,
+        qcDiscordanceThreshold: params.qcDiscordanceThreshold,
+        qcMinPairedCpgs: params.qcMinPairedCpgs,
         bigwig: booleanParam(params.bigwig, 'bigwig')
     ]
     def publishRoot = configuredOutdir.normalize().toAbsolutePath().toString()
@@ -230,6 +234,8 @@ process VALIDATE_INPUTS {
       --concordance-min-depth "${direct_inputs.concordanceMinDepth}" \\
       --min-coverage "${direct_inputs.minCoverage}" \\
       --mismatch-window-bp "${direct_inputs.mismatchWindowBp}" \\
+      --qc-discordance-threshold "${direct_inputs.qcDiscordanceThreshold}" \\
+      --qc-min-paired-cpgs "${direct_inputs.qcMinPairedCpgs}" \\
       ${bigwigOption} \\
       --project-outdir "${publish_root}" \\
       --output-dir .
@@ -419,10 +425,13 @@ process BUILD_HAPLOTYPE_ANCESTRY {
     path normalized_ped
     path selected_samples
     path iht
+    path methylation_summaries
+    path transmission_qc_summary
     path validation_success
     val publish_root
     path visualizer
     path pedigree_plotter
+    path transmission_qc_plotter
 
     output:
     path 'haplotype-ancestry', emit: visualization
@@ -436,6 +445,8 @@ process BUILD_HAPLOTYPE_ANCESTRY {
       --ped "${normalized_ped}" \\
       --iht "${iht}" \\
       --selected-samples "${selected_samples}" \\
+      --methylation-summaries *.methylation-summary.json \\
+      --transmission-qc-summary "${transmission_qc_summary}" \\
       --output haplotype-ancestry
     """
 }
@@ -552,6 +563,61 @@ process EXPAND_MODEL_TO_ALL_CPGS {
       --min-coverage "${min_coverage}" \\
       --config-fingerprint "${config_fingerprint}" \\
       --output-dir .
+    """
+}
+
+
+process SUMMARIZE_HAPLOTYPE_METHYLATION {
+    tag "${sample_id}"
+
+    input:
+    tuple val(sample_id), path(all_cpg_bed), path(iht)
+    path validation_success
+    path summarizer
+
+    output:
+    tuple val(sample_id), path("${sample_id}.methylation-summary.json"), emit: summaries
+
+    script:
+    """
+    set -euo pipefail
+    export PYTHONDONTWRITEBYTECODE=1
+    test -s validation.success
+    python3 "${summarizer}" \\
+      --iht "${iht}" \\
+      --all-cpgs "${all_cpg_bed}" \\
+      --sample-id "${sample_id}" \\
+      --output "${sample_id}.methylation-summary.json"
+    """
+}
+
+
+process SUMMARIZE_TRANSMISSION_METHYLATION {
+    tag 'parent-child chromosome QC'
+
+    input:
+    path normalized_ped
+    path all_cpg_beds
+    val discordance_threshold
+    val minimum_paired_cpgs
+    path validation_success
+    path summarizer
+
+    output:
+    path 'transmission-qc-summary.json', emit: summary
+
+    script:
+    def all_cpg_args = all_cpg_beds.collect { bed -> "--all-cpgs \"${bed}\"" }.join(' ')
+    """
+    set -euo pipefail
+    export PYTHONDONTWRITEBYTECODE=1
+    test -s validation.success
+    python3 "${summarizer}" \\
+      --ped "${normalized_ped}" \\
+      ${all_cpg_args} \\
+      --discordance-threshold "${discordance_threshold}" \\
+      --minimum-paired-cpgs "${minimum_paired_cpgs}" \\
+      --output transmission-qc-summary.json
     """
 }
 
@@ -698,16 +764,6 @@ workflow {
         Channel.value(settings.publishRoot),
         Channel.value(file("${projectDir}/src/run_gtg_inheritance.py", checkIfExists: true))
     )
-    BUILD_HAPLOTYPE_ANCESTRY(
-        RUN_VALIDATION.out.normalized_ped,
-        RUN_VALIDATION.out.selected_samples,
-        RUN_GTG_INHERITANCE.out.iht,
-        validation_gate,
-        Channel.value(settings.publishRoot),
-        Channel.value(file("${projectDir}/src/plot_haplotype_ancestry.py", checkIfExists: true)),
-        Channel.value(file("${projectDir}/src/plot_pedigree_haplotypes.py", checkIfExists: true))
-    )
-
     GENERATE_REFERENCE_CPGS(
         reference_artifact,
         validation_gate,
@@ -758,6 +814,41 @@ workflow {
         validation_gate,
         Channel.value(settings.publishRoot),
         Channel.value(file("${projectDir}/src/expand_model_to_all_cpgs.py", checkIfExists: true))
+    )
+
+    methylation_summary_inputs = EXPAND_MODEL_TO_ALL_CPGS.out.all_cpg_results
+        .map { sample_id, bed, index, qc -> tuple(sample_id, bed) }
+        .combine(RUN_GTG_INHERITANCE.out.iht)
+    SUMMARIZE_HAPLOTYPE_METHYLATION(
+        methylation_summary_inputs,
+        validation_gate,
+        Channel.value(file("${projectDir}/src/summarize_haplotype_methylation.py", checkIfExists: true))
+    )
+    methylation_summary_files = SUMMARIZE_HAPLOTYPE_METHYLATION.out.summaries
+        .map { sample_id, summary -> summary }
+        .collect()
+    transmission_qc_beds = EXPAND_MODEL_TO_ALL_CPGS.out.all_cpg_results
+        .map { sample_id, bed, index, qc -> bed }
+        .collect()
+    SUMMARIZE_TRANSMISSION_METHYLATION(
+        RUN_VALIDATION.out.normalized_ped,
+        transmission_qc_beds,
+        Channel.value(settings.inputs.qcDiscordanceThreshold),
+        Channel.value(settings.inputs.qcMinPairedCpgs),
+        validation_gate,
+        Channel.value(file("${projectDir}/src/summarize_transmission_methylation.py", checkIfExists: true))
+    )
+    BUILD_HAPLOTYPE_ANCESTRY(
+        RUN_VALIDATION.out.normalized_ped,
+        RUN_VALIDATION.out.selected_samples,
+        RUN_GTG_INHERITANCE.out.iht,
+        methylation_summary_files,
+        SUMMARIZE_TRANSMISSION_METHYLATION.out.summary,
+        validation_gate,
+        Channel.value(settings.publishRoot),
+        Channel.value(file("${projectDir}/src/plot_haplotype_ancestry.py", checkIfExists: true)),
+        Channel.value(file("${projectDir}/src/plot_pedigree_haplotypes.py", checkIfExists: true)),
+        Channel.value(file("${projectDir}/src/plot_transmission_qc.py", checkIfExists: true))
     )
 
     completed_sample_qc = EXPAND_MODEL_TO_ALL_CPGS.out.all_cpg_results
