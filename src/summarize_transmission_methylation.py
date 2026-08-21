@@ -451,7 +451,7 @@ def summarize(
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--ped", required=True, type=Path)
-    parser.add_argument("--all-cpgs", nargs="*", type=Path, default=[])
+    parser.add_argument("--all-cpgs", action="extend", nargs="+", type=Path, default=[])
     parser.add_argument("--discordance-threshold", type=float, default=0.4)
     parser.add_argument("--minimum-paired-cpgs", type=int, default=100)
     parser.add_argument("--output", required=True, type=Path)

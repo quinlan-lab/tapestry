@@ -85,21 +85,24 @@ which describes Tapestry output status rather than sequencing status. The
 bundle can be opened locally without a web server or network connection.
 
 Use the **Transmission QC** link in that bundle to compare model-based
-methylation on parent-to-child transmitted haplotypes. The chromosome heatmap
-defaults to `1 - mean absolute difference` at exact shared CpGs and can instead
-show signed child-minus-parent difference, the fraction differing by at least
-0.4, callable fraction, or inherited specificity relative to the parent's
-non-transmitted haplotype. A parent-child selector filters both QC plots to one
-transmission pair or shows the full pedigree. Hovering reports
-paired/evaluable CpG counts and the
-number excluded near phase mismatches. A companion stacked bar plot reports the
-number of missing parent-child comparisons per chromosome, separating edges
-without methylation output for both samples from edges with fewer than the
-configured minimum number of contributing callable CpGs. Cells below that minimum are
-not assigned a concordance colour. Both members of a pedigree edge must be selected for downstream
-processing before that edge can receive a concordance estimate. These are
-measurements on genetically inherited haplotypes and do not alone establish
-inheritance of methylation state.
+methylation on parent-to-child transmitted haplotypes. A genome-wide overview
+keeps every pair visible and splits completeness (missing chromosomes, callable
+fraction, mismatch-excluded fraction, paired-CpG yield) from concordance
+(agreement, large-discordance fraction, inherited specificity, signed
+difference). Color is robust cohort-relative outlier severity; cells stay blank
+when fewer than four pairs can be scored. A ranked table and paternal/maternal
+strip plots surface the strongest pairs. Clicking a pair opens that pair's
+chromosomes and the chromosomes that dominate its genome-wide score. The
+chromosome heatmap can switch from outlier coloring to absolute values. Relative
+scores use all eligible pairs on the chromosome as their baseline even when the
+detail view shows one pair. Hovering reports the raw metric, cohort median,
+robust score, paired/evaluable CpG counts, and the number excluded near phase
+mismatches. A companion stacked bar plot reports missing parent-child
+comparisons per chromosome, separating edges without methylation output from
+edges with fewer than the configured minimum contributing CpGs. Both members of
+a pedigree edge must be selected for downstream processing before that edge can
+receive a concordance estimate. These are measurements on genetically inherited
+haplotypes and do not alone establish inheritance of methylation state.
 
 For transmission QC, CpGs are paired only when chromosome, start, and end
 coordinates match and the child's paternal or maternal founder label occurs on

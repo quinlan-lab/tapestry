@@ -7,7 +7,7 @@ import tempfile
 import unittest
 from pathlib import Path
 
-from summarize_transmission_methylation import TransmissionSummaryError, summarize
+from summarize_transmission_methylation import TransmissionSummaryError, main, summarize
 
 
 HEADER = (
@@ -176,6 +176,84 @@ class TransmissionMethylationSummaryTests(unittest.TestCase):
                 TransmissionSummaryError, "conflicting methylation values"
             ):
                 summarize(ped, [parent, child])
+
+    def test_summarize_emits_every_parent_child_edge_with_both_beds(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            ped = root / "family.ped"
+            ped.write_text(
+                "FAM\tGF\t0\t0\t1\t0\n"
+                "FAM\tGM\t0\t0\t2\t0\n"
+                "FAM\tPARENT\tGF\tGM\t1\t0\n"
+                "FAM\tCHILD\tPARENT\t0\t1\t0\n",
+                encoding="utf-8",
+            )
+            beds = {}
+            for sample, pat, mat in (
+                ("GF", "A", "B"),
+                ("GM", "C", "D"),
+                ("PARENT", "A", "C"),
+                ("CHILD", "A", "X"),
+            ):
+                path = root / f"{sample}.dna-methylation.all-cpgs.bed.gz"
+                _write_bed(path, [f"chr1\t0\t{pat}\t{mat}\t0.20\t0.80\tfalse"])
+                beds[sample] = path
+
+            result = summarize(ped, list(beds.values()), minimum_paired_cpgs=1)
+
+            pairs = {
+                (row["parent_id"], row["child_id"], row["relationship"])
+                for row in result["comparisons"]
+            }
+            self.assertEqual(
+                pairs,
+                {
+                    ("GF", "PARENT", "paternal"),
+                    ("GM", "PARENT", "maternal"),
+                    ("PARENT", "CHILD", "paternal"),
+                },
+            )
+            self.assertEqual(len(result["edges"]), 3)
+            self.assertEqual(result["unavailable_edges"], [])
+            self.assertEqual(
+                result["samples"], ["CHILD", "GF", "GM", "PARENT"]
+            )
+
+    def test_cli_keeps_repeated_all_cpgs_flags(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            ped = root / "family.ped"
+            ped.write_text(
+                "FAM\tP\t0\t0\t1\t0\nFAM\tC\tP\t0\t1\t0\n",
+                encoding="utf-8",
+            )
+            parent = root / "P.dna-methylation.all-cpgs.bed.gz"
+            child = root / "C.dna-methylation.all-cpgs.bed.gz"
+            _write_bed(parent, ["chr1\t0\tA\tB\t0.20\t0.80\tfalse"])
+            _write_bed(child, ["chr1\t0\tA\tC\t0.20\t0.40\tfalse"])
+            output = root / "transmission-qc-summary.json"
+
+            status = main(
+                [
+                    "--ped",
+                    str(ped),
+                    "--all-cpgs",
+                    str(parent),
+                    "--all-cpgs",
+                    str(child),
+                    "--minimum-paired-cpgs",
+                    "1",
+                    "--output",
+                    str(output),
+                ]
+            )
+
+            self.assertEqual(status, 0)
+            document = output.read_text(encoding="utf-8")
+            self.assertIn('"parent_id":"P"', document)
+            self.assertIn('"child_id":"C"', document)
+            self.assertIn("P.dna-methylation.all-cpgs.bed.gz", document)
+            self.assertIn("C.dna-methylation.all-cpgs.bed.gz", document)
 
 
 if __name__ == "__main__":

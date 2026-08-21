@@ -8,6 +8,8 @@ work-*/
 .test-work/
 ex/haplotype-ancestry/
 .trash
+ex/
+.maki
 .reasonix/
 .DS_Store
 ~ai-*.tmp
