@@ -42,6 +42,7 @@ class Cpg:
     pat_value: float | None
     mat_value: float | None
     mismatch: bool
+    ambiguous: bool = False
 
     def value_for_label(self, label: str | None) -> tuple[float | None, float | None]:
         """Return methylation on ``label`` and on the other haplotype."""
@@ -129,23 +130,35 @@ def _same_number(left: float | None, right: float | None) -> bool:
     return left is None or right is None or abs(left - right) <= 1e-12
 
 
-def _merge_duplicate(left: Cpg, right: Cpg, path: Path) -> Cpg:
+def _merge_duplicate(left: Cpg, right: Cpg) -> Cpg:
     if (left.chromosome, left.position, left.end) != (
         right.chromosome,
         right.position,
         right.end,
     ):
         raise AssertionError("duplicate merge received different CpGs")
-    if left.pat_label != right.pat_label or left.mat_label != right.mat_label:
-        raise TransmissionSummaryError(
-            f"{path}: conflicting founder labels at {left.chromosome}:{left.position}"
-        )
-    if not _same_number(left.pat_value, right.pat_value) or not _same_number(
-        left.mat_value, right.mat_value
-    ):
-        raise TransmissionSummaryError(
-            f"{path}: conflicting methylation values at "
-            f"{left.chromosome}:{left.position}"
+    labels_conflict = (
+        left.pat_label != right.pat_label or left.mat_label != right.mat_label
+    )
+    values_conflict = not _same_number(
+        left.pat_value, right.pat_value
+    ) or not _same_number(left.mat_value, right.mat_value)
+    ambiguous = left.ambiguous or right.ambiguous or labels_conflict or values_conflict
+    if ambiguous:
+        # Nested phase-set spans can assign one CpG to multiple hap-map blocks
+        # with incompatible read-haplotype orientations. There is no defensible
+        # value to select for transmission QC, so retain the coordinate as an
+        # explicitly uncallable observation instead of failing the entire run.
+        return Cpg(
+            chromosome=left.chromosome,
+            position=left.position,
+            end=left.end,
+            pat_label=None,
+            mat_label=None,
+            pat_value=None,
+            mat_value=None,
+            mismatch=left.mismatch or right.mismatch,
+            ambiguous=True,
         )
     return Cpg(
         chromosome=left.chromosome,
@@ -160,7 +173,7 @@ def _merge_duplicate(left: Cpg, right: Cpg, path: Path) -> Cpg:
 
 
 def iter_cpgs(path: Path) -> Iterator[Cpg]:
-    """Stream sorted CpGs, collapsing only identical duplicate observations."""
+    """Stream sorted CpGs, marking conflicting duplicate observations ambiguous."""
     columns: dict[str, int] | None = None
     pending: Cpg | None = None
     last_key: tuple[tuple[int, int | str], int, int] | None = None
@@ -218,7 +231,7 @@ def iter_cpgs(path: Path) -> Iterator[Cpg]:
                 current.position,
                 current.end,
             ):
-                pending = _merge_duplicate(pending, current, path)
+                pending = _merge_duplicate(pending, current)
             else:
                 yield pending
                 pending = current
@@ -257,6 +270,7 @@ def _paired_rows(parent_path: Path, child_path: Path) -> Iterator[tuple[Cpg, Cpg
 def _empty_metrics() -> dict[str, int | float]:
     return {
         "shared_cpgs": 0,
+        "ambiguous_cpgs": 0,
         "eligible_cpgs": 0,
         "mismatch_excluded_cpgs": 0,
         "paired_cpgs": 0,
@@ -282,6 +296,7 @@ def _finalize_metrics(
     mean_abs = float(values["abs_difference_sum"]) / paired if paired else None
     return {
         "shared_cpgs": int(values["shared_cpgs"]),
+        "ambiguous_cpgs": int(values["ambiguous_cpgs"]),
         "eligible_cpgs": eligible,
         "mismatch_excluded_cpgs": excluded,
         "evaluated_cpgs": evaluated,
@@ -323,6 +338,9 @@ def compare_transmission(
     for parent, child in _paired_rows(parent_path, child_path):
         values = by_chromosome.setdefault(child.chromosome, _empty_metrics())
         values["shared_cpgs"] += 1
+        if parent.ambiguous or child.ambiguous:
+            values["ambiguous_cpgs"] += 1
+            continue
         transmitted_label = (
             child.pat_label if relationship == "paternal" else child.mat_label
         )

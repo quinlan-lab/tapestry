@@ -109,7 +109,10 @@ coordinates match and the child's paternal or maternal founder label occurs on
 the corresponding parent. The callable fraction is the number with both model
 measurements divided by label-matched CpGs after mismatch-window exclusions.
 Inherited specificity uses the stricter subset with child, transmitted-parent,
-and non-transmitted-parent measurements all present.
+and non-transmitted-parent measurements all present. When overlapping hap-map
+blocks produce conflicting founder labels or methylation values at one CpG, the
+coordinate is retained in the shared-CpG count, reported as ambiguous, and
+excluded from eligible and paired transmission-QC calculations.
 
 Founder phasing fetches read-backed and inheritance VCF records one configured
 autosome at a time, retaining only compact hap-map and mismatch results between

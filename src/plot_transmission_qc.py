@@ -776,10 +776,11 @@ function render() {
         row.specificity_cpgs.toLocaleString(), row.child_id,
         stat ? fmt(stat.center, metric === 'mean_difference') : 'not available',
         fmtScore(stat?.score),
-        stat?.count || 0, definition.label, fmt(row[metric], metric === 'mean_difference')
+        stat?.count || 0, definition.label, fmt(row[metric], metric === 'mean_difference'),
+        Number(row.ambiguous_cpgs || 0).toLocaleString()
       ] : [edgeLabel(edgeDefinitions.get(edge)), chromosome, 'not available', 'not available',
            'not available', '0', '0', 'not available', '0', 'not available', '0', edgeDefinitions.get(edge).child_id,
-           'not available', 'not available', '0', definition.label, 'not available']);
+           'not available', 'not available', '0', definition.label, 'not available', '0']);
     }
     z.push(zRow); customdata.push(customRow);
   }
@@ -793,7 +794,7 @@ function render() {
     z, customdata, zmin: outlierMode ? 0 : definition.range[0], zmax: outlierMode ? 4 : definition.range[1], zmid: !outlierMode && definition.range[0] < 0 ? 0 : undefined,
     colorscale: outlierMode ? [[0,'#fff7ec'],[0.35,'#fdd49e'],[0.7,'#fc8d59'],[1,'#b30000']] : definition.colorscale, hoverongaps: false,
     colorbar: {title: {text: outlierMode ? 'Robust outlier<br>score' : definition.label, side: 'right'}},
-    hovertemplate: '<b>%{customdata[0]}</b><br>%{customdata[1]}<br>%{customdata[15]}: %{customdata[16]}<br>Chromosome median: %{customdata[12]}<br>Robust outlier score: %{customdata[13]} (%{customdata[14]} eligible pairs)<br><br>Agreement: %{customdata[2]}<br>Signed child − parent: %{customdata[3]}<br>Large-discordance fraction: %{customdata[4]}<br>Paired CpGs: %{customdata[5]} / %{customdata[6]} evaluated<br>Callable fraction: %{customdata[7]}<br>Mismatch-proximal excluded: %{customdata[8]}<br>Inherited specificity: %{customdata[9]} (%{customdata[10]} CpGs)<extra></extra>'
+    hovertemplate: '<b>%{customdata[0]}</b><br>%{customdata[1]}<br>%{customdata[15]}: %{customdata[16]}<br>Chromosome median: %{customdata[12]}<br>Robust outlier score: %{customdata[13]} (%{customdata[14]} eligible pairs)<br><br>Agreement: %{customdata[2]}<br>Signed child − parent: %{customdata[3]}<br>Large-discordance fraction: %{customdata[4]}<br>Paired CpGs: %{customdata[5]} / %{customdata[6]} evaluated<br>Callable fraction: %{customdata[7]}<br>Ambiguous duplicate CpGs excluded: %{customdata[17]}<br>Mismatch-proximal excluded: %{customdata[8]}<br>Inherited specificity: %{customdata[9]} (%{customdata[10]} CpGs)<extra></extra>'
   }], {
     template: 'plotly_white', height, margin: {l: 300, r: 105, t: 65, b: 65},
     title: {text: `${outlierMode ? 'Chromosome-relative outliers' : definition.label} · ${titleSuffix}`, x: 0.01, xanchor: 'left'},

@@ -153,7 +153,42 @@ class TransmissionMethylationSummaryTests(unittest.TestCase):
                 sorted([mother.name, child.name]),
             )
 
-    def test_conflicting_duplicate_rows_are_rejected(self) -> None:
+    def test_conflicting_duplicate_values_are_excluded_as_ambiguous(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            ped = root / "family.ped"
+            ped.write_text(
+                "FAM\tP\t0\t0\t1\t0\nFAM\tC\tP\t0\t1\t0\n",
+                encoding="utf-8",
+            )
+            parent = root / "P.dna-methylation.all-cpgs.bed.gz"
+            child = root / "C.dna-methylation.all-cpgs.bed.gz"
+            _write_bed(
+                parent,
+                [
+                    "chr1\t0\tA\tB\t0.95\t0.634\tfalse",
+                    "chr1\t0\tA\tB\t0.634\t0.95\tfalse",
+                    "chr1\t1\tA\tB\t0.4\t0.6\tfalse",
+                ],
+            )
+            _write_bed(
+                child,
+                [
+                    "chr1\t0\tA\tC\t0.2\t0.4\tfalse",
+                    "chr1\t1\tA\tC\t0.4\t0.3\tfalse",
+                ],
+            )
+
+            result = summarize(ped, [parent, child], minimum_paired_cpgs=1)
+
+            paternal = result["comparisons"][0]
+            self.assertEqual(paternal["shared_cpgs"], 2)
+            self.assertEqual(paternal["ambiguous_cpgs"], 1)
+            self.assertEqual(paternal["eligible_cpgs"], 1)
+            self.assertEqual(paternal["paired_cpgs"], 1)
+            self.assertEqual(paternal["agreement"], 1.0)
+
+    def test_conflicting_duplicate_labels_are_excluded_as_ambiguous(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary)
             ped = root / "family.ped"
@@ -167,15 +202,17 @@ class TransmissionMethylationSummaryTests(unittest.TestCase):
                 parent,
                 [
                     "chr1\t0\tA\tB\t0.2\t0.8\tfalse",
-                    "chr1\t0\tA\tB\t0.3\t0.8\tfalse",
+                    "chr1\t0\tB\tA\t0.8\t0.2\tfalse",
                 ],
             )
             _write_bed(child, ["chr1\t0\tA\tC\t0.2\t0.4\tfalse"])
 
-            with self.assertRaisesRegex(
-                TransmissionSummaryError, "conflicting methylation values"
-            ):
-                summarize(ped, [parent, child])
+            result = summarize(ped, [parent, child])
+
+            paternal = result["comparisons"][0]
+            self.assertEqual(paternal["ambiguous_cpgs"], 1)
+            self.assertEqual(paternal["eligible_cpgs"], 0)
+            self.assertEqual(paternal["paired_cpgs"], 0)
 
     def test_summarize_emits_every_parent_child_edge_with_both_beds(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:
