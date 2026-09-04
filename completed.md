@@ -107,7 +107,11 @@ outputs and are reported as `no_inheritance_phase`, not falsely as `complete`.
   only as a parity oracle. The deterministic comparison passes for chromosome
   metadata, intervals, missing values, and values to six decimal places. Its
   SHA-256 is
-  `1a1527cf364e1e572a81c7284fc9ccd2b3690b5896baa5b57399864f85ad7771`.
+  `43c1f8f2aecf2647dc02ec15a8b8c43af9c2639ab850ffbb717e0c5cb18634da`.
+  UCSC republishes this unversioned `linux.x86_64` binary without changing its
+  self-reported version, so the pinned digest was refreshed (previous digest
+  `1a1527cf364e1e572a81c7284fc9ccd2b3690b5896baa5b57399864f85ad7771` no longer
+  matches the served bytes).
 
 ## Completed milestones
 

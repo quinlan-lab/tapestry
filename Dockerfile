@@ -1,7 +1,7 @@
 ARG RUST_IMAGE=rust:1.95.0-bookworm
 ARG PYTHON_IMAGE=python:3.11.13-slim-bookworm
 ARG BEDGRAPH_TO_BIGWIG_URL=https://hgdownload.soe.ucsc.edu/admin/exe/linux.x86_64/bedGraphToBigWig
-ARG BEDGRAPH_TO_BIGWIG_SHA256=1a1527cf364e1e572a81c7284fc9ccd2b3690b5896baa5b57399864f85ad7771
+ARG BEDGRAPH_TO_BIGWIG_SHA256=43c1f8f2aecf2647dc02ec15a8b8c43af9c2639ab850ffbb717e0c5cb18634da
 
 FROM ${RUST_IMAGE} AS gtg-builder
 

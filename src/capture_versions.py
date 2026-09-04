@@ -14,7 +14,7 @@ from typing import Any
 
 GTG_COMMIT = "e12aca6b49ee7208952467db4a2a9e2f79b98efb"
 BEDGRAPH_TO_BIGWIG_SHA256 = (
-    "1a1527cf364e1e572a81c7284fc9ccd2b3690b5896baa5b57399864f85ad7771"
+    "43c1f8f2aecf2647dc02ec15a8b8c43af9c2639ab850ffbb717e0c5cb18634da"
 )
 
 
