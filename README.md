@@ -1,13 +1,15 @@
 # tapestry
 
-A pipeline to phase DNA methylation from HiFi reads in a human pedigree (including, as a special case, a trio) to the haplotypes of the pedigree's founders. 
+Phase DNA methylation from PacBio HiFi reads onto founder haplotypes in a human
+pedigree, including trios.
 
 ## Generic WDL-output workflow
 
-The generic Nextflow workflow consumes a completed miniwdl run of the PacBio
-HiFi human WGS `family` WDL. It supports GRCh38 autosomes, pedigree mode, model
-methylation, and WDL v3.3.0 or v3.3.1. It does not call HiPhase or
-pb-CpG-tools: those products come from the WDL.
+Run Tapestry on completed miniwdl outputs from the PacBio HiFi human WGS
+`family` WDL **v3.3.0 or v3.3.1**, a six-column PED, and an indexed **GRCh38**
+FASTA. This Nextflow workflow uses the WDL's HiPhase and model methylation
+outputs; it processes `chr1`–`chr22` and selects PED members with both parents
+present by default.
 
 ```bash
 nextflow run . -profile slurm,apptainer \
@@ -19,125 +21,79 @@ nextflow run . -profile slurm,apptainer \
   -resume
 ```
 
-The FASTA index defaults to `<reference-fasta>.fai`; override it with
-`--reference-index`. Tapestry detects the WDL release from `workflow_version`,
-selects every PED member with both parents present, and processes `chr1` through
-`chr22`. Optional overrides include `--samples CHILD1,CHILD2`,
-`--regions chr1,chr2`, `--min-coverage 10`, `--mismatch-window-bp 50`, and
-`--qc-discordance-threshold 0.4`, `--qc-min-paired-cpgs 100`, and
-`--bigwig false`. Inheritance thresholds are exposed as `--map-min-qual`,
-`--map-min-depth`, `--min-run-markers`, `--concordance-min-qual`, and
-`--concordance-min-depth`; their respective defaults are 20, 10, 10, 20, and
-5. Validation prints every effective scientific setting and records it in
-`pipeline_info/resolved-run.json`.
+Use `-profile docker` for local Docker runs. The [Dockerfile](Dockerfile)
+pins runtime dependencies; pass `--container <image-or-digest>` to use your
+built image until a release digest is published. Configure site-specific queues
+and resources through a local profile; see [nextflow.config](nextflow.config).
+A minimal PED is in [examples/generic](examples/generic/).
 
-The full command always validates before starting scientific processes. For an
-optional preflight that stops after validation, add `-entry validate`:
+### Options and validation
 
-```bash
-nextflow run . -entry validate -profile docker \
-  --outputs-json /path/to/miniwdl-run/outputs.json \
-  --ped /path/to/family.ped \
-  --reference-fasta /path/to/GRCh38.fa \
-  --outdir /path/to/tapestry-results
-```
+| Option | Default / purpose |
+|---|---|
+| `--samples CHILD1,CHILD2` | All PED members with both parents present |
+| `--regions chr1,chr2` | All GRCh38 autosomes |
+| `--reference-index PATH` | `<reference-fasta>.fai` |
+| `--min-coverage` | `10` |
+| `--mismatch-window-bp` | `50` |
+| `--bigwig false` | Disable BigWigs; enabled by default |
+| `--map-min-qual`, `--map-min-depth`, `--min-run-markers` | `20`, `10`, `10` |
+| `--concordance-min-qual`, `--concordance-min-depth` | `20`, `5` |
+| `--qc-discordance-threshold`, `--qc-min-paired-cpgs` | `0.4`, `100` |
 
-Validation converts miniwdl outputs into Tapestry's internal canonical manifest,
-verifies the PED and exact VCF/output sample sets, checks reference and indexed
-artifact headers and indexes without scanning genome-wide records, and publishes `resolved-run.json`,
-`resolved-manifest.json`, normalized inputs, and a validation report under
-`<outdir>/pipeline_info/`. It also prints the selected family, samples, WDL
-release, reference regions, coverage threshold, BigWig choice, and output
-directory. Record-level checks happen in the scientific stage that consumes each
-artifact. Users do not author an intermediate run configuration or manifest.
+Every run validates inputs first, checking the PED, sample sets, WDL release,
+reference, artifact headers/indexes, and output collisions. Add `-entry validate`
+to the same command for an optional preflight. Effective settings are printed
+and saved in `pipeline_info/resolved-run.json`; canonical inputs and the
+validation report are saved alongside it. No intermediate manifest is required
+from the user.
 
-The full workflow publishes `pipeline_info/`, `reference/`, `inheritance/`,
-`visualizations/`, one directory under `samples/` for each selected eligible
-pedigree member, and `results-manifest.json` beneath `<outdir>`. The manifest contains only
-published relative paths, identifies indexed artifacts, and records count mode
-as disabled. Completion prints the manifest path and per-sample status counts.
-Open `<outdir>/visualizations/haplotype-ancestry/index.html` for an offline
-interactive chromosome painting of the raw `gtg` inheritance blocks. Copy the
-entire `haplotype-ancestry/` directory when moving the visualization between
-systems. Select a
-sample to see its two haplotype stripes across every configured chromosome,
-then click a block to paint that chromosome across the PDF-style pedigree. The
-clicked founder haplotype is emphasized wherever it occurs in the family while
-unrelated blocks are muted. At the clicked genomic interval, carriers with
-downstream methylation output also receive a compact 0-to-1 dumbbell: the solid
-point is mean model-based methylation on the selected founder haplotype, the
-hollow point is the other haplotype, and the percentage labels the selected
-founder. Hovering reports the means, phased-CpG counts, paired difference, and
-mismatch/allele-specific counts. Inheritance-map-only carriers and selected
-samples without phased CpGs are labeled explicitly. Adjacent map intervals with
-the same label are merged visually into one inherited run, while coordinates
-and labels remain those of the published `.iht.sorted.txt`. Blank chromosome spans mean that the
-inheritance map contains no block there, not that a particular sample lacks
-sequencing. Internal `gtg` founder codes such as `A` and `B` are displayed as
-the corresponding PED sample haplotypes (for example, `FOUNDER hap1` and
-`FOUNDER hap2`). The bundle stores one data shard per sample for the overview,
-one inheritance shard per chromosome, and one compact methylation-summary shard
-per chromosome, loading each only when requested. The
-sample selector prefixes every ID with its pedigree generation (`F0`, `F1`, and
-so on), aligning married-in individuals with their partners. Downstream targets
-have no status suffix; other pedigree members are marked `inheritance map only`,
-which describes Tapestry output status rather than sequencing status. The
-bundle can be opened locally without a web server or network connection.
+### Results
 
-Use the **Transmission QC** link in that bundle to compare model-based
-methylation on parent-to-child transmitted haplotypes. A genome-wide overview
-keeps every pair visible and splits completeness (missing chromosomes, callable
-fraction, mismatch-excluded fraction, paired-CpG yield) from concordance
-(agreement, large-discordance fraction, inherited specificity, signed
-difference). Color is robust cohort-relative outlier severity; cells stay blank
-when fewer than four pairs can be scored. A ranked table and paternal/maternal
-strip plots surface the strongest pairs. Clicking a pair opens that pair's
-chromosomes and the chromosomes that dominate its genome-wide score. The
-chromosome heatmap can switch from outlier coloring to absolute values. Relative
-scores use all eligible pairs on the chromosome as their baseline even when the
-detail view shows one pair. Hovering reports the raw metric, cohort median,
-robust score, paired/evaluable CpG counts, and the number excluded near phase
-mismatches. A companion stacked bar plot reports missing parent-child
-comparisons per chromosome, separating edges without methylation output from
-edges with fewer than the configured minimum contributing CpGs. Both members of
-a pedigree edge must be selected for downstream processing before that edge can
-receive a concordance estimate. These are measurements on genetically inherited
-haplotypes and do not alone establish inheritance of methylation state.
+Under `--outdir`, Tapestry writes:
 
-For transmission QC, CpGs are paired only when chromosome, start, and end
-coordinates match and the child's paternal or maternal founder label occurs on
-the corresponding parent. The callable fraction is the number with both model
-measurements divided by label-matched CpGs after mismatch-window exclusions.
-Inherited specificity uses the stricter subset with child, transmitted-parent,
-and non-transmitted-parent measurements all present. When overlapping hap-map
-blocks produce conflicting founder labels or methylation values at one CpG, the
-coordinate is retained in the shared-CpG count, reported as ambiguous, and
-excluded from eligible and paired transmission-QC calculations.
+- `samples/`: per-sample all-CpG BEDs, indexes, BigWigs, and QC.
+- `reference/` and `inheritance/`: reference CpGs and inheritance-phasing outputs.
+- `visualizations/`: offline haplotype ancestry and transmission QC views.
+- `pipeline_info/`: validated inputs, settings, and provenance.
+- `results-manifest.json`: published relative paths, indexes, and sample statuses.
 
-Founder phasing fetches read-backed and inheritance VCF records one configured
-autosome at a time, retaining only compact hap-map and mismatch results between
-chromosomes. It then reads indexed hap1/hap2 model BEDs by autosome, appends rows
-in canonical order, and writes BigWigs in bounded chunks. Peak variant and
-methylation working memory therefore scale with the largest selected chromosome
-rather than the whole genome, without changing output schemas or overlap
-semantics. BigWig projection collapses repeated intervals only when their
-non-null methylation values agree; conflicting values fail explicitly rather
-than being averaged or selected arbitrarily.
-Docker, Apptainer, and Slurm profiles are defined in
-[`nextflow.config`](nextflow.config); site-specific queues and resource policy
-should be supplied by a local profile.
-Nextflow's trace, report, timeline, and DAG are written to
-`.nextflow-reports/` in the launch directory and overwritten safely on a
-`-resume` run; standard `-with-*` options can redirect them.
+The generic workflow uses model methylation only; count mode is disabled.
+Completion prints the manifest path and sample status counts. Nextflow execution
+reports go to `.nextflow-reports/` in the launch directory; `-with-*` options
+can redirect them. Processing is chromosome-wise to bound memory. BigWigs
+collapse repeated intervals only when their non-null values agree; conflicts fail.
 
-The OCI image defined by [`Dockerfile`](Dockerfile) contains the pinned Python
-environment, bcftools/tabix, and `gtg` commit
-`e12aca6b49ee7208952467db4a2a9e2f79b98efb`. It also contains a
-checksum-pinned UCSC `bedGraphToBigWig` binary solely as the parity oracle for
-the `pyBigWig` migration test; production tracks use `pyBigWig`. Override the development image with
-`--container <image-or-digest>` until a release digest is published.
+### Explore ancestry and transmission QC
 
-## Dependencies
+Open `<outdir>/visualizations/haplotype-ancestry/index.html` locally. Select a
+sample and click an inheritance block to trace its founder haplotype through the
+pedigree and compare mean methylation on the two haplotypes. Hover for counts
+and QC details. Blank spans indicate missing inheritance blocks;
+`inheritance map only` indicates no downstream methylation output. Neither
+label describes sequencing coverage. Copy the entire `haplotype-ancestry/`
+directory to move the offline visualization.
+
+The **Transmission QC** link compares parent–child methylation, separating
+completeness from concordance. Select both members for downstream processing to
+obtain a concordance estimate. Click a pair for chromosome details and hover for
+metrics and excluded-CpG counts. Colors show cohort-relative outlier severity;
+scores stay blank when fewer than four pairs are available.
+
+CpGs are paired by exact coordinates and matching transmitted founder labels,
+excluding mismatch windows and ambiguous labels or values. Callable fraction
+uses label-matched CpGs after exclusions as its denominator; inherited
+specificity additionally requires a measurement on the parent's non-transmitted
+haplotype. Ambiguous coordinates remain in shared-CpG counts but are excluded
+from eligible and paired counts. These comparisons alone do not establish
+inheritance of methylation state.
+
+## Legacy shell workflows
+
+These scripts use site-specific paths and tool installations. For completed WDL
+outputs, use the Nextflow workflow above.
+
+### Dependencies
 
 The generic workflow obtains its tools from the configured container. The
 legacy shell workflows below assume the following command-line tools are in the
@@ -148,7 +104,7 @@ user's PATH:
 * `hiphase` (https://github.com/PacificBiosciences/HiPhase)
 * `aligned_bam_to_cpg_scores` (https://github.com/PacificBiosciences/pb-CpG-tools)
 
-## Installation
+### Installation
 
 Install the python dependencies:
 
@@ -217,37 +173,8 @@ nohup python src/phase_meth_to_founder_haps.py \
 
 ```
 
-This will produce a log file that looks like: 
-
-```
-2025-10-06 14:41:36 - INFO - Got read-based phasing data: 2445352 rows, 8 columns
-2025-10-06 14:41:37 - INFO - Got read-based phase blocks: 10017 rows, 7 columns
-2025-10-06 14:44:45 - INFO - Got inheritance-based phasing data: 2192365 rows, 7 columns
-2025-10-06 14:44:45 - INFO - Got inheritance-based phase blocks: 1329 rows, 5 columns
-2025-10-06 14:44:52 - INFO - Got all phasing data: 2189885 rows, 15 columns
-2025-10-06 14:44:59 - INFO - Got hap map: 8904 rows, 7 columns
-2025-10-06 14:44:59 - INFO - Got sites: 2189885 rows, 5 columns
-2025-10-06 14:44:59 - INFO - Got sites where read-based and inheritance-based bit vectors don't match: 33390 rows, 5 columns
-2025-10-06 14:45:00 - INFO - Wrote paternal and maternal hap-map blocks for IGV visualization
-2025-10-06 14:45:00 - INFO - Wrote hap-map blocks
-2025-10-06 14:45:00 - INFO - Wrote sites of bit-vectors, and sites where bit vectors are mismatched, for IGV visualization
-2025-10-06 14:45:31 - INFO - Got read-based phasing of count-based methylation levels: 26729958 rows, 7 columns
-2025-10-06 14:45:58 - INFO - Got read-based phasing of model-based methylation levels: 26729958 rows, 7 columns
-2025-10-06 14:47:43 - INFO - Phased count-based methylation levels to founder haplotypes: 26729958 rows, 14 columns
-2025-10-06 14:49:26 - INFO - Phased model-based methylation levels to founder haplotypes: 26729958 rows, 14 columns
-2025-10-06 14:49:52 - INFO - Combined count- and model-based methylation levels: 26729958 rows, 16 columns
-2025-10-06 14:49:52 - INFO - Percentage of CpG sites that are phased to founder haplotypes: 93%
-2025-10-06 14:49:52 - INFO - Percentage of CpG sites that are within 50bp of a mismatch site: 0.183%
-2025-10-06 14:49:57 - INFO - Wrote methylation levels phased to founder haplotypes
-2025-10-06 14:52:15 - INFO - Wrote bigwig file for pat count-based methylation levels
-2025-10-06 14:54:37 - INFO - Wrote bigwig file for pat model-based methylation levels
-2025-10-06 14:56:54 - INFO - Wrote bigwig file for mat count-based methylation levels
-2025-10-06 14:59:16 - INFO - Wrote bigwig file for mat model-based methylation levels
-2025-10-06 14:59:17 - INFO - Done running /scratch/ucgd/lustre-labs/quinlan/u6018199/tapestry/src/phase_meth_to_founder_haps.py
-```
-
-and phases count- and model-based DNA methylation to founder haplotypes. 
-The tool also creates files that collectively enable visualization of phased DNA methylation in IGV, e.g., 
+The tool writes founder-phased methylation, haplotype maps, mismatch sites, and
+BigWigs for visualization in IGV:
 
 <img src="images/tapestry.pedigree.png" alt="XXX" width="900"/>
 
@@ -257,12 +184,8 @@ We would like to be aware of the existence of all CpG sites in the reference gen
 
 ### Output format of pedigree workflow
 
-The bed file output by step 4 includes a header containing run metadata and column headings. The `##source=` line records the script path followed by `with args` and a dictionary of the command-line arguments passed to `src/expand_to_all_cpgs.py`. The final header line lists the column names in the form "#col1 col2 col3...". An example header is shown below:
-
-```
-##source='/scratch/ucgd/lustre-labs/quinlan/u6018199/tapestry/src/expand_to_all_cpgs.py with args {'bed_all_cpgs_in_reference': '/scratch/ucgd/lustre-labs/quinlan/data-shared/dna-methylation/CEPH1463.GRCh38.hifi.founder-phased.all-cpgs.2/all_cpg_sites_in_reference.bed', 'bed_meth_count_unphased': '/scratch/ucgd/lustre-labs/quinlan/data-shared/dna-methylation/CEPH1463.GRCh38.hifi.count.read-backed-phased/200084.GRCh38.haplotagged.combined.bed.gz', 'bed_meth_model_unphased': '/scratch/ucgd/lustre-labs/quinlan/data-shared/dna-methylation/CEPH1463.GRCh38.hifi.model.read-backed-phased/200084.GRCh38.haplotagged.combined.bed.gz', 'bed_meth_founder_phased': '/scratch/ucgd/lustre-labs/quinlan/data-shared/dna-methylation/CEPH1463.GRCh38.hifi.founder-phased/200084.dna-methylation.founder-phased.bed', 'bed_het_site_mismatches': '/scratch/ucgd/lustre-labs/quinlan/data-shared/dna-methylation/CEPH1463.GRCh38.hifi.founder-phased/200084.bit-vector-sites-mismatches.bed', 'bed_meth_founder_phased_all_cpgs': '/scratch/ucgd/lustre-labs/quinlan/data-shared/dna-methylation/CEPH1463.GRCh38.hifi.founder-phased.all-cpgs.2/200084.dna-methylation.founder-phased.all_cpgs.bed', 'uid': '200084', 'vcf_iht_phased': '/scratch/ucgd/lustre-labs/quinlan/data-shared/haplotype-maps/CEPH1463.GRCh38/CEPH1463.GRCh38.pass.sorted.vcf.gz'}'
-#chrom  start_cpg       end_cpg total_read_count        methylation_level_count methylation_level_model start_hap_map_block end_hap_map_block       haplotype_concordance_in_hap_map_block  num_het_SNVs_in_hap_map_block   total_read_count_pat    total_read_count_mat    founder_haplotype_pat   founder_haplotype_mat   methylation_level_pat_count     methylation_level_mat_count     methylation_level_pat_model     methylation_level_mat_model     cpg_is_within_50bp_of_mismatch_site     cpg_overlaps_at_least_one_snv   snv_genotypes   cpg_is_allele_specific
-```
+The BED header records the script and arguments in `##source=` and lists column
+names on the final `#chrom` line. BED coordinates are zero-based, half-open.
 
 Definitions of column headings: 
 
