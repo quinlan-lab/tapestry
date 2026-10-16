@@ -95,7 +95,7 @@ def _build_hap_map(df, kid_allele_col, parent_allele_col,
             record[col] = row[col]
         record[hap_col_name] = haplotype
         record["haplotype_concordance"] = concordance
-        record["num_het_SNVs"] = n
+        record["num_het_SNVs_in_parent"] = n
         records.append(record)
 
         data_mismatch.append({
@@ -114,7 +114,7 @@ def _build_hap_map(df, kid_allele_col, parent_allele_col,
         )
         .select([
             "chrom", "start", "end",
-            hap_col_name, "haplotype_concordance", "num_het_SNVs",
+            hap_col_name, "haplotype_concordance", "num_het_SNVs_in_parent",
         ])
         .sort(["chrom", "start", "end"])
     )

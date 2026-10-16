@@ -10,7 +10,7 @@ def extract_bit_vector(l):
     return np.array([int(x) for x in l], dtype=np.uint8)
 
 
-def write_hap_map_blocks(df_hap_map, uid, parental, output_dir):
+def write_hap_map_blocks(df_hap_map, uid, parental, output_dir, num_het_SNVs_column="num_het_SNVs"):
     """Write hap-map blocks BED for IGV visualization.
 
     The name column combines the assigned haplotype, the block's concordance,
@@ -22,6 +22,12 @@ def write_hap_map_blocks(df_hap_map, uid, parental, output_dir):
     an entire chromosome (~1 recombination per chromosome). The SNV count gives
     the weight behind that concordance: a low concordance over many SNVs is far
     more convincing than the same value over a handful.
+
+    num_het_SNVs_column names the per-block SNV-count column in df_hap_map,
+    because the workflows count different SNVs. The pedigree workflow counts
+    SNVs het in the sample being phased ("num_het_SNVs"); the trio workflow
+    counts SNVs het in the parent being compared, where the kid may be
+    homozygous ("num_het_SNVs_in_parent").
     """
     df_blocks = (
         df_hap_map
@@ -30,7 +36,7 @@ def write_hap_map_blocks(df_hap_map, uid, parental, output_dir):
             + pl.lit(",")
             + pl.col("haplotype_concordance").round(2).cast(pl.String)
             + pl.lit(",")
-            + pl.col("num_het_SNVs").cast(pl.String),
+            + pl.col(num_het_SNVs_column).cast(pl.String),
         )
         .select([
             pl.col("chrom"),

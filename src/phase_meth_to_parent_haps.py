@@ -131,7 +131,7 @@ def phase_meth_to_parent_haplotypes(
             'end_': 'end_hap_map_block_pat',
             'paternal_haplotype_': 'paternal_haplotype',
             'haplotype_concordance_': 'paternal_concordance',
-            'num_het_SNVs_': 'num_het_SNVs_in_dad',
+            'num_het_SNVs_in_parent_': 'num_het_SNVs_in_dad',
         })
     )
 
@@ -150,7 +150,7 @@ def phase_meth_to_parent_haplotypes(
             'end_': 'end_hap_map_block_mat',
             'maternal_haplotype_': 'maternal_haplotype',
             'haplotype_concordance_': 'maternal_concordance',
-            'num_het_SNVs_': 'num_het_SNVs_in_mom',
+            'num_het_SNVs_in_parent_': 'num_het_SNVs_in_mom',
         })
     )
 
@@ -407,8 +407,8 @@ def main():
     logger.info(f"Paternal bitvector mismatches: {len(df_mismatch_pat)}, Maternal bitvector mismatches: {len(df_mismatch_mat)}")
 
     # Write hap-map blocks for IGV (separately for paternal and maternal)
-    write_hap_map_blocks(df_hap_map_pat, kid_id, "paternal", args.output_dir)
-    write_hap_map_blocks(df_hap_map_mat, kid_id, "maternal", args.output_dir)
+    write_hap_map_blocks(df_hap_map_pat, kid_id, "paternal", args.output_dir, num_het_SNVs_column="num_het_SNVs_in_parent")
+    write_hap_map_blocks(df_hap_map_mat, kid_id, "maternal", args.output_dir, num_het_SNVs_column="num_het_SNVs_in_parent")
     logger.info(f"Wrote hap-map blocks to '{args.output_dir}'")
 
     # Write bitvector mismatch sites to BED (for later proximity computation) and VCF (for IGV visualization)
