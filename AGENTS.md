@@ -120,8 +120,6 @@ paths; its data-creation scripts still depend on site-local source data.
   `tests/run_nextflow_e2e.sh` runs the informative Docker/resume fixture.
 - `wiki/`: code-linked conceptual walkthrough with reproducible figures.
 - `manuscript/`: paper text, analyses, figure sources; not pipeline code.
-- `Snakefile`: an incomplete experiment, not the working workflow or a source of
-  truth.
 
 ## Data contracts and invariants
 

@@ -329,7 +329,7 @@ All output is written under `trio_dev_data/output/`. To inspect results in IGV, 
 
 ## TODO
 
-- [ ] Convert manual workflow into a Snakemake workflow (see `Snakefile` for early version of this)
+- [ ] Extend the Nextflow pipeline (`main.nf`), which covers the pedigree-wise workflow, to the trio-wise workflow
 - [ ] https://quinlangroup.slack.com/archives/C09MHJSPPEE/p1770676950847639 
 - [ ] https://quinlangroup.slack.com/archives/C09MHJSPPEE/p1770676759903709
 
