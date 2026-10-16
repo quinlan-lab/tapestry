@@ -8,8 +8,8 @@ the same interval. This script enforces that invariant on the actual output
 BEDs after a (regression) run on CHPC:
 
     PYTHONPATH=src:src/util .venv/bin/python src/util/check_hap_map_blocks.py \\
-        <out>/NA12878.hap-map-blocks.paternal.sorted.bed.gz \\
-        <out>/NA12878.hap-map-blocks.maternal.sorted.bed.gz
+        <out>/NA12878.hap-map-blocks.paternal.bed.gz \\
+        <out>/NA12878.hap-map-blocks.maternal.bed.gz
 
 Exit code is non-zero if any (chrom, start, end) appears more than once.
 

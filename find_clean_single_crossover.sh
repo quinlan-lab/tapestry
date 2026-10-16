@@ -43,8 +43,8 @@ if [ -n "$DEV_DIR" ]; then
 fi
 
 # INPUT FILES (outputs of phase_meth_to_parent_haps.py)
-blocks_paternal="${output_dir}/${kid_id}.hap-map-blocks.paternal.sorted.bed.gz"
-blocks_maternal="${output_dir}/${kid_id}.hap-map-blocks.maternal.sorted.bed.gz"
+blocks_paternal="${output_dir}/${kid_id}.hap-map-blocks.paternal.bed.gz"
+blocks_maternal="${output_dir}/${kid_id}.hap-map-blocks.maternal.bed.gz"
 mismatch_paternal="${output_dir}/${kid_id}.bit-vector-sites-mismatches.paternal.bed"
 mismatch_maternal="${output_dir}/${kid_id}.bit-vector-sites-mismatches.maternal.bed"
 

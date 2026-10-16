@@ -65,8 +65,8 @@ artifact.
 
 Usage:
     PYTHONPATH=src:src/util .venv/bin/python src/util/find_clean_single_crossover.py \\
-        --paternal-blocks    <out>/NA12878.hap-map-blocks.paternal.sorted.bed.gz \\
-        --maternal-blocks    <out>/NA12878.hap-map-blocks.maternal.sorted.bed.gz \\
+        --paternal-blocks    <out>/NA12878.hap-map-blocks.paternal.bed.gz \\
+        --maternal-blocks    <out>/NA12878.hap-map-blocks.maternal.bed.gz \\
         --paternal-mismatch  <out>/NA12878.bit-vector-sites-mismatches.paternal.bed \\
         --maternal-mismatch  <out>/NA12878.bit-vector-sites-mismatches.maternal.bed \\
         --out candidates.tsv
