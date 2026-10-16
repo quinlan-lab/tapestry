@@ -99,7 +99,7 @@ def _check(df, parental, n_input):
     if len(dups):
         failures.append(f"{parental}: duplicate hap-map blocks:\n{dups}")
 
-    total = df["num_het_SNVs_in_parent"].sum()
+    total = df["num_het_SNVs"].sum()
     if total != n_input:
         failures.append(
             f"{parental}: num_het_SNVs sums to {total} but there were "
@@ -130,7 +130,7 @@ def main():
 
     # Concrete expectation: the nested set yields its OWN single block of 3 SNVs,
     # and the big block holds the remaining 4 -- not 7-in-the-big + a triplicate.
-    pat_sizes = sorted(df_pat["num_het_SNVs_in_parent"].to_list())
+    pat_sizes = sorted(df_pat["num_het_SNVs"].to_list())
     if pat_sizes != [3, 4]:
         failures.append(
             f"paternal block sizes {pat_sizes}, expected [3, 4] "

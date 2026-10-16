@@ -131,7 +131,7 @@ def phase_meth_to_parent_haplotypes(
             'end_': 'end_hap_map_block_pat',
             'paternal_haplotype_': 'paternal_haplotype',
             'haplotype_concordance_': 'paternal_concordance',
-            'num_het_SNVs_in_parent_': 'num_het_SNVs_in_dad',
+            'num_het_SNVs_': 'num_het_SNVs_in_dad',
         })
     )
 
@@ -150,7 +150,7 @@ def phase_meth_to_parent_haplotypes(
             'end_': 'end_hap_map_block_mat',
             'maternal_haplotype_': 'maternal_haplotype',
             'haplotype_concordance_': 'maternal_concordance',
-            'num_het_SNVs_in_parent_': 'num_het_SNVs_in_mom',
+            'num_het_SNVs_': 'num_het_SNVs_in_mom',
         })
     )
 
