@@ -24,18 +24,38 @@ Under the old fan-out this sum was inflated (each nested SNV counted 2-3x) and
 the nested block appeared as duplicate rows. It also checks there are no
 duplicate (chrom, start, end) rows.
 
-Run locally (no CHPC, no real data needed):
-    PYTHONPATH=src:src/util .venv/bin/python tests/test_recombination_dedup.py
+It also runs the trio hap map through the shared
+src/util/hap_map.py:write_hap_map_blocks writer exactly as
+src/phase_meth_to_parent_haps.py does, so a change to that writer which breaks
+the trio workflow (e.g. hardcoding the pedigree "num_het_SNVs" column) fails CI.
+
+Synthetic genotypes are Mendelian-valid: both parents are het (0|1) at every
+site, so any kid genotype/phasing is consistent with inheritance.
+
+Run with the CI discovery command, or directly as a script:
+    PYTHONPATH=src:src/util .venv/bin/python -m unittest discover -s tests -p 'test_*.py'
+    .venv/bin/python tests/test_recombination_dedup.py
 """
 
+import gzip
 import sys
 import tempfile
+import unittest
 from pathlib import Path
 
 import polars as pl
 
-from phasing_trio import get_phase_blocks, get_all_phasing
-from hap_map_trio import get_hap_map
+_REPO = Path(__file__).resolve().parents[1]
+for _path in (_REPO / "src" / "util", _REPO / "src"):
+    if str(_path) not in sys.path:
+        sys.path.insert(0, str(_path))
+
+from phasing_trio import get_phase_blocks, get_all_phasing  # noqa: E402
+from hap_map_trio import get_hap_map  # noqa: E402
+from hap_map import write_hap_map_blocks  # noqa: E402
+
+# Trio hap-map SNV-count column, as passed by src/phase_meth_to_parent_haps.py.
+TRIO_NUM_HET_SNVS_COLUMN = "num_het_SNVs_in_parent"
 
 KID, DAD, MOM = "NA_KID", "NA_DAD", "NA_MOM"
 
@@ -89,66 +109,143 @@ def _write_inputs(d: Path):
     return str(vcf_path), str(blocks_path)
 
 
-def _check(df, parental, n_input):
-    """Assert no fan-out: every input het SNV counted in exactly one block."""
-    failures = []
+def _build_trio_hap_map(d: Path):
+    """Run the trio phasing + hap-map stages on the synthetic fixture."""
+    d.mkdir(parents=True, exist_ok=True)
+    vcf_path, blocks_path = _write_inputs(d)
 
-    dups = (
-        df.group_by(["chrom", "start", "end"]).len().filter(pl.col("len") > 1)
+    df_blocks_kid = get_phase_blocks(blocks_path, KID)
+    df_blocks_dad = get_phase_blocks(blocks_path, DAD)
+    df_blocks_mom = get_phase_blocks(blocks_path, MOM)
+
+    df_kid_dad, df_kid_mom = get_all_phasing(
+        vcf_path, KID, DAD, MOM,
+        df_blocks_kid, df_blocks_dad, df_blocks_mom,
     )
-    if len(dups):
-        failures.append(f"{parental}: duplicate hap-map blocks:\n{dups}")
 
-    total = df["num_het_SNVs_in_parent"].sum()
-    if total != n_input:
-        failures.append(
-            f"{parental}: num_het_SNVs sums to {total} but there were "
-            f"{n_input} input phased het SNVs (fan-out double-counting)."
+    df_pat, df_mat, _, _ = get_hap_map(df_kid_dad, df_kid_mom)
+    return df_kid_dad, df_kid_mom, df_pat, df_mat
+
+
+def _read_bgzipped_bed(path: Path):
+    with gzip.open(path, "rt") as f:
+        return [
+            line.rstrip("\n").split("\t")
+            for line in f
+            if line.strip() and not line.startswith("#")
+        ]
+
+
+class TrioHapMapNestedPhaseSetTests(unittest.TestCase):
+    """Each phased het SNV lands in exactly one (kid PS, parent PS) block."""
+
+    @classmethod
+    def setUpClass(cls):
+        with tempfile.TemporaryDirectory() as tmp:
+            (
+                cls.df_kid_dad,
+                cls.df_kid_mom,
+                cls.df_pat,
+                cls.df_mat,
+            ) = _build_trio_hap_map(Path(tmp))
+        cls.hap_maps = {
+            "paternal": (cls.df_pat, len(cls.df_kid_dad)),
+            "maternal": (cls.df_mat, len(cls.df_kid_mom)),
+        }
+
+    def test_no_duplicate_hap_map_blocks(self):
+        for parental, (df, _) in self.hap_maps.items():
+            with self.subTest(parental=parental):
+                dups = (
+                    df.group_by(["chrom", "start", "end"])
+                    .len()
+                    .filter(pl.col("len") > 1)
+                )
+                self.assertEqual(
+                    len(dups), 0,
+                    f"{parental}: duplicate hap-map blocks:\n{dups}",
+                )
+
+    def test_num_het_SNVs_sum_equals_input_phased_het_SNVs(self):
+        for parental, (df, n_input) in self.hap_maps.items():
+            with self.subTest(parental=parental):
+                self.assertGreater(n_input, 0)
+                self.assertEqual(
+                    df[TRIO_NUM_HET_SNVS_COLUMN].sum(), n_input,
+                    f"{parental}: {TRIO_NUM_HET_SNVS_COLUMN} over blocks must "
+                    "equal the number of input phased het SNVs "
+                    "(fan-out double-counting)",
+                )
+
+    def test_nested_phase_set_is_its_own_paternal_block(self):
+        # The nested set yields its OWN single block of 3 SNVs, and the big
+        # block holds the remaining 4 -- not 7-in-the-big + a triplicate.
+        self.assertEqual(
+            sorted(self.df_pat[TRIO_NUM_HET_SNVS_COLUMN].to_list()), [3, 4],
         )
-    return failures
 
 
-def main():
-    with tempfile.TemporaryDirectory() as tmp:
-        d = Path(tmp)
-        vcf_path, blocks_path = _write_inputs(d)
+class TrioHapMapBlocksWriterTests(unittest.TestCase):
+    """The shared hap-map-blocks writer must keep working for the trio."""
 
-        df_blocks_kid = get_phase_blocks(blocks_path, KID)
-        df_blocks_dad = get_phase_blocks(blocks_path, DAD)
-        df_blocks_mom = get_phase_blocks(blocks_path, MOM)
+    def test_writes_indexed_hap_map_blocks_with_trio_snv_counts(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            d = Path(tmp)
+            _, _, df_pat, df_mat = _build_trio_hap_map(d / "inputs")
+            output_dir = d / "outputs"
+            hap_maps = {"paternal": df_pat, "maternal": df_mat}
 
-        df_kid_dad, df_kid_mom = get_all_phasing(
-            vcf_path, KID, DAD, MOM,
-            df_blocks_kid, df_blocks_dad, df_blocks_mom,
-        )
+            for parental, df in hap_maps.items():
+                write_hap_map_blocks(
+                    df, KID, parental, str(output_dir),
+                    num_het_SNVs_column=TRIO_NUM_HET_SNVS_COLUMN,
+                )
 
-        df_pat, df_mat, _, _ = get_hap_map(df_kid_dad, df_kid_mom)
+            for parental, df in hap_maps.items():
+                with self.subTest(parental=parental):
+                    bed = output_dir / f"{KID}.hap-map-blocks.{parental}.bed.gz"
+                    self.assertTrue(bed.is_file(), f"missing {bed}")
+                    self.assertTrue(
+                        Path(f"{bed}.tbi").is_file(), f"missing {bed}.tbi",
+                    )
+                    self.assertFalse(
+                        (output_dir / f"{KID}.hap-map-blocks.{parental}.bed").exists(),
+                        "uncompressed BED should be removed after bgzip",
+                    )
 
-    failures = []
-    failures += _check(df_pat, "paternal", len(df_kid_dad))
-    failures += _check(df_mat, "maternal", len(df_kid_mom))
+                    expected = [
+                        [
+                            row["chrom"],
+                            str(row["start"]),
+                            str(row["end"]),
+                            ",".join([
+                                row[f"{parental}_haplotype"],
+                                str(round(row["haplotype_concordance"], 2)),
+                                str(row[TRIO_NUM_HET_SNVS_COLUMN]),
+                            ]),
+                        ]
+                        for row in df.sort(["chrom", "start", "end"]).iter_rows(named=True)
+                    ]
+                    rows = _read_bgzipped_bed(bed)
+                    self.assertEqual(
+                        sorted(rows, key=lambda r: (r[0], int(r[1]), int(r[2]))),
+                        expected,
+                    )
 
-    # Concrete expectation: the nested set yields its OWN single block of 3 SNVs,
-    # and the big block holds the remaining 4 -- not 7-in-the-big + a triplicate.
-    pat_sizes = sorted(df_pat["num_het_SNVs_in_parent"].to_list())
-    if pat_sizes != [3, 4]:
-        failures.append(
-            f"paternal block sizes {pat_sizes}, expected [3, 4] "
-            "(4 big-block + 3 nested-block SNVs, no double counting)."
-        )
-
-    print("paternal hap-map blocks:")
-    print(df_pat)
-    print("maternal hap-map blocks:")
-    print(df_mat)
-
-    if failures:
-        print("\nFAIL:")
-        for f in failures:
-            print(" -", f)
-        sys.exit(1)
-    print("\nPASS: each SNV assigned to exactly one phase set; no fan-out, no duplicate blocks.")
+                    # name = "<hap>,<concordance>,<count>"; counts are the
+                    # trio's parent-het SNV counts.
+                    labels = {"paternal": {"A", "B"}, "maternal": {"C", "D"}}[parental]
+                    counts = []
+                    for row in rows:
+                        hap, concordance, count = row[3].split(",")
+                        self.assertIn(hap, labels)
+                        self.assertTrue(0.0 <= float(concordance) <= 1.0)
+                        counts.append(int(count))
+                    self.assertEqual(
+                        sorted(counts),
+                        sorted(df[TRIO_NUM_HET_SNVS_COLUMN].to_list()),
+                    )
 
 
 if __name__ == "__main__":
-    main()
+    unittest.main()
