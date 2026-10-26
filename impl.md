@@ -30,8 +30,8 @@ model-only operation.
 ## User interface
 
 The normative schema-v1 contracts live in `schemas/run.schema.json` and
-`schemas/upstream-manifest.schema.json`; `examples/generic/` contains portable
-examples. This historical plan does not define a second manifest dialect.
+`schemas/upstream-manifest.schema.json`. This historical plan does not define a
+second manifest dialect.
 
 The public entry point is `--run-config`, rather than Nextflow's
 `-params-file`. This lets Tapestry resolve paths relative to the YAML or JSON

@@ -25,7 +25,6 @@ Use `-profile docker` for local Docker runs. The [Dockerfile](Dockerfile)
 pins runtime dependencies; pass `--container <image-or-digest>` to use your
 built image until a release digest is published. Configure site-specific queues
 and resources through a local profile; see [nextflow.config](nextflow.config).
-A minimal PED is in [examples/generic](examples/generic/).
 
 ### Options and validation
 

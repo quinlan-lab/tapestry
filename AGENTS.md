@@ -73,7 +73,6 @@ paths; its data-creation scripts still depend on site-local source data.
   Apptainer/Slurm profiles. Users pass miniwdl outputs, PED, reference, output
   location, and optional scientific overrides directly; executor and resource
   policy belong in profiles.
-- `examples/generic/`: a minimal PED example for the direct workflow.
 - `ROADMAP.md`, `completed.md`, `impl.md`: remaining work, completed work, and
   the archived detailed implementation plan, respectively. Do not copy current
   interface details into planning documents.
