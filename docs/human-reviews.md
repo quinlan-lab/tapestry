@@ -16,7 +16,10 @@ that the code is correct.
 Only record completion on the reviewer's explicit statement. If a review finds
 issues, record them alongside the relevant review questions. Reading code does
 not establish that tests passed or scientific parity was demonstrated. Commit
-completed entries to preserve when the review was recorded.
+completed entries to preserve when the review was recorded. For each future
+HR-XXX completion requested by Peter McHale, check the Status and all Scope
+boxes, record the reviewer and actual review date, then automatically commit
+and push the update.
 
 A review applies only to the stated revision and scope. To extend it to a newer
 revision, inspect the intervening diff and add a dated follow-up entry naming
