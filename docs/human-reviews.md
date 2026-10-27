@@ -7,19 +7,19 @@ Automated checks and AI inspection do not constitute human review.
 ## How to record a review
 
 Each entry has five fields: Status, Reviewer, Review date, Scope, and Review
-questions. An unchecked Status box means pending; check it when the entire
-stated scope has been manually reviewed. Check individual Scope boxes as you
-finish those parts, and supply the reviewer's name and actual review date
-(`YYYY-MM-DD`). Add a green ✅ marker after each checked box so completed
-items stand out in rendered Markdown. Checked boxes record review completion,
-not approval or proof that the code is correct.
+questions. An unchecked Status box means pending; replace it with a green ✅
+marker when the entire stated scope has been manually reviewed. Replace
+individual Scope boxes with ✅ markers as you finish those parts, and supply
+the reviewer's name and actual review date (`YYYY-MM-DD`). Use only the green
+marker for completed items, without a checkbox. These markers record review
+completion, not approval or proof that the code is correct.
 
 Only record completion on the reviewer's explicit statement. If a review finds
 issues, record them alongside the relevant review questions. Reading code does
 not establish that tests passed or scientific parity was demonstrated. Commit
 completed entries to preserve when the review was recorded. For each future
-HR-XXX completion requested by Peter McHale, check the Status and all Scope
-boxes, record the reviewer and actual review date, then automatically commit
+HR-XXX completion requested by Peter McHale, replace the Status and all Scope
+boxes with ✅ markers, record the reviewer and actual review date, then automatically commit
 and push the update.
 
 A review applies only to the stated revision and scope. To extend it to a newer
@@ -73,13 +73,13 @@ it does not assert human approval or completion of those gates.
 
 ### HR-001: All-CpG construction and biological annotations — Highest scientific priority
 
-- [x] ✅ Status: review complete
+- ✅ Status: review complete
 - Reviewer: Peter McHale
 - Review date: 2026-10-26
 - Scope:
-  - [x] ✅ [expand_model_to_all_cpgs.py:208–245 — joins and null handling](https://github.com/quinlan-lab/tapestry/blob/e2502e2c78cfd50009d10c301043c5be9e32c4a1/src/expand_model_to_all_cpgs.py#L208-L245)
-  - [x] ✅ [expand_model_to_all_cpgs.py:118–139 — mismatch proximity](https://github.com/quinlan-lab/tapestry/blob/e2502e2c78cfd50009d10c301043c5be9e32c4a1/src/expand_model_to_all_cpgs.py#L118-L139)
-  - [x] ✅ [expand_model_to_all_cpgs.py:143–191 — variant annotations](https://github.com/quinlan-lab/tapestry/blob/e2502e2c78cfd50009d10c301043c5be9e32c4a1/src/expand_model_to_all_cpgs.py#L143-L191)
+  - ✅ [expand_model_to_all_cpgs.py:208–245 — joins and null handling](https://github.com/quinlan-lab/tapestry/blob/e2502e2c78cfd50009d10c301043c5be9e32c4a1/src/expand_model_to_all_cpgs.py#L208-L245)
+  - ✅ [expand_model_to_all_cpgs.py:118–139 — mismatch proximity](https://github.com/quinlan-lab/tapestry/blob/e2502e2c78cfd50009d10c301043c5be9e32c4a1/src/expand_model_to_all_cpgs.py#L118-L139)
+  - ✅ [expand_model_to_all_cpgs.py:143–191 — variant annotations](https://github.com/quinlan-lab/tapestry/blob/e2502e2c78cfd50009d10c301043c5be9e32c4a1/src/expand_model_to_all_cpgs.py#L143-L191)
 - Review questions: Are reference-only/sample-only CpGs and null measurements
   preserved? Is overlap multiplicity intentional? Are coordinate conversions,
   the strict mismatch-distance boundary, multiallelic handling, and the
@@ -87,13 +87,13 @@ it does not assert human approval or completion of those gates.
 
 ### HR-002: VCF normalization and inheritance inference — Highest scientific priority
 
-- [x] ✅ Status: review complete
+- ✅ Status: review complete
 - Reviewer: Peter McHale
 - Review date: 2026-10-27
 - Scope:
-  - [x] ✅ [normalize_joint_vcf.py:205–264 — phase metadata and VCF branches](https://github.com/quinlan-lab/tapestry/blob/e2502e2c78cfd50009d10c301043c5be9e32c4a1/src/normalize_joint_vcf.py#L205-L264)
-  - [x] ✅ [run_gtg_inheritance.py:166–220 — mapping and concordance commands](https://github.com/quinlan-lab/tapestry/blob/e2502e2c78cfd50009d10c301043c5be9e32c4a1/src/run_gtg_inheritance.py#L166-L220)
-  - [x] ✅ [ROADMAP.md:46–73 — real WDL/CEPH parity release gate](https://github.com/quinlan-lab/tapestry/blob/e2502e2c78cfd50009d10c301043c5be9e32c4a1/ROADMAP.md#L46-L73)
+  - ✅ [normalize_joint_vcf.py:205–264 — phase metadata and VCF branches](https://github.com/quinlan-lab/tapestry/blob/e2502e2c78cfd50009d10c301043c5be9e32c4a1/src/normalize_joint_vcf.py#L205-L264)
+  - ✅ [run_gtg_inheritance.py:166–220 — mapping and concordance commands](https://github.com/quinlan-lab/tapestry/blob/e2502e2c78cfd50009d10c301043c5be9e32c4a1/src/run_gtg_inheritance.py#L166-L220)
+  - ✅ [ROADMAP.md:46–73 — real WDL/CEPH parity release gate](https://github.com/quinlan-lab/tapestry/blob/e2502e2c78cfd50009d10c301043c5be9e32c4a1/ROADMAP.md#L46-L73)
 - Review questions: Are PS/PF removal, sample ordering, and complete-family
   filtering correct? Do mapping and concordance receive their intended VCF
   branches and thresholds? Are incomplete-family sites retained for annotation?
