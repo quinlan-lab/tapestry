@@ -129,13 +129,13 @@ it does not assert human approval or completion of those gates.
 
 ### HR-005: QC scoring and displayed methylation summaries — High interpretation burden
 
-- [ ] Status: review complete
-- Reviewer: not yet recorded
-- Review date: not yet recorded
+- ✅ Status: review complete
+- Reviewer: Peter McHale
+- Review date: 2026-10-27
 - Scope:
-  - [ ] [plot_transmission_qc.py:70–101 — outlier scoring](https://github.com/quinlan-lab/tapestry/blob/e2502e2c78cfd50009d10c301043c5be9e32c4a1/src/plot_transmission_qc.py#L70-L101)
-  - [ ] [plot_transmission_qc.py:146–182 — genome-wide aggregation](https://github.com/quinlan-lab/tapestry/blob/e2502e2c78cfd50009d10c301043c5be9e32c4a1/src/plot_transmission_qc.py#L146-L182)
-  - [ ] [summarize_haplotype_methylation.py:164–188 — methylation means](https://github.com/quinlan-lab/tapestry/blob/e2502e2c78cfd50009d10c301043c5be9e32c4a1/src/summarize_haplotype_methylation.py#L164-L188)
+  - ✅ [plot_transmission_qc.py:70–101 — outlier scoring](https://github.com/quinlan-lab/tapestry/blob/e2502e2c78cfd50009d10c301043c5be9e32c4a1/src/plot_transmission_qc.py#L70-L101)
+  - ✅ [plot_transmission_qc.py:146–182 — genome-wide aggregation](https://github.com/quinlan-lab/tapestry/blob/e2502e2c78cfd50009d10c301043c5be9e32c4a1/src/plot_transmission_qc.py#L146-L182)
+  - ✅ [summarize_haplotype_methylation.py:164–188 — methylation means](https://github.com/quinlan-lab/tapestry/blob/e2502e2c78cfd50009d10c301043c5be9e32c4a1/src/summarize_haplotype_methylation.py#L164-L188)
 - Review questions: Are cohort size, MAD scaling, fallback behavior, and related
   pedigree edges handled appropriately for interpretation? Are chromosome
   eligibility and CpG weighting defensible? Can duplicate rows overweight a
