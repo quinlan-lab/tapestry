@@ -102,13 +102,13 @@ it does not assert human approval or completion of those gates.
 
 ### HR-003: Founder phasing, empty results, and duplicate policy — High scientific priority
 
-- [ ] Status: review complete
-- Reviewer: not yet recorded
-- Review date: not yet recorded
+- ✅ Status: review complete
+- Reviewer: Peter McHale
+- Review date: 2026-10-27
 - Scope:
-  - [ ] [phase_meth_to_founder_haps.py:296–320 — chromosome-wise reconciliation](https://github.com/quinlan-lab/tapestry/blob/e2502e2c78cfd50009d10c301043c5be9e32c4a1/src/phase_meth_to_founder_haps.py#L296-L320)
-  - [ ] [phase_meth_to_founder_haps.py:34–62 — empty-map behavior](https://github.com/quinlan-lab/tapestry/blob/e2502e2c78cfd50009d10c301043c5be9e32c4a1/src/phase_meth_to_founder_haps.py#L34-L62)
-  - [ ] [phase_meth_to_founder_haps.py:148–175 — BigWig duplicate handling](https://github.com/quinlan-lab/tapestry/blob/e2502e2c78cfd50009d10c301043c5be9e32c4a1/src/phase_meth_to_founder_haps.py#L148-L175)
+  - ✅ [phase_meth_to_founder_haps.py:296–320 — chromosome-wise reconciliation](https://github.com/quinlan-lab/tapestry/blob/e2502e2c78cfd50009d10c301043c5be9e32c4a1/src/phase_meth_to_founder_haps.py#L296-L320)
+  - ✅ [phase_meth_to_founder_haps.py:34–62 — empty-map behavior](https://github.com/quinlan-lab/tapestry/blob/e2502e2c78cfd50009d10c301043c5be9e32c4a1/src/phase_meth_to_founder_haps.py#L34-L62)
+  - ✅ [phase_meth_to_founder_haps.py:148–175 — BigWig duplicate handling](https://github.com/quinlan-lab/tapestry/blob/e2502e2c78cfd50009d10c301043c5be9e32c4a1/src/phase_meth_to_founder_haps.py#L148-L175)
 - Review questions: Does batching preserve nested phase-set membership and
   chromosome boundaries? Do empty results represent unassignable founder phase
   correctly? Is collapsing identical BigWig values and rejecting conflicts
