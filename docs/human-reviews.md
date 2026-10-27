@@ -116,13 +116,13 @@ it does not assert human approval or completion of those gates.
 
 ### HR-004: Transmission QC definitions and exclusions — High scientific priority
 
-- [ ] Status: review complete
-- Reviewer: not yet recorded
-- Review date: not yet recorded
+- ✅ Status: review complete
+- Reviewer: Peter McHale
+- Review date: 2026-10-27
 - Scope:
-  - [ ] [summarize_transmission_methylation.py:338–370 — pairing and exclusions](https://github.com/quinlan-lab/tapestry/blob/e2502e2c78cfd50009d10c301043c5be9e32c4a1/src/summarize_transmission_methylation.py#L338-L370)
-  - [ ] [summarize_transmission_methylation.py:291–324 — metric formulas](https://github.com/quinlan-lab/tapestry/blob/e2502e2c78cfd50009d10c301043c5be9e32c4a1/src/summarize_transmission_methylation.py#L291-L324)
-  - [ ] [summarize_transmission_methylation.py:129–171 — duplicate merging](https://github.com/quinlan-lab/tapestry/blob/e2502e2c78cfd50009d10c301043c5be9e32c4a1/src/summarize_transmission_methylation.py#L129-L171)
+  - ✅ [summarize_transmission_methylation.py:338–370 — pairing and exclusions](https://github.com/quinlan-lab/tapestry/blob/e2502e2c78cfd50009d10c301043c5be9e32c4a1/src/summarize_transmission_methylation.py#L338-L370)
+  - ✅ [summarize_transmission_methylation.py:291–324 — metric formulas](https://github.com/quinlan-lab/tapestry/blob/e2502e2c78cfd50009d10c301043c5be9e32c4a1/src/summarize_transmission_methylation.py#L291-L324)
+  - ✅ [summarize_transmission_methylation.py:129–171 — duplicate merging](https://github.com/quinlan-lab/tapestry/blob/e2502e2c78cfd50009d10c301043c5be9e32c4a1/src/summarize_transmission_methylation.py#L129-L171)
 - Review questions: Are transmitted labels, mismatch exclusions, denominators,
   and specificity sign correct? Should a conflict on either haplotype exclude
   the entire coordinate? Are null merging and numeric tolerance appropriate?
