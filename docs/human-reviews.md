@@ -83,13 +83,13 @@ it does not assert human approval or completion of those gates.
 
 ### HR-002: VCF normalization and inheritance inference — Highest scientific priority
 
-- [ ] Status: review complete
-- Reviewer: not yet recorded
-- Review date: not yet recorded
+- [x] Status: review complete
+- Reviewer: Peter McHale
+- Review date: 2026-10-27
 - Scope:
-  - [ ] [normalize_joint_vcf.py:205–264 — phase metadata and VCF branches](https://github.com/quinlan-lab/tapestry/blob/e2502e2c78cfd50009d10c301043c5be9e32c4a1/src/normalize_joint_vcf.py#L205-L264)
-  - [ ] [run_gtg_inheritance.py:166–220 — mapping and concordance commands](https://github.com/quinlan-lab/tapestry/blob/e2502e2c78cfd50009d10c301043c5be9e32c4a1/src/run_gtg_inheritance.py#L166-L220)
-  - [ ] [ROADMAP.md:46–73 — real WDL/CEPH parity release gate](https://github.com/quinlan-lab/tapestry/blob/e2502e2c78cfd50009d10c301043c5be9e32c4a1/ROADMAP.md#L46-L73)
+  - [x] [normalize_joint_vcf.py:205–264 — phase metadata and VCF branches](https://github.com/quinlan-lab/tapestry/blob/e2502e2c78cfd50009d10c301043c5be9e32c4a1/src/normalize_joint_vcf.py#L205-L264)
+  - [x] [run_gtg_inheritance.py:166–220 — mapping and concordance commands](https://github.com/quinlan-lab/tapestry/blob/e2502e2c78cfd50009d10c301043c5be9e32c4a1/src/run_gtg_inheritance.py#L166-L220)
+  - [x] [ROADMAP.md:46–73 — real WDL/CEPH parity release gate](https://github.com/quinlan-lab/tapestry/blob/e2502e2c78cfd50009d10c301043c5be9e32c4a1/ROADMAP.md#L46-L73)
 - Review questions: Are PS/PF removal, sample ordering, and complete-family
   filtering correct? Do mapping and concordance receive their intended VCF
   branches and thresholds? Are incomplete-family sites retained for annotation?
