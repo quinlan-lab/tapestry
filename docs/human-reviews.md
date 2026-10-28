@@ -73,7 +73,7 @@ it does not assert human approval or completion of those gates.
 
 ### HR-001: All-CpG construction and biological annotations — Highest scientific priority
 
-- ✅ Status: review complete
+- ✅ Review complete
 - Reviewer: Peter McHale
 - Review date: 2026-10-26
 - Scope:
@@ -87,7 +87,7 @@ it does not assert human approval or completion of those gates.
 
 ### HR-002: VCF normalization and inheritance inference — Highest scientific priority
 
-- ✅ Status: review complete
+- ✅ Review complete
 - Reviewer: Peter McHale
 - Review date: 2026-10-27
 - Scope:
@@ -102,7 +102,7 @@ it does not assert human approval or completion of those gates.
 
 ### HR-003: Founder phasing, empty results, and duplicate policy — High scientific priority
 
-- ✅ Status: review complete
+- ✅ Review complete
 - Reviewer: Peter McHale
 - Review date: 2026-10-27
 - Scope:
@@ -116,7 +116,7 @@ it does not assert human approval or completion of those gates.
 
 ### HR-004: Transmission QC definitions and exclusions — High scientific priority
 
-- ✅ Status: review complete
+- ✅ Review complete
 - Reviewer: Peter McHale
 - Review date: 2026-10-27
 - Scope:
@@ -129,7 +129,7 @@ it does not assert human approval or completion of those gates.
 
 ### HR-005: QC scoring and displayed methylation summaries — High interpretation burden
 
-- ✅ Status: review complete
+- ✅ Review complete
 - Reviewer: Peter McHale
 - Review date: 2026-10-27
 - Scope:
@@ -143,7 +143,7 @@ it does not assert human approval or completion of those gates.
 
 ### HR-006: Input identity and Nextflow wiring — High operational priority
 
-- [ ] Status: review complete
+- [ ] Review complete
 - Reviewer: not yet recorded
 - Review date: not yet recorded
 - Scope:
@@ -157,7 +157,7 @@ it does not assert human approval or completion of those gates.
 
 ### HR-007: Shared legacy helpers — High regression risk
 
-- [ ] Status: review complete
+- [ ] Review complete
 - Reviewer: not yet recorded
 - Review date: not yet recorded
 - Scope:
@@ -170,7 +170,7 @@ it does not assert human approval or completion of those gates.
 
 ### HR-008: Container, provenance, and verification — Focused technical review
 
-- [ ] Status: review complete
+- [ ] Review complete
 - Reviewer: not yet recorded
 - Review date: not yet recorded
 - Scope:
