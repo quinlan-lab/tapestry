@@ -161,6 +161,8 @@ it does not assert human approval or completion of those gates.
   pedigree and trio paths? After removing explicit shell sorting, do all callers
   provide sorted data? Are output names and indexes compatible with consumers?
 
+<!-- Keep the compact review metadata separate from the multi-paragraph answers list. -->
+
 - **AI-assisted review answers**
 
   Code inspection on 2026-10-28 found that current production callers supply
