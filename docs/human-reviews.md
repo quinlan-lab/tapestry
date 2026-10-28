@@ -71,9 +71,7 @@ Real WDL/CEPH scientific parity and target-cluster runtime checks remain release
 gates at the target revision. This summary describes the implementation scope;
 it does not assert human approval or completion of those gates.
 
-### HR-001: All-CpG construction and biological annotations — Highest scientific priority
-
-✅ Review complete
+### ✅ HR-001: All-CpG construction and biological annotations — Highest scientific priority
 
 - Reviewer: Peter McHale
 - Review date: 2026-10-26
@@ -86,9 +84,7 @@ it does not assert human approval or completion of those gates.
   the strict mismatch-distance boundary, multiallelic handling, and the
   allele-specific flag scientifically appropriate?
 
-### HR-002: VCF normalization and inheritance inference — Highest scientific priority
-
-✅ Review complete
+### ✅ HR-002: VCF normalization and inheritance inference — Highest scientific priority
 
 - Reviewer: Peter McHale
 - Review date: 2026-10-27
@@ -102,9 +98,7 @@ it does not assert human approval or completion of those gates.
   Has real WDL/CEPH parity evidence been examined? Code review alone does not
   close that release gate.
 
-### HR-003: Founder phasing, empty results, and duplicate policy — High scientific priority
-
-✅ Review complete
+### ✅ HR-003: Founder phasing, empty results, and duplicate policy — High scientific priority
 
 - Reviewer: Peter McHale
 - Review date: 2026-10-27
@@ -117,9 +111,7 @@ it does not assert human approval or completion of those gates.
   correctly? Is collapsing identical BigWig values and rejecting conflicts
   consistent with the intended downstream ambiguity policy?
 
-### HR-004: Transmission QC definitions and exclusions — High scientific priority
-
-✅ Review complete
+### ✅ HR-004: Transmission QC definitions and exclusions — High scientific priority
 
 - Reviewer: Peter McHale
 - Review date: 2026-10-27
@@ -131,9 +123,7 @@ it does not assert human approval or completion of those gates.
   and specificity sign correct? Should a conflict on either haplotype exclude
   the entire coordinate? Are null merging and numeric tolerance appropriate?
 
-### HR-005: QC scoring and displayed methylation summaries — High interpretation burden
-
-✅ Review complete
+### ✅ HR-005: QC scoring and displayed methylation summaries — High interpretation burden
 
 - Reviewer: Peter McHale
 - Review date: 2026-10-27
@@ -146,9 +136,7 @@ it does not assert human approval or completion of those gates.
   eligibility and CpG weighting defensible? Can duplicate rows overweight a
   coordinate in displayed means?
 
-### HR-006: Input identity and Nextflow wiring — High operational priority
-
-☐ Review complete
+### ☐ HR-006: Input identity and Nextflow wiring — High operational priority
 
 - Reviewer: not yet recorded
 - Review date: not yet recorded
@@ -161,9 +149,7 @@ it does not assert human approval or completion of those gates.
   stages enforce record invariants omitted from preflight? Are positional tuple
   indexes and sample-keyed joins correct?
 
-### HR-007: Shared legacy helpers — High regression risk
-
-☐ Review complete
+### ☐ HR-007: Shared legacy helpers — High regression risk
 
 - Reviewer: not yet recorded
 - Review date: not yet recorded
@@ -175,9 +161,7 @@ it does not assert human approval or completion of those gates.
   pedigree and trio paths? After removing explicit shell sorting, do all callers
   provide sorted data? Are output names and indexes compatible with consumers?
 
-### HR-008: Container, provenance, and verification — Focused technical review
-
-☐ Review complete
+### ☐ HR-008: Container, provenance, and verification — Focused technical review
 
 - Reviewer: not yet recorded
 - Review date: not yet recorded
