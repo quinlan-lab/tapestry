@@ -194,15 +194,15 @@ it does not assert human approval or completion of those gates.
   compatibility. HR-007 was marked complete at Peter McHale's request on 2026-10-28;
   the sorting findings above remain recorded.
 
-### ☐ HR-008: Container, provenance, and verification — Focused technical review
+### ✅ HR-008: Container, provenance, and verification — Focused technical review
 
-- Reviewer: not yet recorded
-- Review date: not yet recorded
+- Reviewer: Peter McHale
+- Review date: 2026-10-28
 - Scope:<br>
-  ☐ [Dockerfile:57–67 — native dependency build](https://github.com/quinlan-lab/tapestry/blob/e2502e2c78cfd50009d10c301043c5be9e32c4a1/Dockerfile#L57-L67)<br>
-  ☐ [Dockerfile:3–5 — UCSC binary pin](https://github.com/quinlan-lab/tapestry/blob/e2502e2c78cfd50009d10c301043c5be9e32c4a1/Dockerfile#L3-L5)<br>
-  ☐ [capture_versions.py:15–18 — recorded checksum constant](https://github.com/quinlan-lab/tapestry/blob/e2502e2c78cfd50009d10c301043c5be9e32c4a1/src/capture_versions.py#L15-L18)<br>
-  ☐ [run_nextflow_e2e.sh:104–112 — resume assertion](https://github.com/quinlan-lab/tapestry/blob/e2502e2c78cfd50009d10c301043c5be9e32c4a1/tests/run_nextflow_e2e.sh#L104-L112)
+  ✅ [Dockerfile:57–67 — native dependency build](https://github.com/quinlan-lab/tapestry/blob/e2502e2c78cfd50009d10c301043c5be9e32c4a1/Dockerfile#L57-L67)<br>
+  ✅ [Dockerfile:3–5 — UCSC binary pin](https://github.com/quinlan-lab/tapestry/blob/e2502e2c78cfd50009d10c301043c5be9e32c4a1/Dockerfile#L3-L5)<br>
+  ✅ [capture_versions.py:15–18 — recorded checksum constant](https://github.com/quinlan-lab/tapestry/blob/e2502e2c78cfd50009d10c301043c5be9e32c4a1/src/capture_versions.py#L15-L18)<br>
+  ✅ [run_nextflow_e2e.sh:104–112 — resume assertion](https://github.com/quinlan-lab/tapestry/blob/e2502e2c78cfd50009d10c301043c5be9e32c4a1/tests/run_nextflow_e2e.sh#L104-L112)
 - Review questions: Do native builds work on the target FIPS-enabled Apptainer
   host? Does recorded provenance match the installed binary? Does the fixture
   exercise all intended stages and caching? Which scientific and cluster-runtime
