@@ -149,14 +149,14 @@ it does not assert human approval or completion of those gates.
   stages enforce record invariants omitted from preflight? Are positional tuple
   indexes and sample-keyed joins correct?
 
-### ☐ HR-007: Shared legacy helpers — High regression risk
+### ✅ HR-007: Shared legacy helpers — High regression risk
 
-- Reviewer: not yet recorded
-- Review date: not yet recorded
+- Reviewer: Peter McHale
+- Review date: 2026-10-28
 - Scope:<br>
-  ☐ [util/hap_map.py:26–48 — shared hap-map writer](https://github.com/quinlan-lab/tapestry/blob/e2502e2c78cfd50009d10c301043c5be9e32c4a1/src/util/hap_map.py#L26-L48)<br>
-  ☐ [hap_map_trio.py:98–117 — trio SNV-count column](https://github.com/quinlan-lab/tapestry/blob/e2502e2c78cfd50009d10c301043c5be9e32c4a1/src/hap_map_trio.py#L98-L117)<br>
-  ☐ [util/write_data.py:122–135 — methylation writer](https://github.com/quinlan-lab/tapestry/blob/e2502e2c78cfd50009d10c301043c5be9e32c4a1/src/util/write_data.py#L122-L135)
+  ✅ [util/hap_map.py:26–48 — shared hap-map writer](https://github.com/quinlan-lab/tapestry/blob/e2502e2c78cfd50009d10c301043c5be9e32c4a1/src/util/hap_map.py#L26-L48)<br>
+  ✅ [hap_map_trio.py:98–117 — trio SNV-count column](https://github.com/quinlan-lab/tapestry/blob/e2502e2c78cfd50009d10c301043c5be9e32c4a1/src/hap_map_trio.py#L98-L117)<br>
+  ✅ [util/write_data.py:122–135 — methylation writer](https://github.com/quinlan-lab/tapestry/blob/e2502e2c78cfd50009d10c301043c5be9e32c4a1/src/util/write_data.py#L122-L135)
 - Review questions: Are writer/producer column contracts compatible in both
   pedigree and trio paths? After removing explicit shell sorting, do all callers
   provide sorted data? Are output names and indexes compatible with consumers?
@@ -187,9 +187,10 @@ indexing; they depend on their callers. The `write_methylation()` docstring has
 been corrected to state this requirement and explain that `.sorted.bed.gz` is
 a compatibility suffix, not evidence that the writer sorts its input.
 
-These conclusions are based on code inspection; the workflows were not rerun
-for this review. They do not establish complete output-name/index compatibility
-or mark HR-007 complete.
+These AI-assisted conclusions are based on code inspection; the workflows were
+not rerun for this review. They do not establish complete output-name/index
+compatibility. HR-007 was marked complete at Peter McHale's request on 2026-10-28;
+the sorting findings above remain recorded.
 
 ### ☐ HR-008: Container, provenance, and verification — Focused technical review
 
