@@ -120,10 +120,16 @@ def write_df_to_vcf(df, vcf, uid=None):
 
 
 def write_methylation(df, file_path, source):
-    """Write a methylation dataframe to a sorted, compressed, and indexed BED file.
+    """Write an already sorted methylation dataframe to a bgzipped, indexed BED.
 
-    Writes the dataframe to a BED file, then sorts, compresses (bgzip), and indexes (tabix).
-    The original uncompressed file is removed.
+    Input must group rows by chromosome with nondecreasing start coordinates
+    within each chromosome. This function preserves row order; it does not sort
+    or explicitly validate ordering before tabix indexing. Callers must supply
+    natural chromosome order when required by downstream consumers.
+
+    Writes the BED, compresses it with bgzip, and creates a tabix index. The
+    original uncompressed file is removed after successful indexing. The
+    .sorted.bed.gz suffix is retained for compatibility.
 
     Returns the root path (without .sorted.bed.gz suffix).
     """

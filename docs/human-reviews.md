@@ -161,6 +161,36 @@ it does not assert human approval or completion of those gates.
   pedigree and trio paths? After removing explicit shell sorting, do all callers
   provide sorted data? Are output names and indexes compatible with consumers?
 
+#### AI-assisted review answers
+
+Code inspection on 2026-10-28 found that current production callers supply
+sorted inputs to the shared BED writers:
+
+- Pedigree hap-map blocks: `build_hap_map_by_chromosome()` in
+  `src/phase_meth_to_founder_haps.py` applies `version_sort()` before returning,
+  providing natural chromosome order followed by start coordinate.
+- Trio hap-map blocks: `_build_hap_map()` in `src/hap_map_trio.py` sorts by
+  `chrom`, `start`, and `end`, using lexical chromosome order.
+- Legacy pedigree and trio all-CpG methylation: `label_cpgs_as_allele_specific()`
+  in `src/expand_to_all_cpgs.py` and `src/expand_to_all_cpgs_trio.py` sorts by
+  `chrom` and `start_cpg` before the result reaches `write_methylation()`, also
+  using lexical chromosome order.
+
+These sorts keep chromosomes contiguous and starts nondecreasing within each
+chromosome, satisfying tabix ordering requirements. However, lexical ordering
+(`chr1`, `chr10`, ..., `chr2`) does not preserve the natural chromosome order
+provided by the removed shell sorting helper. Natural-order parity remains an
+issue in the legacy trio hap-map and both legacy methylation-expansion paths.
+
+The shared BED writers neither sort nor explicitly validate ordering before
+indexing; they depend on their callers. The `write_methylation()` docstring has
+been corrected to state this requirement and explain that `.sorted.bed.gz` is
+a compatibility suffix, not evidence that the writer sorts its input.
+
+These conclusions are based on code inspection; the workflows were not rerun
+for this review. They do not establish complete output-name/index compatibility
+or mark HR-007 complete.
+
 ### ☐ HR-008: Container, provenance, and verification — Focused technical review
 
 - Reviewer: not yet recorded
