@@ -136,14 +136,14 @@ it does not assert human approval or completion of those gates.
   eligibility and CpG weighting defensible? Can duplicate rows overweight a
   coordinate in displayed means?
 
-### ☐ HR-006: Input identity and Nextflow wiring — High operational priority
+### ✅ HR-006: Input identity and Nextflow wiring — High operational priority
 
-- Reviewer: not yet recorded
-- Review date: not yet recorded
+- Reviewer: Peter McHale
+- Review date: 2026-10-28
 - Scope:<br>
-  ☐ [tapestry_validate.py:587–638 — sample/artifact association](https://github.com/quinlan-lab/tapestry/blob/e2502e2c78cfd50009d10c301043c5be9e32c4a1/src/tapestry_validate.py#L587-L638)<br>
-  ☐ [tapestry_validate.py:852–892 — artifact validation](https://github.com/quinlan-lab/tapestry/blob/e2502e2c78cfd50009d10c301043c5be9e32c4a1/src/tapestry_validate.py#L852-L892)<br>
-  ☐ [main.nf:774–816 — stage wiring](https://github.com/quinlan-lab/tapestry/blob/e2502e2c78cfd50009d10c301043c5be9e32c4a1/main.nf#L774-L816)
+  ✅ [tapestry_validate.py:587–638 — sample/artifact association](https://github.com/quinlan-lab/tapestry/blob/e2502e2c78cfd50009d10c301043c5be9e32c4a1/src/tapestry_validate.py#L587-L638)<br>
+  ✅ [tapestry_validate.py:852–892 — artifact validation](https://github.com/quinlan-lab/tapestry/blob/e2502e2c78cfd50009d10c301043c5be9e32c4a1/src/tapestry_validate.py#L852-L892)<br>
+  ✅ [main.nf:774–816 — stage wiring](https://github.com/quinlan-lab/tapestry/blob/e2502e2c78cfd50009d10c301043c5be9e32c4a1/main.nf#L774-L816)
 - Review questions: Do array ordering and identity checks associate artifacts
   with the right samples? Are null artifacts handled correctly? Do consuming
   stages enforce record invariants omitted from preflight? Are positional tuple
