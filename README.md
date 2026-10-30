@@ -222,6 +222,11 @@ cpg_is_allele_specific | does the CpG dinucleotide appear in the reads correspon
 
 ### Step 3 of trio workflow: Phasing count- and model-based DNA methylation in kid to parental haplotypes 
 
+WhatsHap's optional `phase --recombination-list` report records putative crossovers
+and flanking parental haplotype states, but does not identify transmitted
+haplotypes in blocks without reported crossovers. See the
+[source evidence and upstream test](docs/whatshap_recombination_evidence.md).
+
 The `phase_meth_to_parent_haps.sh` script calls `src/phase_meth_to_parent_haps.py`, which phases methylation levels in the kid to the corresponding haplotypes in the parents (A/B in dad, C/D in mom), and creates files for IGV visualization, e.g.,
 
 <img src="images/tapestry.trio.alignments.png" alt="Trio alignments in IGV" width="900"/>
