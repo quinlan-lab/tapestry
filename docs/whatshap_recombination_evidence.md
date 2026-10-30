@@ -1,6 +1,7 @@
 # WhatsHap recombination reports and transmitted haplotypes
 
-Evidence reviewed 2026-10-30 against upstream **WhatsHap v2.8**. This is
+Evidence reviewed 2026-10-30 against upstream **WhatsHap v2.8**, commit
+`f07423a7ba0c7609e7d4d5c73fb5e4e240057830`. This is
 source inspection and an upstream test example, not a new end-to-end run.
 
 `whatshap phase --ped family.ped --recombination-list crossovers.txt ...`
@@ -12,19 +13,19 @@ event report, not a claim that WhatsHap lacks internal transmission states.
 ## Source-code evidence and upstream test
 
 1. **The option requests events.** The
-   [v2.8 CLI definition](https://github.com/whatshap/whatshap/blob/v2.8/whatshap/cli/phase.py)
+   [v2.8 CLI definition](https://github.com/whatshap/whatshap/blob/f07423a7ba0c7609e7d4d5c73fb5e4e240057830/whatshap/cli/phase.py#L1136-L1137)
    (`add_arguments`, pedigree-phasing options) describes
    `--recombination-list` as “Write putative recombination events to FILE.”
-   Its `write_recombination_list` function writes child ID, chromosome,
+   Its [`write_recombination_list` function](https://github.com/whatshap/whatshap/blob/f07423a7ba0c7609e7d4d5c73fb5e4e240057830/whatshap/cli/phase.py#L992-L1027) writes child ID, chromosome,
    two flanking positions, four parental transmission fields, and
    recombination cost. The fields ending in `1` and `2` refer to the two
    positions: `transmitted_hap_father1`, `transmitted_hap_father2`,
-   `transmitted_hap_mother1`, `transmitted_hap_mother2`. The writer adds one
+   `transmitted_hap_mother1`, `transmitted_hap_mother2`. The writer [adds one](https://github.com/whatshap/whatshap/blob/f07423a7ba0c7609e7d4d5c73fb5e4e240057830/whatshap/cli/phase.py#L1013-L1023)
    to internal positions, so reported positions are one-based variant
    coordinates bracketing an inferred event, not an exact crossover base.
 
 2. **Only changes produce events.** In
-   [v2.8 `find_recombination`](https://github.com/whatshap/whatshap/blob/v2.8/whatshap/pedigree.py),
+   [v2.8 `find_recombination`](https://github.com/whatshap/whatshap/blob/f07423a7ba0c7609e7d4d5c73fb5e4e240057830/whatshap/pedigree.py#L138-L176),
    positions are grouped by component/block. An event is appended only
    when consecutive inspected transmission states differ. Father states
    are decoded with `% 2`, mother states with `// 2`; these are binary
@@ -33,7 +34,7 @@ event report, not a claim that WhatsHap lacks internal transmission states.
    regardless of which parental homologs were transmitted.
 
 3. **An upstream test demonstrates the switches.**
-   [v2.8 `test_find_recombination`](https://github.com/whatshap/whatshap/blob/v2.8/tests/test_pedigree.py)
+   [v2.8 `test_find_recombination`](https://github.com/whatshap/whatshap/blob/f07423a7ba0c7609e7d4d5c73fb5e4e240057830/tests/test_pedigree.py#L53-L78)
    supplies one block with transmission vector `[0, 0, 1, 1, 0]` and expects
    two events: father `0 → 1` between internal positions 5432 and 8307,
    then father `1 → 0` between 9000 and 9500. Mother remains `0 → 0` in
@@ -64,11 +65,11 @@ combination; the event list cannot distinguish them. Absence of a row also
 does not prove biological absence of a crossover: these are inferred events,
 and v2.8 skips blocks with at most two positions and begins comparisons at
 index 2 (omitting the first adjacent pair). This follows directly from
-`find_recombination` above.
+the [block-length guard and comparison loop](https://github.com/whatshap/whatshap/blob/f07423a7ba0c7609e7d4d5c73fb5e4e240057830/whatshap/pedigree.py#L157-L160).
 
 Transmission labels must also be interpreted within their phase-block
 orientation; the binary indices are not automatically Tapestry's A/B/C/D
 labels across disconnected blocks. Tapestry's trio workflow therefore still
 needs its parent/child phased-allele comparison to assign parental homologs
 in blocks without reported events. The current
-[`run-whatshap.sh`](../run-whatshap.sh) does not request this optional report.
+[`run-whatshap.sh` invocation](https://github.com/quinlan-lab/tapestry/blob/438d3838b4a7725d5676611358008e3b63b8976f/run-whatshap.sh#L143-L152) does not request this optional report.
