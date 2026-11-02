@@ -1,0 +1,6 @@
+region	chr22:20500000-21500000
+child	NA12879
+father	NA12877
+mother	NA12878
+read_phased_source	/scratch/ucgd/lustre-labs/quinlan/data-shared/read-backed-phasing
+inheritance_source	/scratch/ucgd/lustre-labs/quinlan/data-shared/haplotype-maps/CEPH1463.GRCh38
