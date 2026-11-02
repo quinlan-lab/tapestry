@@ -25,3 +25,10 @@ trio_dev_data/input/chr*.fa
 trio_dev_data/input/chr*.fa.fai
 # Rendered IGV session (generate with trio_no_methylation_igv_session.generate.sh)
 trio_no_methylation_igv_session.xml
+
+# Archived legacy runs and temporary fixture-generation files.
+trio_dev_data/archive/
+trio_dev_data/.input.*/
+trio_dev_data/input/*.source.txt
+trio_dev_data/input/fixture.tsv
+trio_dev_data/input/.reference.*/

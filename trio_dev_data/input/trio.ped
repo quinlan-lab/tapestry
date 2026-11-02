@@ -1,2 +1,12 @@
-# https://github.com/Platinum-Pedigree-Consortium/Platinum-Pedigree-Datasets?tab=readme-ov-file#accessing-controlled-samples
-1463	NA12878	NA12891	NA12892	2	UW
+# Public-sharing provenance (Platinum Pedigree/Palladium release):
+# NA12879, NA12877, and NA12878 are explicitly listed as consented for public access:
+# https://pmc.ncbi.nlm.nih.gov/articles/PMC11326147/ (Data availability)
+# Consortium access guidance (distinguishes open and controlled samples):
+# https://github.com/Platinum-Pedigree-Consortium/Platinum-Pedigree-Datasets#accessing-controlled-samples
+# Public dataset license: CC BY 4.0; attribute the source and identify subsetting/modifications.
+# https://registry.opendata.aws/platinum-pedigree/
+# Applies to the public release; exact CHPC source-file provenance is not yet verified.
+# Subset to these three individuals before sharing; do not publish the full source family VCF.
+# Sex follows the consortium sample metadata: NA12879 = 2 (female).
+# family child father mother sex phenotype
+1463	NA12879	NA12877	NA12878	2	0
