@@ -87,7 +87,9 @@ c92e763af17271446194991e71917ac220593a5a3d40a06667be24178ef08cf2  hg38-blacklist
 
 ## Find the results
 
-The experiment writes one directory under `trio_dev_data/output/`. Start with
+By default, the runner writes all five branches to
+`trio_dev_data/output/crossover-experiments/`. Pass a new directory as the
+optional third argument to write the same layout elsewhere. Start with
 `quality/crossovers.tsv` for the four candidates and
 `quality/read-evidence/calls.tsv` for the evidence behind each classification.
 
