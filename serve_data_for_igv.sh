@@ -1,1 +1,0 @@
-python serve_data_for_igv.py --port 8000 --data-dir /scratch/ucgd/lustre-labs/quinlan/data-shared
