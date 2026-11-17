@@ -85,11 +85,30 @@ ce3ee1ca39356238f7aee438a40a88b4f1b9d80b316b263e16fb12402212d10f  chr22.fa
 c92e763af17271446194991e71917ac220593a5a3d40a06667be24178ef08cf2  hg38-blacklist.v2.bed.gz
 ```
 
-Each run under `trio_dev_data/output/crossover-experiments/` has the exact
-phasing command, log, raw WhatsHap report, indexed phased VCF, crossover TSV
-and BED. The quality run also has `read-evidence/calls.tsv` and
-`read-evidence/anchor-evidence.tsv`. TSV marker positions are one-based
-inclusive. BED is zero-based half-open.
+## Find the results
+
+The experiment writes one directory under `trio_dev_data/output/`. Start with
+`quality/crossovers.tsv` for the four candidates and
+`quality/read-evidence/calls.tsv` for the evidence behind each classification.
+
+```text
+trio_dev_data/output/crossover-experiments/
+├── baseline/                 Original VCF
+├── quality/                  Trio quality filter
+│   └── read-evidence/        Classifications and per-anchor counts
+├── public-mask/              Quality filter plus public region masks
+├── four-snp-mask/            Quality filter with four suspect SNPs removed
+└── depth18/                  Quality filter with a higher depth floor
+```
+
+Each branch contains `crossovers.tsv`, `crossovers.bed`, the raw
+`recombination.txt` report and the indexed `phased.vcf.gz`. The other files in
+each branch record the phasing command, logs and inputs for reproduction.
+Shared annotation BEDs and filtered input VCFs are at the experiment root.
+TSV marker positions are one-based inclusive. BED is zero-based half-open.
+
+The trio methylation workflow writes to sibling directories such as
+`trio_dev_data/output/pedmec-phasing/` when run.
 
 For IGV, select hg38 and load the local `crossovers.bed`, `phased.vcf.gz` and
 the indexed fixture BAMs. Load `segdup.bed` and `blacklist.bed` from the
