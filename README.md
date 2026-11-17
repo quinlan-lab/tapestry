@@ -314,7 +314,14 @@ File | Description
 `serve_data_for_igv.py` | HTTP server with range-request support for serving genomic data files for IGV to consume. Roots at `--data-dir` (default `trio_dev_data/`); point it at the production tree to inspect genome-wide output. Start with `.venv/bin/python serve_data_for_igv.py` (default port 8000).
 `trio_dev_data_igv_session.xml` | IGV session file that loads the dev data (haplotagged BAMs, phased VCFs, phase blocks, methylation bigwigs, and mismatch-site VCFs) over HTTP from `serve_data_for_igv.py`. The Resource paths point at `http://localhost:PORT/...`, so the server can run either locally on your laptop or remotely on CHPC (in which case tunnel with `ssh -L PORT:localhost:PORT <host>`). Open in IGV via File > Open Session after starting the server.
 
-**The trio dev run must be performed on CHPC, not on a local machine.** Although the dev data subset (`trio_dev_data/input/`) is small enough to commit and copy around, `aligned_bam_to_cpg_scores.sh` invokes the pb-CpG-tools binary from a CHPC-only path (`/uufs/chpc.utah.edu/common/HIPAA/u6018199/pb-CpG-tools-v3.0.0-x86_64-unknown-linux-gnu/bin`), which is not available locally. Because every later step consumes its output, the entire dev chain (and therefore `phase_meth_to_parent_haps.sh`) has to be run on CHPC.
+The checked-in trio fixture covers GRCh38 chr22:20,500,000–21,500,000.
+The [WhatsHap crossover experiments](analysis/crossover_experiments/README.md)
+run locally on that fixture and link to the code and results for the slide
+notes. For local crossover inspection in IGV, open the generated BEDs and
+indexed phased VCFs directly. The HTTP server and session listed above are for the
+legacy methylation tracks.
+
+**The full trio methylation dev run requires CHPC.** Although the dev data subset (`trio_dev_data/input/`) is small enough to commit and copy around, `aligned_bam_to_cpg_scores.sh` invokes the pb-CpG-tools binary from a CHPC-only path (`/uufs/chpc.utah.edu/common/HIPAA/u6018199/pb-CpG-tools-v3.0.0-x86_64-unknown-linux-gnu/bin`), which is not available locally. Because every later step consumes its output, the entire dev chain (and therefore `phase_meth_to_parent_haps.sh`) has to be run on CHPC.
 
 To run the trio workflow on the dev data, on CHPC:
 
@@ -324,7 +331,7 @@ To run the trio workflow on the dev data, on CHPC:
 
 # Pipeline (pass --dev-dir trio_dev_data to each step):
 ./run-whatshap.sh --dev-dir trio_dev_data
-./aligned_bam_to_cpg_scores.sh -t NA12878 NA12891 NA12892 --dev-dir trio_dev_data
+./aligned_bam_to_cpg_scores.sh -t NA12879 NA12877 NA12878 --dev-dir trio_dev_data
 ./phase_meth_to_parent_haps.sh --dev-dir trio_dev_data
 ./expand_to_all_cpgs.trio.sh --dev-dir trio_dev_data
 ```

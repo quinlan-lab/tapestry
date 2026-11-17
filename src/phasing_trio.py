@@ -5,26 +5,11 @@ import bioframe as bf
 import polars as pl
 
 from phasing import is_snv_het
+# Shared with crossover flank annotation; keep the historical helper name.
+from phase_sets import read_ps as _read_ps
 
 logger = logging.getLogger(__name__)
 
-
-def _read_ps(ps_all, si):
-    """Read one sample's phase-set (PS) id from a cyvcf2 format('PS') array.
-
-    Returns the PS as a string (to match phase_block_id in the blocks TSV), or
-    None when the sample has no PS at this site (unphased / homozygous). cyvcf2
-    encodes a missing integer as a large negative sentinel, so we treat any
-    negative value as missing; a real PS is a 1-based position and always > 0.
-    """
-    if ps_all is None:
-        return None
-    val = ps_all[si]
-    try:
-        v = int(val[0]) if hasattr(val, "__len__") else int(val)
-    except (TypeError, ValueError):
-        return None
-    return None if v < 0 else str(v)
 
 def get_phase_blocks(blocks_tsv: str, uid: str) -> pl.DataFrame:
     """
