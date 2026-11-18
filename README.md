@@ -304,24 +304,23 @@ cpg_is_allele_specific_mom | does the CpG dinucleotide appear in the reads of on
 
 ### Trio dev data
 
-A small development dataset (region `chr1:1000000-2000000` for the CEPH1463 trio) can be created and used to run and test the trio workflow locally. The following files support this:
+A small development dataset for the CEPH1463 trio can be used to test the trio workflow. The following files support this:
 
 File | Description
 :--- | :---
 `trio_dev_data_config.sh` | Defines the genomic region (`DEV_REGION`) used by all other dev data scripts.
 `trio_dev_data_create.sh` | Creates the dev dataset by subsetting the production VCF and BAM files to the dev region. Run on a machine with access to the production data: `./trio_dev_data_create.sh trio_dev_data`.
 `trio_dev_data_get_ref.sh` | Downloads the reference FASTA for the dev region chromosome from UCSC. Only needs to be run once: `./trio_dev_data_get_ref.sh trio_dev_data`.
-`serve_data_for_igv.py` | HTTP server with range-request support for serving genomic data files for IGV to consume. Roots at `--data-dir` (default `trio_dev_data/`); point it at the production tree to inspect genome-wide output. Start with `.venv/bin/python serve_data_for_igv.py` (default port 8000).
-`trio_dev_data_igv_session.xml` | IGV session file that loads the dev data (haplotagged BAMs, phased VCFs, phase blocks, methylation bigwigs, and mismatch-site VCFs) over HTTP from `serve_data_for_igv.py`. The Resource paths point at `http://localhost:PORT/...`, so the server can run either locally on your laptop or remotely on CHPC (in which case tunnel with `ssh -L PORT:localhost:PORT <host>`). Open in IGV via File > Open Session after starting the server.
 
 The checked-in trio fixture covers GRCh38 chr22:20,500,000–21,500,000.
 The [WhatsHap crossover experiments](analysis/crossover_experiments/README.md)
 run locally on that fixture and link to the code and results for the slide
-notes. For local crossover inspection in IGV, open the generated BEDs and
-indexed phased VCFs directly. The HTTP server and session listed above are for the
-legacy methylation tracks.
+notes. For local fixture inspection in IGV, open the generated BEDs and
+indexed phased VCFs directly.
 
-**The full trio methylation dev run requires CHPC.** Although the dev data subset (`trio_dev_data/input/`) is small enough to commit and copy around, `aligned_bam_to_cpg_scores.sh` invokes the pb-CpG-tools binary from a CHPC-only path (`/uufs/chpc.utah.edu/common/HIPAA/u6018199/pb-CpG-tools-v3.0.0-x86_64-unknown-linux-gnu/bin`), which is not available locally. Because every later step consumes its output, the entire dev chain (and therefore `phase_meth_to_parent_haps.sh`) has to be run on CHPC.
+The legacy methylation wrapper expects pb-CpG-tools v3.0.0 at a fixed CHPC
+installation path. A portable workflow needs to supply that executable in its
+runtime. PacBio publishes a Linux x86-64 build.
 
 To run the trio workflow on the dev data, on CHPC:
 
@@ -336,11 +335,42 @@ To run the trio workflow on the dev data, on CHPC:
 ./expand_to_all_cpgs.trio.sh --dev-dir trio_dev_data
 ```
 
-All output is written under `trio_dev_data/output/`. To inspect results in IGV, run `serve_data_for_igv.py` / `trio_dev_data_igv_session.xml` either directly on CHPC (tunnelling the port back to your laptop, as described above) or locally after copying `trio_dev_data/output/` back from CHPC. Running parts of the workflow locally on the truncated dev dataset is also useful for quick iteration, though steps that depend on the CHPC-only pb-CpG-tools binary (see above) must still be run on CHPC.
+All output is written under `trio_dev_data/output/`.
+
+### Open chr22 trio results on CHPC in IGV
+
+Start the range server on the CHPC host that will be the SSH tunnel endpoint.
+Give it the run's results directory containing `pedmec-phasing/` and
+`dna-methylation/`:
+
+```bash
+.venv/bin/python serve_data_for_igv.py --data-dir /absolute/path/to/chr22-run/output
+```
+
+On your Mac, forward port 8000 to that same host:
+
+```bash
+ssh -N -L 127.0.0.1:8000:127.0.0.1:8000 hunnicutt
+```
+
+In IGV Desktop, use **File > Open Session** to open
+[`trio_chr22_igv_session.xml`](trio_chr22_igv_session.xml) from the local
+checkout. It opens near the isolated paternal crossover and includes a saved
+region for the distance-flagged cluster. It loads model methylation BigWigs
+using the existing trio output filenames and the crossover candidates from
+`crossover-experiments/quality/crossovers.bed`.
+Keep indexes beside the corresponding tracks. For a different output layout,
+update the resource paths and matching track IDs in the XML.
+
+For remote pedigree data, the range server can still serve an explicit
+directory. Start it on CHPC with
+`.venv/bin/python serve_data_for_igv.py --data-dir /path/to/pedigree-data`,
+then forward port 8000 with `ssh -L 8000:localhost:8000 <host>` and load the
+track URLs in IGV.
 
 ## TODO
 
-- [ ] Extend the Nextflow pipeline (`main.nf`), which covers the pedigree-wise workflow, to the trio-wise workflow
+- [ ] Add a chromosome-parallel trio workflow for CHPC. Start with chr22 and validate distance-screened crossovers, crossover-aware bit-vector matching, and parental methylation assignments.
 - [ ] https://quinlangroup.slack.com/archives/C09MHJSPPEE/p1770676950847639 
 - [ ] https://quinlangroup.slack.com/archives/C09MHJSPPEE/p1770676759903709
 

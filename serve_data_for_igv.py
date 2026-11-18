@@ -20,7 +20,7 @@ http://localhost:PORT/<relative-path> under DIR, and tunnel from your laptop
 with `ssh -L PORT:localhost:PORT <host>`.
 
 Usage:
-    .venv/bin/python serve_data_for_igv.py [--port PORT] [--data-dir DIR]
+    .venv/bin/python serve_data_for_igv.py --data-dir DIR [--port PORT]
 """
 
 import argparse
@@ -38,9 +38,6 @@ WHOLE_FILE_SUFFIXES = (
     ".gtf", ".gff", ".gff3", ".bed", ".bedgraph",
 )
 
-DEFAULT_DATA_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "trio_dev_data")
-
-
 def _resolve(data_dir, filename):
     """Resolve a request path under data_dir, rejecting path traversal."""
     path = os.path.normpath(os.path.join(data_dir, filename))
@@ -57,6 +54,12 @@ async def handle(request):
         return web.Response(status=404, text=f"{filename} not found")
 
     file_size = os.path.getsize(path)
+    if request.method == "HEAD":
+        return web.Response(headers={
+            "Content-Length": str(file_size),
+            "Accept-Ranges": "bytes",
+        })
+
     range_header = request.headers.get("Range")
 
     if range_header:
@@ -107,9 +110,10 @@ async def handle(request):
 def main():
     parser = argparse.ArgumentParser(description="Serve genomic data files for IGV to consume")
     parser.add_argument("--port", type=int, default=8000)
-    parser.add_argument("--data-dir", default=DEFAULT_DATA_DIR,
-                        help="Directory to serve as the HTTP root (default: trio_dev_data)")
+    parser.add_argument("--data-dir", required=True, help="Directory to serve as the HTTP root")
     args = parser.parse_args()
+    if not os.path.isdir(args.data_dir):
+        parser.error(f"data directory does not exist: {args.data_dir}")
 
     # Configure logging so aiohttp's access logger (INFO) actually emits a line
     # per request; without a handler it is silent. Status codes show too, so a
