@@ -281,6 +281,37 @@ Configure process resources with the `trio_crossover_screening` label.
 
 Run `tests/run_nextflow_trio_smoke.sh` for the chr22 fixture check.
 
+### Crossover-aware trio haplotype maps
+
+For a phased chromosome VCF, generate a WhatsHap block list for each trio
+member and run the matcher in hap-map-only mode. If screening used a cutoff
+other than 10,000 bp, pass the same `--crossover-distance-bp` to the matcher.
+
+```bash
+# Set chrom, kid, dad, and mom to the chromosome and sample IDs.
+for sample in "$kid" "$dad" "$mom"; do
+  .venv/bin/whatshap stats --sample "$sample" --block-list "$sample.blocks.tsv" \
+    "$chrom.phased.vcf.gz"
+done
+PYTHONPATH=src:src/util .venv/bin/python src/phase_meth_to_parent_haps.py \
+  --kid_id "$kid" --dad_id "$dad" --mom_id "$mom" \
+  --vcf_pedmec_phased "$chrom.phased.vcf.gz" --crossovers-tsv "$chrom.crossovers.tsv" \
+  --blocks_tsv_kid "$kid.blocks.tsv" --blocks_tsv_dad "$dad.blocks.tsv" \
+  --blocks_tsv_mom "$mom.blocks.tsv" --output_dir hap-maps --skip-methylation
+```
+
+The matcher compares the child’s paternal and maternal alleles with the
+corresponding parent’s alleles within each `FORMAT/PS` pair. A homozygous
+child with no PS contributes its allele to the widest overlapping child
+block. Each parent’s comparisons are split at its isolated crossover
+brackets. Nearby brackets connect into clusters across both parents. The
+entire span of each cluster, including intervening gaps, is excluded for
+every parent with a call in that cluster. Both flanking markers are excluded
+from each bracket or cluster. Each remaining segment with informative SNVs
+gets its own haplotype label, concordance and mismatch sites. The script
+writes separate paternal and maternal hap-map BEDs with tabix indexes and
+mismatch sites in BED and indexed VCF formats.
+
 ### Shell workflow
 
 1. Phase variants using pedMEC-based trio phasing with the `run-whatshap.sh` script.

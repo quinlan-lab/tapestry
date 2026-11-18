@@ -19,6 +19,7 @@ Switch = TypedDict("Switch", {
     "position1": int, "position2": int, "state_before": str, "state_after": str,
     "recombination_cost": int,
 })
+UnresolvedSpan = tuple[str, int, int]  # chromosome, zero-based start, exclusive end
 
 
 def switches(path: Path) -> Iterator[Switch]:
@@ -68,6 +69,54 @@ def nearest_gaps(calls: list[Switch]) -> dict[str, int | None]:
     if len(calls) != len(gaps):
         raise ValueError("Duplicate crossover bracket for the same child and parent")
     return gaps
+
+
+def read_unresolved_spans(
+    path: Path, child_id: str, distance_bp: int = DISTANCE_BP,
+) -> dict[str, list[UnresolvedSpan]]:
+    """Read the screened TSV and return excluded spans for each parent.
+
+    A distance cluster is a connected component of brackets across both parents.
+    It excludes the entire interval from the first to last marker, including
+    gaps between calls, for every parent with a switch in that component.
+    """
+    if distance_bp < 0:
+        raise ValueError("Crossover distance must be non-negative")
+    brackets: dict[str, list[tuple[int, int, str, int]]] = defaultdict(list)
+    with path.open() as handle:
+        rows = csv.DictReader(handle, delimiter="\t")
+        if rows.fieldnames != COLUMNS:
+            raise ValueError(f"{path}: expected the screened WhatsHap crossover TSV header")
+        for row in rows:
+            try:
+                left, right = int(row["position1"]), int(row["position2"])
+                clustered = int(row["clustered"])
+            except (TypeError, ValueError) as exc:
+                raise ValueError(f"{path}:{rows.line_num}: invalid crossover coordinates or flag") from exc
+            chrom, parent = row["chromosome"], row["parent"]
+            if not (row["#child_id"] == child_id and chrom and parent in ("father", "mother")
+                    and 0 < left < right and clustered in (0, 1)):
+                raise ValueError(f"{path}:{rows.line_num}: invalid crossover for child {child_id}")
+            brackets[chrom].append((left, right, parent, clustered))
+
+    spans: dict[str, list[UnresolvedSpan]] = {"father": [], "mother": []}
+    for chrom, calls in brackets.items():
+        ordered = sorted(calls)
+        first = 0
+        while first < len(ordered):
+            left, right, _, _ = ordered[first]
+            stop = first + 1
+            while stop < len(ordered) and ordered[stop][0] - right <= distance_bp:
+                right = max(right, ordered[stop][1])
+                stop += 1
+            component = ordered[first:stop]
+            if any(flag != int(len(component) > 1) for _, _, _, flag in component):
+                raise ValueError(f"{path}: clustered flags disagree with the {distance_bp} bp cutoff "
+                                 f"at {chrom}:{left}-{right}")
+            for parent in {parent for _, _, parent, _ in component}:
+                spans[parent].append((chrom, left - 1, right))
+            first = stop
+    return spans
 
 
 def main() -> None:

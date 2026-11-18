@@ -10,6 +10,7 @@ from phasing_trio import (
 )
 from hap_map_trio import get_hap_map
 from hap_map import write_hap_map_blocks
+from report_whatshap_crossovers import DISTANCE_BP, read_unresolved_spans
 from get_meth_hap1_hap2 import read_meth_hap1_hap2
 from shell import shell
 from write_data import (
@@ -318,6 +319,14 @@ def main():
     parser.add_argument('--blocks_tsv_kid', required=True, help='WhatsHap blocks TSV for child')
     parser.add_argument('--blocks_tsv_dad', required=True, help='WhatsHap blocks TSV for father')
     parser.add_argument('--blocks_tsv_mom', required=True, help='WhatsHap blocks TSV for mother')
+    parser.add_argument(
+        '--crossovers-tsv', type=Path,
+        help='Distance-screened WhatsHap crossover TSV for the phased VCF',
+    )
+    parser.add_argument(
+        '--crossover-distance-bp', type=int, default=DISTANCE_BP,
+        help='Same cutoff used to screen the TSV (default: %(default)s)',
+    )
 
     # Methylation BEDs (from aligned_bam_to_cpg_scores.sh). Optional: not needed
     # when --skip-methylation is set, in which case only the hap-map blocks and
@@ -383,6 +392,11 @@ def main():
     Path(args.output_dir).mkdir(parents=True, exist_ok=True)
 
     kid_id, dad_id, mom_id = args.kid_id, args.dad_id, args.mom_id
+    unresolved_spans = None
+    if args.crossovers_tsv is not None:
+        unresolved_spans = read_unresolved_spans(args.crossovers_tsv, kid_id, args.crossover_distance_bp)
+        logger.info("Unresolved spans: paternal=%d, maternal=%d",
+                    len(unresolved_spans['father']), len(unresolved_spans['mother']))
 
     # Step 1: Get phase blocks for each individual (pre-computed by run-whatshap.sh)
     logger.info("Getting phase blocks for each individual...")
@@ -396,13 +410,16 @@ def main():
     df_kid_dad, df_kid_mom = get_all_phasing(
         args.vcf_pedmec_phased, kid_id, dad_id, mom_id,
         df_blocks_kid, df_blocks_dad, df_blocks_mom,
+        require_phase_sets=unresolved_spans is not None,
     )
     logger.info(f"Number of het sites in dad: {len(df_kid_dad)}, Number of het sites in mom: {len(df_kid_mom)}")
 
     # Step 3: Construct a hap map, consisting of intervals ("hap-map blocks") in which
     # haplotypes in the kid are mapped to haplotypes in the parents
     logger.info("Constructing hap map (hap-map blocks mapping kid haplotypes to parent haplotypes)...")
-    df_hap_map_pat, df_hap_map_mat, df_mismatch_pat, df_mismatch_mat = get_hap_map(df_kid_dad, df_kid_mom)
+    df_hap_map_pat, df_hap_map_mat, df_mismatch_pat, df_mismatch_mat = get_hap_map(
+        df_kid_dad, df_kid_mom, unresolved_spans=unresolved_spans,
+    )
     logger.info(f"Paternal hap map: {len(df_hap_map_pat)} blocks, Maternal hap map: {len(df_hap_map_mat)} blocks")
     logger.info(f"Paternal bitvector mismatches: {len(df_mismatch_pat)}, Maternal bitvector mismatches: {len(df_mismatch_mat)}")
 

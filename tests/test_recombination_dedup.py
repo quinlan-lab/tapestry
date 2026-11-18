@@ -53,6 +53,7 @@ for _path in (_REPO / "src" / "util", _REPO / "src"):
 from phasing_trio import get_phase_blocks, get_all_phasing  # noqa: E402
 from hap_map_trio import get_hap_map  # noqa: E402
 from hap_map import write_hap_map_blocks  # noqa: E402
+from report_whatshap_crossovers import COLUMNS, read_unresolved_spans  # noqa: E402
 
 # Trio hap-map SNV-count column, as passed by src/phase_meth_to_parent_haps.py.
 TRIO_NUM_HET_SNVS_COLUMN = "num_het_SNVs_in_parent"
@@ -183,6 +184,95 @@ class TrioHapMapNestedPhaseSetTests(unittest.TestCase):
         self.assertEqual(
             sorted(self.df_pat[TRIO_NUM_HET_SNVS_COLUMN].to_list()), [3, 4],
         )
+
+
+def _write_crossover_tsv(path, calls):
+    with path.open("w") as handle:
+        print(*COLUMNS, sep="\t", file=handle)
+        for start, end, parent, nearest, clustered in calls:
+            event = f"{KID}:chr1:{start}-{end}:{parent}"
+            print(event, KID, "chr1", parent, start, end, 1, 0, 45, nearest, clustered,
+                  sep="\t", file=handle)
+
+
+class TrioCrossoverMatchingTests(unittest.TestCase):
+    def test_independent_comparisons_split_nested_phase_pairs(self):
+        positions = [100, 150, 200, 230, 240, 260, 280, 300, 340, 350, 360, 450,
+                     500, 501, 502, 510, 599, 600, 630, 640, 650, 670, 680, 681, 800, 850, 900]
+        vcf = VCF_HEADER
+        for pos in positions:
+            nested = 500 <= pos <= 502
+            kid_ps = 500 if nested else 100
+            dad_ps = 999 if pos == 510 else kid_ps  # No matching block in the father.
+            pat = int(pos == 150 or (260 < pos < 600 and not nested))
+            mat = int((pos < 340 and pos != 300) or nested)
+            kid = f"{pat}|{mat}:{kid_ps}" if pat != mat else f"{pat}/{mat}:."
+            vcf += f"chr1\t{pos}\t.\tA\tG\t.\t.\t.\tGT:PS\t{kid}\t0|1:{dad_ps}\t0|1:100\n"
+
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            vcf_path, blocks, calls = root / "trio.vcf", root / "blocks.tsv", root / "calls.tsv"
+            vcf_path.write_text(vcf)
+            blocks.write_text(BLOCKS_TSV)
+            _write_crossover_tsv(calls, [
+                (230, 260, "father", 80, 0), (340, 360, "mother", 80, 0),
+                (600, 630, "father", 20, 1), (650, 680, "mother", 20, 1),
+            ])
+            spans = read_unresolved_spans(calls, KID, 20)
+            self.assertEqual(spans, {
+                "father": [("chr1", 229, 260), ("chr1", 599, 680)],
+                "mother": [("chr1", 339, 360), ("chr1", 599, 680)],
+            })
+            kid_dad, kid_mom = get_all_phasing(
+                str(vcf_path), KID, DAD, MOM,
+                *(get_phase_blocks(str(blocks), sample) for sample in (KID, DAD, MOM)),
+                require_phase_sets=True,
+            )
+
+        for paired, parent in [(kid_dad, "dad"), (kid_mom, "mom")]:
+            expected_positions = [pos for pos in positions if parent == "mom" or pos != 510]
+            self.assertEqual(paired["end"].to_list(), expected_positions)
+            nested = paired.filter(pl.col("end").is_between(500, 502))
+            self.assertEqual(nested["phase_block_id_kid"].to_list(), ["500"] * 3)
+            self.assertEqual(nested[f"phase_block_id_{parent}"].to_list(),
+                             ["500" if parent == "dad" else "100"] * 3)
+
+        pat, mat, mismatch_pat, mismatch_mat = get_hap_map(kid_dad, kid_mom, unresolved_spans=spans)
+        self.assertEqual(pat.select("start", "end", "paternal_haplotype", TRIO_NUM_HET_SNVS_COLUMN).rows(), [
+            (99, 229, "A", 3), (260, 599, "B", 7), (499, 502, "A", 3), (680, 900, "A", 4),
+        ])
+        self.assertEqual(mat.select("start", "end", "maternal_haplotype", TRIO_NUM_HET_SNVS_COLUMN).rows(), [
+            (99, 339, "D", 8), (360, 599, "C", 3), (499, 502, "D", 3), (680, 900, "C", 4),
+        ])
+        self.assertEqual(mismatch_pat["end"].to_list(), [150])
+        self.assertEqual(mismatch_mat["end"].to_list(), [300])
+        for parent, paired, hap_map in [("father", kid_dad, pat), ("mother", kid_mom, mat)]:
+            eligible = [pos for pos in paired["end"]
+                        if all(not start < pos <= end for _, start, end in spans[parent])]
+            self.assertEqual(hap_map[TRIO_NUM_HET_SNVS_COLUMN].sum(), len(eligible))
+
+        empty, _, mismatches, _ = get_hap_map(kid_dad, kid_mom, unresolved_spans={
+            "father": [("chr1", 0, 900)],
+        })
+        self.assertTrue(empty.is_empty())
+        self.assertEqual(empty.schema, pat.schema)
+        self.assertTrue(mismatches.is_empty())
+        self.assertEqual(mismatches.schema, mismatch_pat.schema)
+
+    def test_transitive_cluster_uses_full_span_for_affected_parent(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            calls = Path(tmp) / "calls.tsv"
+            _write_crossover_tsv(calls, [
+                (36, 40, "father", 10, 1), (1, 10, "father", 10, 1),
+                (20, 26, "father", 10, 1),
+            ])
+            self.assertEqual(read_unresolved_spans(calls, KID, 10), {
+                "father": [("chr1", 0, 40)], "mother": [],
+            })
+            with self.assertRaisesRegex(ValueError, "clustered flags disagree"):
+                read_unresolved_spans(calls, KID, 9)
+            _write_crossover_tsv(calls, [])
+            self.assertEqual(read_unresolved_spans(calls, KID, 10), {"father": [], "mother": []})
 
 
 class TrioHapMapBlocksWriterTests(unittest.TestCase):
