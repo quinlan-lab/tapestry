@@ -26,6 +26,7 @@
         "src/write_results_manifest.py",
         "src/filter_whatshap_crossovers_by_reads.py",
         "src/prefilter_whatshap_vcf.py",
+        "src/report_whatshap_crossovers.py",
         "src/util/phase_sets.py",
         "analysis/crossover_experiments/summarize.py"
     ]

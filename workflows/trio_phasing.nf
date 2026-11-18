@@ -88,6 +88,30 @@ process PHASE_TRIO_CHROMOSOME {
 }
 
 
+process SCREEN_TRIO_CROSSOVERS {
+    tag "${chrom}"
+    label 'trio_crossover_screening'
+    publishDir "${publish_root}/per_chrom_phased", mode: 'copy', overwrite: true
+
+    input:
+    tuple val(chrom), path(recombination)
+    path screener
+    val distance_bp
+    val publish_root
+
+    output:
+    tuple val(chrom), path("${chrom}.crossovers.tsv"), path("${chrom}.crossovers.bed"),
+        emit: crossover_candidates
+
+    script:
+    """
+    python3 "${screener}" --input "${recombination}" --chromosome "${chrom}" \\
+        --distance-bp "${distance_bp}" --tsv "${chrom}.crossovers.tsv" \\
+        --bed "${chrom}.crossovers.bed"
+    """
+}
+
+
 def phasingTargets(chromosomeList, region) {
     if (!chromosomeList) {
         error 'Trio phasing requires --chromosomes <chr1,chr2,...>'
@@ -121,6 +145,10 @@ workflow TRIO_PHASING {
     if (!inputs.outdir) {
         error 'Trio phasing requires --outdir <directory>'
     }
+    def distance_bp = inputs.crossoverDistanceBp.toString()
+    if (!(distance_bp ==~ /[0-9]+/)) {
+        error '--crossover-distance-bp must be a non-negative integer'
+    }
     def ped = requiredFile(inputs.ped, 'ped')
     def joint = requiredFile(inputs.jointVcf, 'joint-vcf')
     def joint_files = [joint, findIndex(joint, ["${joint.name}.csi", "${joint.name}.tbi"])]
@@ -133,6 +161,7 @@ workflow TRIO_PHASING {
     def father = indexedBam(inputs.fatherBam, 'father-bam')
     def mother = indexedBam(inputs.motherBam, 'mother-bam')
     def prefilter = file("${projectDir}/src/prefilter_whatshap_vcf.py", checkIfExists: true)
+    def screener = file("${projectDir}/src/report_whatshap_crossovers.py", checkIfExists: true)
     def shell_helpers = ['logging.sh', 'trio_ped.sh'].collect {
         file("${projectDir}/src/util/${it}", checkIfExists: true)
     }
@@ -143,7 +172,12 @@ workflow TRIO_PHASING {
         ped, joint_files, reference_files, child, father, mother,
         prefilter, shell_helpers, publish_root.toString()
     )
+    SCREEN_TRIO_CROSSOVERS(
+        PHASE_TRIO_CHROMOSOME.out.phased.map { chrom, vcf, index, report -> tuple(chrom, report) },
+        screener, distance_bp, publish_root.toString()
+    )
 
     emit:
     phased = PHASE_TRIO_CHROMOSOME.out.phased
+    crossover_candidates = SCREEN_TRIO_CROSSOVERS.out.crossover_candidates
 }

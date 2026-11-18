@@ -215,12 +215,13 @@ cpg_is_allele_specific | does the CpG dinucleotide appear in the reads correspon
 
 ## Trio-wise workflow
 
-### Nextflow trio variant phasing
+### Nextflow trio variant phasing and crossover screening
 
-Use `-entry trio` to run WhatsHap pedMEC once per requested chromosome. Use a
-six-column PED with one trio record and three indexed BAMs whose read-group
-`SM` tags match the PED sample IDs. The joint VCF must be bgzipped with a
-colocated `.csi` or `.tbi`. Keep BAM indexes (`.bai` or `.csi`) beside the
+Use `-entry trio` to run WhatsHap pedMEC and flag nearby inferred crossovers
+once per requested chromosome. Use a six-column PED with one trio record
+and three indexed BAMs whose read-group `SM` tags match the PED sample IDs.
+The joint VCF must be bgzipped with a colocated `.csi` or `.tbi`. Keep BAM
+indexes (`.bai` or `.csi`) beside the
 BAMs and the FASTA's `.fai` beside the reference. A BGZF FASTA also needs its
 `.gzi`. Run with Nextflow, bcftools, bgzip, and Python with pysam and WhatsHap
 2.8 on the worker's `PATH`. The fixture was tested with bcftools 1.23.
@@ -248,15 +249,35 @@ with production inputs on CHPC. Use the Slurm profile with the tools available
 on the compute nodes and configure resources with the `trio_phasing` process
 label.
 
-Each task subsets the joint VCF, applies the provisional filter (PASS or `.`,
-QUAL ≥20, called genotypes with GQ ≥20 and DP ≥10 in all three samples), clears
-existing phase, and runs pedMEC. The task publishes `<chrom>.phased.vcf.gz`,
-`<chrom>.phased.vcf.gz.tbi`, and `<chrom>.recombination.txt` under
-`<outdir>/per_chrom_phased/`. The crossover report contains raw candidates.
-The [chr22 experiment](analysis/crossover_experiments/README.md) used a
-provisional nearest-bracket gap of ≤10,000 bp to flag clusters, pooling both
-parents within a child and chromosome. Crossover screening and subsequent
-methylation steps are separate from this entry point.
+For each chromosome, `PHASE_TRIO_CHROMOSOME` subsets the joint VCF, applies the
+provisional filter (PASS or `.`, QUAL ≥20, called genotypes with GQ ≥20 and
+DP ≥10 in all three samples), clears existing phase, and runs pedMEC. It
+publishes `<chrom>.phased.vcf.gz`, `<chrom>.phased.vcf.gz.tbi`, and
+WhatsHap’s raw `<chrom>.recombination.txt` report under
+`<outdir>/per_chrom_phased/`.
+
+`SCREEN_TRIO_CROSSOVERS` reads the raw report and emits one record per parent
+whose transmitted haplotype switches between the two variant markers reported
+by WhatsHap. Each record spans both flanking markers. If both parents switch
+in one raw row, each parent gets its own record for that interval.
+
+For each record, the process finds the smallest gap to another inferred
+crossover for the same child and chromosome, considering both parents. For
+disjoint intervals, the gap is the later interval’s left marker position minus
+the earlier interval’s right marker position. Intervals that overlap or share
+a marker have a gap of zero. The process sets `clustered` to 1 when the smallest
+gap is at most `--crossover-distance-bp` and to 0 otherwise. The cutoff is a
+non-negative integer that defaults to 10,000 bp. See the
+[chr22 experiment](analysis/crossover_experiments/README.md).
+
+The process publishes all inferred crossovers with their `clustered` flags in
+`<chrom>.crossovers.tsv` and `<chrom>.crossovers.bed` alongside the raw report.
+The TSV records the two one-based marker positions, the parent, the transmitted
+haplotype at each marker, the WhatsHap recombination cost, and `nearest_gap_bp`.
+The BED spans the same markers in zero-based half-open coordinates and puts
+the event ID in column 4, the gap in column 10, and the flag in column 11.
+When a crossover has no neighbor, the gap is blank in TSV and `.` in BED.
+Configure process resources with the `trio_crossover_screening` label.
 
 Run `tests/run_nextflow_trio_smoke.sh` for the chr22 fixture check.
 
@@ -404,8 +425,8 @@ In IGV Desktop, use **File > Open Session** to open
 [`trio_chr22_igv_session.xml`](trio_chr22_igv_session.xml) from the local
 checkout. It opens near the isolated paternal crossover and includes a saved
 region for the distance-flagged cluster. It loads model methylation BigWigs
-using the existing trio output filenames and the crossover candidates from
-`crossover-experiments/quality/crossovers.bed`.
+using the existing trio output filenames and inferred WhatsHap crossovers from
+the quality-filtered experiment’s `crossover-experiments/quality/crossovers.bed`.
 Keep indexes beside the corresponding tracks. For a different output layout,
 update the resource paths and matching track IDs in the XML.
 

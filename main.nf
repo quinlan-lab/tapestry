@@ -29,6 +29,7 @@ params.fatherBam = null
 params.motherBam = null
 params.chromosomes = null
 params.region = null
+params.crossoverDistanceBp = 10000
 
 
 def resolvedPath(baseDir, value) {
@@ -701,11 +702,13 @@ workflow trio {
         motherBam: params.motherBam,
         chromosomes: params.chromosomes,
         region: params.region,
+        crossoverDistanceBp: params.crossoverDistanceBp,
         outdir: params.outdir
     ])
 
     emit:
     phased = TRIO_PHASING.out.phased
+    crossover_candidates = TRIO_PHASING.out.crossover_candidates
 }
 
 
