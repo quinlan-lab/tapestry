@@ -8,7 +8,7 @@ export NXF_OFFLINE=true
 
 usage() {
     echo "Usage: $0"
-    echo "Check local Nextflow trio phasing and crossover screening on the chr22 fixture."
+    echo "Check local Nextflow trio phasing, crossover screening, and bit-vector matching on the chr22 fixture."
 }
 if [[ ${1:-} == -h || ${1:-} == --help ]]; then
     usage
@@ -18,7 +18,7 @@ if [[ $# -ne 0 ]]; then
     usage >&2
     exit 2
 fi
-for tool in "$nextflow_bin" bcftools bgzip python3; do
+for tool in "$nextflow_bin" bcftools bgzip tabix python3; do
     command -v "$tool" >/dev/null || { echo "Missing prerequisite: $tool" >&2; exit 1; }
 done
 if [[ "$(python3 -m whatshap --version)" != 2.8 ]]; then
@@ -92,6 +92,32 @@ chr22	20503754	20510653	NA12879:chr22:20503755-20510653:father	0	.	20503754	2051
 chr22	20959351	20961970	NA12879:chr22:20959352-20961970:father	0	.	20959351	20961970	0	448699	0
 EXPECTED
 
+hap_maps=results/per_chrom_hap_maps/chr22
+paternal="$hap_maps/NA12879.hap-map-blocks.paternal.bed.gz"
+# Query the bases immediately outside the one-based inclusive isolated bracket.
+left="$(tabix "$paternal" chr22:20959351-20959351 | cut -f 4 | cut -d, -f 1-2)"
+right="$(tabix "$paternal" chr22:20961971-20961971 | cut -f 4 | cut -d, -f 1-2)"
+[[ "$left" == A,1.0 && "$right" == B,1.0 ]]
+assignments="$(tabix "$paternal" chr22:20959352-20961970)"
+[[ -z "$assignments" ]]
+
+for parent in paternal maternal; do
+    map="$hap_maps/NA12879.hap-map-blocks.$parent.bed"
+    mismatch="$hap_maps/NA12879.bit-vector-sites-mismatches.$parent"
+    test -s "$map.header"
+    test -s "$map.gz.tbi"
+    # Include the gap between the two clustered brackets and both outside markers.
+    assignments="$(tabix "$map.gz" chr22:20502763-20510653)"
+    [[ -z "$assignments" ]]
+    # This fixture has no mismatches in the resolved blocks.
+    test -f "$mismatch.bed"
+    test ! -s "$mismatch.bed"
+    test -s "$mismatch.bed.header"
+    test -s "$mismatch.vcf.gz.tbi"
+    mismatches="$(bcftools view -H "$mismatch.vcf.gz")"
+    [[ -z "$mismatches" ]]
+done
+
 for cutoff in 24 23; do
     "$nextflow_bin" "${common[@]}" -resume --crossover-distance-bp "$cutoff"
     expected=1
@@ -101,4 +127,4 @@ for cutoff in 24 23; do
     [[ "$(cut -f 11 "$results/chr22.crossovers.tsv" | paste -sd ',' -)" == "clustered,1,1,$expected,0" ]]
 done
 
-echo "PASS: indexed trio phasing, raw crossover parity, and crossover screening on the chr22 fixture"
+echo "PASS: indexed trio phasing, crossover screening, and parental haplotype matching on the chr22 fixture"

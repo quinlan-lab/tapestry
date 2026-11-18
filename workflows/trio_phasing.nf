@@ -112,6 +112,49 @@ process SCREEN_TRIO_CROSSOVERS {
 }
 
 
+process MATCH_TRIO_BIT_VECTORS {
+    tag "${chrom}"
+    label 'trio_bit_vector_matching'
+    publishDir "${publish_root}/per_chrom_hap_maps/${chrom}", mode: 'copy', overwrite: true
+
+    input:
+    tuple val(chrom), path(vcf), path(index), path(crossovers)
+    path ped, stageAs: 'trio.ped'
+    path source_dir
+    val distance_bp
+    val publish_root
+
+    output:
+    tuple val(chrom),
+        path('*.hap-map-blocks.{paternal,maternal}.bed*', arity: '6'),
+        path('*.bit-vector-sites-mismatches.{paternal,maternal}.*', arity: '8'),
+        emit: parental_maps
+
+    script:
+    """
+    set -euo pipefail
+    source "${source_dir}/util/logging.sh"
+    source "${source_dir}/util/trio_ped.sh"
+    read_trio_ids "${ped}"
+
+    for sample in "\$kid_id" "\$dad_id" "\$mom_id"; do
+        python3 -m whatshap stats --sample "\$sample" --block-list "\$sample.blocks.tsv" \\
+            "${vcf}" > "\$sample.stats.tsv" 2> "\$sample.stats.log"
+    done
+
+    export PYTHONDONTWRITEBYTECODE=1
+    export PYTHONPATH="${source_dir}:${source_dir}/util"
+    export POLARS_MAX_THREADS="${task.cpus}"
+    python3 "${source_dir}/phase_meth_to_parent_haps.py" \\
+        --kid_id "\$kid_id" --dad_id "\$dad_id" --mom_id "\$mom_id" \\
+        --vcf_pedmec_phased "${vcf}" --crossovers-tsv "${crossovers}" \\
+        --crossover-distance-bp "${distance_bp}" \\
+        --blocks_tsv_kid "\$kid_id.blocks.tsv" --blocks_tsv_dad "\$dad_id.blocks.tsv" \\
+        --blocks_tsv_mom "\$mom_id.blocks.tsv" --output_dir . --skip-methylation
+    """
+}
+
+
 def phasingTargets(chromosomeList, region) {
     if (!chromosomeList) {
         error 'Trio phasing requires --chromosomes <chr1,chr2,...>'
@@ -176,8 +219,19 @@ workflow TRIO_PHASING {
         PHASE_TRIO_CHROMOSOME.out.phased.map { chrom, vcf, index, report -> tuple(chrom, report) },
         screener, distance_bp, publish_root.toString()
     )
+    matching_inputs = PHASE_TRIO_CHROMOSOME.out.phased
+        .map { chrom, vcf, index, report -> tuple(chrom, vcf, index) }
+        .join(
+            SCREEN_TRIO_CROSSOVERS.out.crossover_candidates.map { chrom, tsv, bed -> tuple(chrom, tsv) },
+            failOnDuplicate: true, failOnMismatch: true
+        )
+    MATCH_TRIO_BIT_VECTORS(
+        matching_inputs, ped, file("${projectDir}/src", checkIfExists: true),
+        distance_bp, publish_root.toString()
+    )
 
     emit:
     phased = PHASE_TRIO_CHROMOSOME.out.phased
     crossover_candidates = SCREEN_TRIO_CROSSOVERS.out.crossover_candidates
+    parental_maps = MATCH_TRIO_BIT_VECTORS.out.parental_maps
 }

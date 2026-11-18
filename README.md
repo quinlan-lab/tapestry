@@ -215,16 +215,18 @@ cpg_is_allele_specific | does the CpG dinucleotide appear in the reads correspon
 
 ## Trio-wise workflow
 
-### Nextflow trio variant phasing and crossover screening
+### Nextflow trio phasing, crossover screening, and haplotype matching
 
-Use `-entry trio` to run WhatsHap pedMEC and flag nearby inferred crossovers
-once per requested chromosome. Use a six-column PED with one trio record
+Use `-entry trio` to run WhatsHap pedMEC, screen inferred crossovers by distance,
+and match child and parent bit vectors once per requested chromosome.
+Use a six-column PED with one trio record
 and three indexed BAMs whose read-group `SM` tags match the PED sample IDs.
 The joint VCF must be bgzipped with a colocated `.csi` or `.tbi`. Keep BAM
 indexes (`.bai` or `.csi`) beside the
 BAMs and the FASTA's `.fai` beside the reference. A BGZF FASTA also needs its
-`.gzi`. Run with Nextflow, bcftools, bgzip, and Python with pysam and WhatsHap
-2.8 on the worker's `PATH`. The fixture was tested with bcftools 1.23.
+`.gzi`. Run with Nextflow, bcftools, bgzip, and a Python environment with the
+trio script dependencies from `requirements.txt`, including WhatsHap 2.8, on
+the worker's `PATH`. The fixture was tested with bcftools 1.23.
 
 ```bash
 # Run from the repository root. Prepare the reference once.
@@ -279,7 +281,21 @@ the event ID in column 4, the gap in column 10, and the flag in column 11.
 When a crossover has no neighbor, the gap is blank in TSV and `.` in BED.
 Configure process resources with the `trio_crossover_screening` label.
 
-Run `tests/run_nextflow_trio_smoke.sh` for the chr22 fixture check.
+After screening, `MATCH_TRIO_BIT_VECTORS` pairs each chromosome's phased VCF
+with its screened TSV, generates the trio's WhatsHap block lists, and runs
+the crossover-aware matcher with the same distance cutoff. It publishes the
+following files under `<outdir>/per_chrom_hap_maps/<chrom>/` for each parent.
+
+- `<child>.hap-map-blocks.<paternal|maternal>.bed.gz` with its tabix index and
+  BED column header file. The fourth BED field contains the parental haplotype,
+  concordance, and informative SNV count.
+- `<child>.bit-vector-sites-mismatches.<paternal|maternal>.bed` with its column
+  header file, plus an indexed VCF for visualization. A parent with zero
+  mismatches has an empty BED and a header-only VCF.
+
+Configure matching resources with the `trio_bit_vector_matching` process label.
+Run `tests/run_nextflow_trio_smoke.sh` to verify the A-to-B paternal assignment
+and the unresolved bracket and cluster span on the chr22 fixture.
 
 ### Crossover-aware trio haplotype maps
 

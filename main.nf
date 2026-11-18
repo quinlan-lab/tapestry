@@ -709,6 +709,7 @@ workflow trio {
     emit:
     phased = TRIO_PHASING.out.phased
     crossover_candidates = TRIO_PHASING.out.crossover_candidates
+    parental_maps = TRIO_PHASING.out.parental_maps
 }
 
 
