@@ -215,6 +215,53 @@ cpg_is_allele_specific | does the CpG dinucleotide appear in the reads correspon
 
 ## Trio-wise workflow
 
+### Nextflow trio variant phasing
+
+Use `-entry trio` to run WhatsHap pedMEC once per requested chromosome. Use a
+six-column PED with one trio record and three indexed BAMs whose read-group
+`SM` tags match the PED sample IDs. The joint VCF must be bgzipped with a
+colocated `.csi` or `.tbi`. Keep BAM indexes (`.bai` or `.csi`) beside the
+BAMs and the FASTA's `.fai` beside the reference. A BGZF FASTA also needs its
+`.gzi`. Run with Nextflow, bcftools, bgzip, and Python with pysam and WhatsHap
+2.8 on the worker's `PATH`. The fixture was tested with bcftools 1.23.
+
+```bash
+# Run from the repository root. Prepare the reference once.
+./trio_dev_data_get_ref.sh trio_dev_data
+export PATH="$PWD/.venv/bin:$PATH"
+fixture=trio_dev_data/input
+nextflow run . -entry trio \
+  --ped "$fixture/trio.ped" \
+  --joint-vcf "$fixture/CEPH-1463.joint.GRCh38.deepvariant.glnexus.vcf.gz" \
+  --reference-fasta "$fixture/chr22.fa" \
+  --child-bam "$fixture/NA12879.GRCh38.haplotagged.bam" \
+  --father-bam "$fixture/NA12877.GRCh38.haplotagged.bam" \
+  --mother-bam "$fixture/NA12878.GRCh38.haplotagged.bam" \
+  --chromosomes chr22 --region chr22:20500000-21500000 \
+  --outdir trio_dev_data/output/nextflow-trio
+```
+
+Supply a comma-separated chromosome list for chromosome-parallel runs. The
+optional `--region CHROM:START-END` uses one-based inclusive variant positions
+and requires a single matching chromosome. Omit it when running whole chr22
+with production inputs on CHPC. Use the Slurm profile with the tools available
+on the compute nodes and configure resources with the `trio_phasing` process
+label.
+
+Each task subsets the joint VCF, applies the provisional filter (PASS or `.`,
+QUAL ≥20, called genotypes with GQ ≥20 and DP ≥10 in all three samples), clears
+existing phase, and runs pedMEC. The task publishes `<chrom>.phased.vcf.gz`,
+`<chrom>.phased.vcf.gz.tbi`, and `<chrom>.recombination.txt` under
+`<outdir>/per_chrom_phased/`. The crossover report contains raw candidates.
+The [chr22 experiment](analysis/crossover_experiments/README.md) used a
+provisional nearest-bracket gap of ≤10,000 bp to flag clusters, pooling both
+parents within a child and chromosome. Crossover screening and subsequent
+methylation steps are separate from this entry point.
+
+Run `tests/run_nextflow_trio_smoke.sh` for the chr22 fixture check.
+
+### Shell workflow
+
 1. Phase variants using pedMEC-based trio phasing with the `run-whatshap.sh` script.
 2. Use `aligned_bam_to_cpg_scores.sh` to generate count- and model-based methylation levels from the haplotagged BAM files produced in step 1, for each trio member (kid, dad, and mom).
 3. Phase count- and model-based methylation data in kid to parental haplotypes (A/B in dad, C/D in mom) using the `phase_meth_to_parent_haps.sh` script, which uses the data produced in steps 1 and 2.

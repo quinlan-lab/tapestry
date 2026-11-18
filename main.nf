@@ -1,4 +1,6 @@
 import java.nio.file.Paths
+include { TRIO_PHASING } from './workflows/trio_phasing'
+
 nextflow.enable.dsl = 2
 
 params.outputsJson = null
@@ -21,6 +23,12 @@ params.qcDiscordanceThreshold = 0.4
 params.qcMinPairedCpgs = 100
 params.bigwig = true
 params.container = null
+params.jointVcf = null
+params.childBam = null
+params.fatherBam = null
+params.motherBam = null
+params.chromosomes = null
+params.region = null
 
 
 def resolvedPath(baseDir, value) {
@@ -680,6 +688,24 @@ workflow RUN_VALIDATION {
 
 workflow validate {
     RUN_VALIDATION()
+}
+
+
+workflow trio {
+    TRIO_PHASING([
+        ped: params.ped,
+        jointVcf: params.jointVcf,
+        reference: params.referenceFasta,
+        childBam: params.childBam,
+        fatherBam: params.fatherBam,
+        motherBam: params.motherBam,
+        chromosomes: params.chromosomes,
+        region: params.region,
+        outdir: params.outdir
+    ])
+
+    emit:
+    phased = TRIO_PHASING.out.phased
 }
 
 
