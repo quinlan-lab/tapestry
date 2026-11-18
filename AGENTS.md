@@ -132,7 +132,7 @@ paths; its data-creation scripts still depend on site-local source data.
 - A variant belongs to the phase set named by that sample's VCF `FORMAT/PS`
   value. Do not infer membership only by overlapping block spans: block spans can
   nest. Each informative SNV must contribute to exactly one `(child phase set,
-  parent phase set)` group. The recombination regression test protects this.
+  parent phase set)` group. The trio hap-map regression tests protect this.
 - Trio labels: child hap1 = paternal, child hap2 = maternal; father hap1/hap2 =
   A/B; mother hap1/hap2 = C/D. A/B/C/D identify fixed parental haplotypes, not
   transmitted/non-transmitted status.

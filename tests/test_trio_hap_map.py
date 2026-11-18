@@ -34,7 +34,7 @@ site, so any kid genotype/phasing is consistent with inheritance.
 
 Run with the CI discovery command, or directly as a script:
     PYTHONPATH=src:src/util .venv/bin/python -m unittest discover -s tests -p 'test_*.py'
-    .venv/bin/python tests/test_recombination_dedup.py
+    .venv/bin/python tests/test_trio_hap_map.py
 """
 
 import gzip
