@@ -1,5 +1,11 @@
 # WhatsHap crossover experiments on chr22
 
+This is the analysis for the
+[crossover-filter slide deck](https://docs.google.com/presentation/d/1DNbL8Fv1w71YkX4RbH7z1vQOdtUXww-2XkzPDmkIMVo/edit).
+The subsequent [crossover-aware trio methylation analysis](../nextflow-trio-model/README.md)
+records the phase blocks, resolved bit-vector matches, and methylation figures
+in the second deck. See the [analysis index](../README.md) for both output branches.
+
 The checked-in GRCh38 fixture covers chr22:20,500,000–21,500,000 for NA12879
 (child), NA12877 (father) and NA12878 (mother). These are candidate switches from
 WhatsHap 2.8 with bcftools 1.23. A raw WhatsHap row can report a switch for both

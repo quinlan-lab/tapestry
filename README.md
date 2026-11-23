@@ -433,6 +433,11 @@ run locally on that fixture and link to the code and results for the slide
 notes. For local fixture inspection in IGV, open the generated BEDs and
 indexed phased VCFs directly.
 
+The subsequent [trio model methylation analysis](analysis/nextflow-trio-model/README.md)
+records and reproduces the second deck's phase blocks, crossover-aware parental
+maps, and child methylation figures. The [analysis index](analysis/README.md)
+maps both slide decks to their source and output directories.
+
 The legacy methylation wrapper expects pb-CpG-tools v3.0.0 at a fixed CHPC
 installation path. A portable workflow needs to supply that executable in its
 runtime. PacBio publishes a Linux x86-64 build.

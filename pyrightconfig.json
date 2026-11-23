@@ -28,6 +28,7 @@
         "src/prefilter_whatshap_vcf.py",
         "src/report_whatshap_crossovers.py",
         "src/util/phase_sets.py",
-        "analysis/crossover_experiments/summarize.py"
+        "analysis/crossover_experiments/summarize.py",
+        "analysis/nextflow-trio-model/summarize.py"
     ]
 }
