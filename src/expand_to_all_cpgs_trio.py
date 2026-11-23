@@ -17,7 +17,6 @@ import polars as pl
 
 import bioframe as bf
 
-from memory_profiler import profile
 
 from read_data import read_bed_and_header
 from write_data import write_methylation
@@ -155,6 +154,9 @@ def _compute_proximity_one_side(df, bed_het_site_mismatches, side):
     Returns:
         DataFrame with an added is_within_{distance}bp_of_mismatch_site_{side} column
     """
+    if Path(bed_het_site_mismatches).stat().st_size == 0:
+        return df.with_columns(pl.lit(False).alias(
+            f'is_within_{CPG_SITE_MISMATCH_SITE_DISTANCE}bp_of_mismatch_site_{side}'))
     df_sites_mismatch = read_bed_and_header(bed_het_site_mismatches)
 
     # Integer columns that bioframe's closest() will convert to float (due to NaN)
@@ -626,7 +628,6 @@ def label_cpgs_as_allele_specific(df):
     return df.select(base_cols + new_cols)
 
 
-@profile # type:ignore
 def main():
     parser = argparse.ArgumentParser(
         description='Expand output of tapestry trio workflow to include all CpG sites and unphased DNA methylation levels'
@@ -749,4 +750,5 @@ def main():
 
 
 if __name__ == "__main__":
-    main()
+    from memory_profiler import profile
+    profile(main)()

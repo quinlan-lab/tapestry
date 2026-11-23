@@ -215,10 +215,11 @@ cpg_is_allele_specific | does the CpG dinucleotide appear in the reads correspon
 
 ## Trio-wise workflow
 
-### Nextflow trio phasing, crossover screening, and haplotype matching
+### Nextflow trio model methylation workflow
 
 Use `-entry trio` to run WhatsHap pedMEC, screen inferred crossovers by distance,
-and match child and parent bit vectors once per requested chromosome.
+match child and parent bit vectors, haplotag BAMs, call model methylation, and
+expand to all CpGs once per requested chromosome.
 Use a six-column PED with one trio record
 and three indexed BAMs whose read-group `SM` tags match the PED sample IDs.
 The joint VCF must be bgzipped with a colocated `.csi` or `.tbi`. Keep BAM
@@ -226,7 +227,9 @@ indexes (`.bai` or `.csi`) beside the
 BAMs and the FASTA's `.fai` beside the reference. A BGZF FASTA also needs its
 `.gzi`. Run with Nextflow, bcftools, bgzip, and a Python environment with the
 trio script dependencies from `requirements.txt`, including WhatsHap 2.8, on
-the worker's `PATH`. The fixture was tested with bcftools 1.23.
+the worker's `PATH`. Also install samtools and pb-CpG-tools v3.0.0
+(`aligned_bam_to_cpg_scores`) there. The existing pedigree Docker image does
+not supply pb-CpG-tools; supply a trio-capable runtime or use installed CHPC tools. The fixture was tested with bcftools 1.23.
 
 ```bash
 # Run from the repository root. Prepare the reference once.
@@ -296,6 +299,30 @@ following files under `<outdir>/per_chrom_hap_maps/<chrom>/` for each parent.
 Configure matching resources with the `trio_bit_vector_matching` process label.
 Run `tests/run_nextflow_trio_smoke.sh` to verify the A-to-B paternal assignment
 and the unresolved bracket and cluster span on the chr22 fixture.
+
+`CALL_TRIO_MODEL` strips pre-existing HP/PS tags, retains MM/ML, haplotags
+all three BAMs against the chromosome's pedMEC VCF, indexes them, and runs
+pb-CpG-tools with `--pileup-mode model`, `--min-coverage 10` and `--min-mapq 1`.
+Override the latter two with `--min-coverage` and `--trio-min-mapq`.
+Resources come from the `trio_model_calling` and `trio_model_expansion` labels.
+
+`EXPAND_TRIO_MODEL` consumes the screened paternal/maternal maps, retaining
+child hap1=paternal, hap2=maternal; father hap1/hap2=A/B; mother hap1/hap2=C/D.
+Each unresolved side has null haplotype measurements and coverage; combined
+model measurements remain available. Original joint-call SNVs, including those
+excluded from phasing, annotate allele-specific CpGs. No count measurement is
+created. Reference CpGs and sample-only combined CpGs are retained, including
+uncovered sites. A region restricts final CpGs by cytosine coordinate; annotation
+also includes the following G base. As in the legacy trio table, final intervals
+span the CG dinucleotide; BigWigs span the cytosine base and use a 0–1 scale.
+
+Outputs are chromosome-local: `per_chrom_model/CHROM/` contains indexed
+haplotagged BAMs and caller BEDs; `per_chrom_methylation/CHROM/` contains
+`trio.dna-methylation.all_cpgs.sorted.bed.gz` and `.tbi`, six haplotype and three
+combined model BigWigs, and `trio.model.qc.json`. The table retains the legacy
+trio model, coverage, map, mismatch and variant columns while omitting count
+methylation columns. Full-precision `*.hap-map.tsv` files accompany map tracks.
+No chromosome concatenation is performed. Run production chromosomes on CHPC.
 
 ### Crossover-aware trio haplotype maps
 

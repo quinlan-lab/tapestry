@@ -128,6 +128,7 @@ process MATCH_TRIO_BIT_VECTORS {
     tuple val(chrom),
         path('*.hap-map-blocks.{paternal,maternal}.bed*', arity: '6'),
         path('*.bit-vector-sites-mismatches.{paternal,maternal}.*', arity: '8'),
+        path('*.hap-map.tsv', arity: '2'),
         emit: parental_maps
 
     script:
@@ -151,6 +152,96 @@ process MATCH_TRIO_BIT_VECTORS {
         --crossover-distance-bp "${distance_bp}" \\
         --blocks_tsv_kid "\$kid_id.blocks.tsv" --blocks_tsv_dad "\$dad_id.blocks.tsv" \\
         --blocks_tsv_mom "\$mom_id.blocks.tsv" --output_dir . --skip-methylation
+    """
+}
+
+
+process CALL_TRIO_MODEL {
+    tag "${target}"
+    label 'trio_model_calling'
+    publishDir "${publish_root}/per_chrom_model/${chrom}", mode: 'copy', overwrite: true
+
+    input:
+    tuple val(chrom), path(vcf), path(index), val(target)
+    path ped, stageAs: 'trio.ped'
+    path reference_files, stageAs: 'reference/*'
+    path child_files, stageAs: 'child/*'
+    path father_files, stageAs: 'father/*'
+    path mother_files, stageAs: 'mother/*'
+    path shell_helpers
+    val min_coverage
+    val min_mapq
+    val publish_root
+
+    output:
+    tuple val(chrom), val(target), path('model'), emit: models
+    tuple val(chrom), path('haplotagged/*'), emit: haplotagged
+
+    script:
+    def reference = shellQuote(reference_files[0])
+    def bam_paths = [child_files, father_files, mother_files].collect { shellQuote(it[0]) }.join(' ')
+    """
+    set -euo pipefail
+    source ./logging.sh
+    source ./trio_ped.sh
+    read_trio_ids "${ped}"
+    mkdir model haplotagged
+    ids=("\$kid_id" "\$dad_id" "\$mom_id")
+    roles=(kid dad mom)
+    bams=(${bam_paths})
+    for i in 0 1 2; do
+        role="\${roles[\$i]}"
+        # Preserve MM/ML while removing inherited HP/PS labels before re-tagging.
+        samtools view -b -x HP -x PS -@ ${task.cpus} \\
+            -o stripped.bam "\${bams[\$i]}" "${target}"
+        samtools index -@ ${task.cpus} stripped.bam
+        python3 -m whatshap haplotag --reference ${reference} \\
+            --sample "\${ids[\$i]}" --output-threads ${task.cpus} \\
+            --output "haplotagged/\$role.haplotagged.bam" "${vcf}" stripped.bam
+        samtools index -@ ${task.cpus} "haplotagged/\$role.haplotagged.bam"
+        aligned_bam_to_cpg_scores --bam "haplotagged/\$role.haplotagged.bam" \\
+            --output-prefix "model/\$role" --threads ${task.cpus} \\
+            --min-coverage ${min_coverage} --min-mapq ${min_mapq} --pileup-mode model
+    done
+    """
+}
+
+process EXPAND_TRIO_MODEL {
+    tag "${target}"
+    label 'trio_model_expansion'
+    publishDir "${publish_root}/per_chrom_methylation/${chrom}", mode: 'copy', overwrite: true,
+        saveAs: { name -> name.tokenize('/').last() }
+
+    input:
+    tuple val(chrom), val(target), path(models), path(maps), path(mismatches), path(map_tables)
+    path ped, stageAs: 'trio.ped'
+    path joint_files, stageAs: 'joint/*'
+    path reference_files, stageAs: 'reference/*'
+    path source_dir
+    val publish_root
+
+    output:
+    tuple val(chrom), path('results/*.bed.gz'), path('results/*.bed.gz.tbi'),
+        path('results/*.bw', arity: '9'), path('results/*.json'), emit: methylation
+
+    script:
+    def reference = shellQuote(reference_files[0])
+    def joint = shellQuote(joint_files[0])
+    // Include the G base when a CpG's C is the last target base.
+    def annotation_target = target.contains(':') ? target.replaceFirst(/-([0-9]+)\$/, { all, end -> "-${end.toLong() + 1}" }) : target
+    """
+    set -euo pipefail
+    source "${source_dir}/util/logging.sh"
+    source "${source_dir}/util/trio_ped.sh"
+    read_trio_ids "${ped}"
+    bcftools view --regions "${annotation_target}" --regions-overlap 1 \\
+        -Ov -o original-trio.vcf ${joint}
+    export PYTHONPATH="${source_dir}:${source_dir}/util"
+    export POLARS_MAX_THREADS="${task.cpus}"
+    python3 "${source_dir}/trio_model_methylation.py" --model-dir "${models}" \\
+        --map-dir . --reference ${reference} --annotation-vcf original-trio.vcf \\
+        --target "${target}" --kid-id "\$kid_id" --dad-id "\$dad_id" --mom-id "\$mom_id" \\
+        --output-dir results
     """
 }
 
@@ -192,6 +283,11 @@ workflow TRIO_PHASING {
     if (!(distance_bp ==~ /[0-9]+/)) {
         error '--crossover-distance-bp must be a non-negative integer'
     }
+    for (setting in [inputs.minCoverage, inputs.minMapq]) {
+        if (!(setting.toString() ==~ /[0-9]+/)) {
+            error '--min-coverage and --trio-min-mapq must be non-negative integers'
+        }
+    }
     def ped = requiredFile(inputs.ped, 'ped')
     def joint = requiredFile(inputs.jointVcf, 'joint-vcf')
     def joint_files = [joint, findIndex(joint, ["${joint.name}.csi", "${joint.name}.tbi"])]
@@ -230,8 +326,23 @@ workflow TRIO_PHASING {
         distance_bp, publish_root.toString()
     )
 
+    CALL_TRIO_MODEL(
+        PHASE_TRIO_CHROMOSOME.out.phased.map { chrom, vcf, index, report -> tuple(chrom, vcf, index) }
+            .join(Channel.fromList(targets), failOnDuplicate: true, failOnMismatch: true),
+        ped, reference_files, child, father, mother, shell_helpers,
+        inputs.minCoverage, inputs.minMapq, publish_root.toString()
+    )
+    EXPAND_TRIO_MODEL(
+        CALL_TRIO_MODEL.out.models.join(MATCH_TRIO_BIT_VECTORS.out.parental_maps,
+            failOnDuplicate: true, failOnMismatch: true),
+        ped, joint_files, reference_files, file("${projectDir}/src", checkIfExists: true),
+        publish_root.toString()
+    )
+
     emit:
     phased = PHASE_TRIO_CHROMOSOME.out.phased
     crossover_candidates = SCREEN_TRIO_CROSSOVERS.out.crossover_candidates
     parental_maps = MATCH_TRIO_BIT_VECTORS.out.parental_maps
+    methylation = EXPAND_TRIO_MODEL.out.methylation
+    haplotagged = CALL_TRIO_MODEL.out.haplotagged
 }

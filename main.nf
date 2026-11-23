@@ -30,6 +30,7 @@ params.motherBam = null
 params.chromosomes = null
 params.region = null
 params.crossoverDistanceBp = 10000
+params.trioMinMapq = 1
 
 
 def resolvedPath(baseDir, value) {
@@ -703,6 +704,8 @@ workflow trio {
         chromosomes: params.chromosomes,
         region: params.region,
         crossoverDistanceBp: params.crossoverDistanceBp,
+        minCoverage: params.minCoverage,
+        minMapq: params.trioMinMapq,
         outdir: params.outdir
     ])
 
@@ -710,6 +713,8 @@ workflow trio {
     phased = TRIO_PHASING.out.phased
     crossover_candidates = TRIO_PHASING.out.crossover_candidates
     parental_maps = TRIO_PHASING.out.parental_maps
+    methylation = TRIO_PHASING.out.methylation
+    haplotagged = TRIO_PHASING.out.haplotagged
 }
 
 

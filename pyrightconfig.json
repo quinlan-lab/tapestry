@@ -8,6 +8,7 @@
     "extraPaths": ["src", "src/util"],
     "include": [
         "src/capture_versions.py",
+        "src/trio_model_methylation.py",
         "src/expand_model_to_all_cpgs.py",
         "src/filter_model_beds.py",
         "src/generate_reference_cpgs.py",

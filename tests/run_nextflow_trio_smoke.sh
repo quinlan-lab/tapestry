@@ -8,7 +8,7 @@ export NXF_OFFLINE=true
 
 usage() {
     echo "Usage: $0"
-    echo "Check local Nextflow trio phasing, crossover screening, and bit-vector matching on the chr22 fixture."
+    echo "Check local chromosome-parallel trio phasing and model methylation on the chr22 fixture."
 }
 if [[ ${1:-} == -h || ${1:-} == --help ]]; then
     usage
@@ -18,7 +18,7 @@ if [[ $# -ne 0 ]]; then
     usage >&2
     exit 2
 fi
-for tool in "$nextflow_bin" bcftools bgzip tabix python3; do
+for tool in "$nextflow_bin" bcftools bgzip tabix samtools aligned_bam_to_cpg_scores python3; do
     command -v "$tool" >/dev/null || { echo "Missing prerequisite: $tool" >&2; exit 1; }
 done
 if [[ "$(python3 -m whatshap --version)" != 2.8 ]]; then
@@ -118,6 +118,8 @@ for parent in paternal maternal; do
     [[ -z "$mismatches" ]]
 done
 
+PYTHONPATH="$repo_root/src:$repo_root/src/util" python3 "$repo_root/tests/check_trio_model_fixture.py" results
+
 for cutoff in 24 23; do
     "$nextflow_bin" "${common[@]}" -resume --crossover-distance-bp "$cutoff"
     expected=1
@@ -127,4 +129,4 @@ for cutoff in 24 23; do
     [[ "$(cut -f 11 "$results/chr22.crossovers.tsv" | paste -sd ',' -)" == "clustered,1,1,$expected,0" ]]
 done
 
-echo "PASS: indexed trio phasing, crossover screening, and parental haplotype matching on the chr22 fixture"
+echo "PASS: indexed trio phasing, screened parental maps, and model methylation on the chr22 fixture"
