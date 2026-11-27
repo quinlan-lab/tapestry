@@ -107,6 +107,71 @@ Nextflow outputs omit count-methylation columns. Final BED intervals span the
 CG dinucleotide; BigWigs span the cytosine base and use a 0–1 scale.
 
 <details>
+<summary>Trio output column definitions</summary>
+
+BED coordinates are zero-based, half-open. Read each file's header for its
+emitted columns and metadata. This reference also includes legacy shell
+count-methylation fields, which the Nextflow trio table omits.
+
+### Output format of trio workflow
+
+Legacy shell BEDs include a header containing run metadata and column headings. The `##source=` line records the script path followed by `with args` and a dictionary of the command-line arguments passed to `src/expand_to_all_cpgs_trio.py`. The final header line lists the column names in the form "#col1 col2 col3...".
+
+Column | Definition
+:--- | :---
+chrom | chromosome on which CpG site is found
+start_cpg | start coordinate of CpG dinucleotide
+end_cpg | end coordinate of CpG dinucleotide
+total_read_count_kid | total number of HiFi reads overlapping CpG site in the kid
+methylation_level_kid_count | count-based unphased methylation level in the kid
+methylation_level_kid_model | model-based unphased methylation level in the kid
+total_read_count_dad | total number of HiFi reads overlapping CpG site in dad
+methylation_level_dad_count | count-based unphased methylation level in dad
+methylation_level_dad_model | model-based unphased methylation level in dad
+total_read_count_mom | total number of HiFi reads overlapping CpG site in mom
+methylation_level_mom_count | count-based unphased methylation level in mom
+methylation_level_mom_model | model-based unphased methylation level in mom
+total_read_count_kid_pat | number of reads from the kid's paternal haplotype
+methylation_level_kid_pat_count | count-based methylation level on the kid's paternal haplotype
+total_read_count_kid_mat | number of reads from the kid's maternal haplotype
+methylation_level_kid_mat_count | count-based methylation level on the kid's maternal haplotype
+methylation_level_kid_pat_model | model-based methylation level on the kid's paternal haplotype
+methylation_level_kid_mat_model | model-based methylation level on the kid's maternal haplotype
+total_read_count_dad_A | number of reads from dad's haplotype A (hap1)
+methylation_level_dad_A_count | count-based methylation level on dad's haplotype A
+total_read_count_dad_B | number of reads from dad's haplotype B (hap2)
+methylation_level_dad_B_count | count-based methylation level on dad's haplotype B
+methylation_level_dad_A_model | model-based methylation level on dad's haplotype A
+methylation_level_dad_B_model | model-based methylation level on dad's haplotype B
+total_read_count_mom_C | number of reads from mom's haplotype C (hap1)
+methylation_level_mom_C_count | count-based methylation level on mom's haplotype C
+total_read_count_mom_D | number of reads from mom's haplotype D (hap2)
+methylation_level_mom_D_count | count-based methylation level on mom's haplotype D
+methylation_level_mom_C_model | model-based methylation level on mom's haplotype C
+methylation_level_mom_D_model | model-based methylation level on mom's haplotype D
+start_hap_map_block_pat | start of the paternal hap-map block
+end_hap_map_block_pat | end of the paternal hap-map block
+paternal_haplotype | which of dad's haplotypes (A or B) corresponds to the kid's paternal haplotype in this block
+paternal_concordance | bit-vector concordance between the kid's paternal allele sequence and dad's assigned haplotype (A or B) over the het SNVs in the paternal hap-map block. Both vectors come from the same `whatshap phase --ped` run. The assigned haplotype is defined as whichever of dad's two haplotypes gives the higher concordance, so the value lies in `[0.5, 1.0]` by construction
+num_het_SNVs_in_dad | number of heterozygous sites in dad within the paternal hap-map block
+start_hap_map_block_mat | start of the maternal hap-map block
+end_hap_map_block_mat | end of the maternal hap-map block
+maternal_haplotype | which of mom's haplotypes (C or D) corresponds to the kid's maternal haplotype in this block
+maternal_concordance | bit-vector concordance between the kid's maternal allele sequence and mom's assigned haplotype (C or D) over the het SNVs in the maternal hap-map block. Both vectors come from the same `whatshap phase --ped` run. The assigned haplotype is defined as whichever of mom's two haplotypes gives the higher concordance, so the value lies in `[0.5, 1.0]` by construction
+num_het_SNVs_in_mom | number of heterozygous sites in mom within the maternal hap-map block
+cpg_is_within_50bp_of_mismatch_site_pat | is the CpG site within 50bp of a het SNV in dad at which the kid's paternal allele disagrees with dad's assigned haplotype (a within-pedMEC bit-vector mismatch on the paternal side)
+cpg_is_within_50bp_of_mismatch_site_mat | is the CpG site within 50bp of a het SNV in mom at which the kid's maternal allele disagrees with mom's assigned haplotype (a within-pedMEC bit-vector mismatch on the maternal side)
+cpg_overlaps_at_least_one_snv | does the CpG dinucleotide overlap an SNV?
+snv_genotypes_kid | are the SNVs (if any) that overlap the CpG dinucleotide `hom` or `het` in the kid?
+cpg_is_allele_specific_kid | does the CpG dinucleotide appear in the reads of only one haplotype in the kid?
+snv_genotypes_dad | are the SNVs (if any) that overlap the CpG dinucleotide `hom` or `het` in dad?
+cpg_is_allele_specific_dad | does the CpG dinucleotide appear in the reads of only one haplotype in dad?
+snv_genotypes_mom | are the SNVs (if any) that overlap the CpG dinucleotide `hom` or `het` in mom?
+cpg_is_allele_specific_mom | does the CpG dinucleotide appear in the reads of only one haplotype in mom?
+
+</details>
+
+<details>
 <summary>Trio phasing, crossover rules, and output details</summary>
 
 For each chromosome, `PHASE_TRIO_CHROMOSOME` subsets the joint VCF, applies the
@@ -255,42 +320,12 @@ chromosome-wise to bound memory. BigWigs collapse repeated intervals only when
 their non-null values agree; conflicts fail.
 
 <details>
-<summary>Explore ancestry and transmission QC</summary>
-
-Open `<outdir>/visualizations/haplotype-ancestry/index.html` locally. Select a
-sample and click an inheritance block to trace its founder haplotype through the
-pedigree and compare mean methylation on the two haplotypes. Hover for counts
-and QC details. Blank spans indicate missing inheritance blocks;
-`inheritance map only` indicates no downstream methylation output. Neither
-label describes sequencing coverage. Copy the entire `haplotype-ancestry/`
-directory to move the offline visualization.
-
-The **Transmission QC** link compares parent–child methylation, separating
-completeness from concordance. Select both members for downstream processing to
-obtain a concordance estimate. Click a pair for chromosome details and hover for
-metrics and excluded-CpG counts. Colors show cohort-relative outlier severity;
-scores stay blank when fewer than four pairs are available.
-
-CpGs are paired by exact coordinates and matching transmitted founder labels,
-excluding mismatch windows and ambiguous labels or values. Callable fraction
-uses label-matched CpGs after exclusions as its denominator; inherited
-specificity additionally requires a measurement on the parent's non-transmitted
-haplotype. Ambiguous coordinates remain in shared-CpG counts but are excluded
-from eligible and paired counts. These comparisons alone do not establish
-inheritance of methylation state.
-
-</details>
-
-## Output column definitions
+<summary>Pedigree output column definitions</summary>
 
 BED coordinates are zero-based, half-open. Read each file's header for its
-emitted columns and metadata. The tables below also describe the legacy shell
-outputs. The Nextflow trio table omits count-methylation fields; the model-only
-pedigree table retains its count fields as nulls and names its configurable
-mismatch-proximity flag `cpg_is_within_mismatch_window`.
-
-<details>
-<summary>Pedigree column reference</summary>
+emitted columns and metadata. This reference also covers legacy shell outputs.
+The model-only Nextflow pedigree table retains count fields as nulls and names
+its configurable mismatch-proximity flag `cpg_is_within_mismatch_window`.
 
 ### Output format of pedigree workflow
 
@@ -327,74 +362,33 @@ cpg_is_allele_specific | does the CpG dinucleotide appear in the reads correspon
 </details>
 
 <details>
-<summary>Trio column reference</summary>
+<summary>Explore ancestry and transmission QC</summary>
 
-### Output format of trio workflow
+Open `<outdir>/visualizations/haplotype-ancestry/index.html` locally. Select a
+sample and click an inheritance block to trace its founder haplotype through the
+pedigree and compare mean methylation on the two haplotypes. Hover for counts
+and QC details. Blank spans indicate missing inheritance blocks;
+`inheritance map only` indicates no downstream methylation output. Neither
+label describes sequencing coverage. Copy the entire `haplotype-ancestry/`
+directory to move the offline visualization.
 
-Legacy shell BEDs include a header containing run metadata and column headings. The `##source=` line records the script path followed by `with args` and a dictionary of the command-line arguments passed to `src/expand_to_all_cpgs_trio.py`. The final header line lists the column names in the form "#col1 col2 col3...".
+The **Transmission QC** link compares parent–child methylation, separating
+completeness from concordance. Select both members for downstream processing to
+obtain a concordance estimate. Click a pair for chromosome details and hover for
+metrics and excluded-CpG counts. Colors show cohort-relative outlier severity;
+scores stay blank when fewer than four pairs are available.
 
-Column | Definition
-:--- | :---
-chrom | chromosome on which CpG site is found
-start_cpg | start coordinate of CpG dinucleotide
-end_cpg | end coordinate of CpG dinucleotide
-total_read_count_kid | total number of HiFi reads overlapping CpG site in the kid
-methylation_level_kid_count | count-based unphased methylation level in the kid
-methylation_level_kid_model | model-based unphased methylation level in the kid
-total_read_count_dad | total number of HiFi reads overlapping CpG site in dad
-methylation_level_dad_count | count-based unphased methylation level in dad
-methylation_level_dad_model | model-based unphased methylation level in dad
-total_read_count_mom | total number of HiFi reads overlapping CpG site in mom
-methylation_level_mom_count | count-based unphased methylation level in mom
-methylation_level_mom_model | model-based unphased methylation level in mom
-total_read_count_kid_pat | number of reads from the kid's paternal haplotype
-methylation_level_kid_pat_count | count-based methylation level on the kid's paternal haplotype
-total_read_count_kid_mat | number of reads from the kid's maternal haplotype
-methylation_level_kid_mat_count | count-based methylation level on the kid's maternal haplotype
-methylation_level_kid_pat_model | model-based methylation level on the kid's paternal haplotype
-methylation_level_kid_mat_model | model-based methylation level on the kid's maternal haplotype
-total_read_count_dad_A | number of reads from dad's haplotype A (hap1)
-methylation_level_dad_A_count | count-based methylation level on dad's haplotype A
-total_read_count_dad_B | number of reads from dad's haplotype B (hap2)
-methylation_level_dad_B_count | count-based methylation level on dad's haplotype B
-methylation_level_dad_A_model | model-based methylation level on dad's haplotype A
-methylation_level_dad_B_model | model-based methylation level on dad's haplotype B
-total_read_count_mom_C | number of reads from mom's haplotype C (hap1)
-methylation_level_mom_C_count | count-based methylation level on mom's haplotype C
-total_read_count_mom_D | number of reads from mom's haplotype D (hap2)
-methylation_level_mom_D_count | count-based methylation level on mom's haplotype D
-methylation_level_mom_C_model | model-based methylation level on mom's haplotype C
-methylation_level_mom_D_model | model-based methylation level on mom's haplotype D
-start_hap_map_block_pat | start of the paternal hap-map block
-end_hap_map_block_pat | end of the paternal hap-map block
-paternal_haplotype | which of dad's haplotypes (A or B) corresponds to the kid's paternal haplotype in this block
-paternal_concordance | bit-vector concordance between the kid's paternal allele sequence and dad's assigned haplotype (A or B) over the het SNVs in the paternal hap-map block. Both vectors come from the same `whatshap phase --ped` run. The assigned haplotype is defined as whichever of dad's two haplotypes gives the higher concordance, so the value lies in `[0.5, 1.0]` by construction
-num_het_SNVs_in_dad | number of heterozygous sites in dad within the paternal hap-map block
-start_hap_map_block_mat | start of the maternal hap-map block
-end_hap_map_block_mat | end of the maternal hap-map block
-maternal_haplotype | which of mom's haplotypes (C or D) corresponds to the kid's maternal haplotype in this block
-maternal_concordance | bit-vector concordance between the kid's maternal allele sequence and mom's assigned haplotype (C or D) over the het SNVs in the maternal hap-map block. Both vectors come from the same `whatshap phase --ped` run. The assigned haplotype is defined as whichever of mom's two haplotypes gives the higher concordance, so the value lies in `[0.5, 1.0]` by construction
-num_het_SNVs_in_mom | number of heterozygous sites in mom within the maternal hap-map block
-cpg_is_within_50bp_of_mismatch_site_pat | is the CpG site within 50bp of a het SNV in dad at which the kid's paternal allele disagrees with dad's assigned haplotype (a within-pedMEC bit-vector mismatch on the paternal side)
-cpg_is_within_50bp_of_mismatch_site_mat | is the CpG site within 50bp of a het SNV in mom at which the kid's maternal allele disagrees with mom's assigned haplotype (a within-pedMEC bit-vector mismatch on the maternal side)
-cpg_overlaps_at_least_one_snv | does the CpG dinucleotide overlap an SNV?
-snv_genotypes_kid | are the SNVs (if any) that overlap the CpG dinucleotide `hom` or `het` in the kid?
-cpg_is_allele_specific_kid | does the CpG dinucleotide appear in the reads of only one haplotype in the kid?
-snv_genotypes_dad | are the SNVs (if any) that overlap the CpG dinucleotide `hom` or `het` in dad?
-cpg_is_allele_specific_dad | does the CpG dinucleotide appear in the reads of only one haplotype in dad?
-snv_genotypes_mom | are the SNVs (if any) that overlap the CpG dinucleotide `hom` or `het` in mom?
-cpg_is_allele_specific_mom | does the CpG dinucleotide appear in the reads of only one haplotype in mom?
+CpGs are paired by exact coordinates and matching transmitted founder labels,
+excluding mismatch windows and ambiguous labels or values. Callable fraction
+uses label-matched CpGs after exclusions as its denominator; inherited
+specificity additionally requires a measurement on the parent's non-transmitted
+haplotype. Ambiguous coordinates remain in shared-CpG counts but are excluded
+from eligible and paired counts. These comparisons alone do not establish
+inheritance of methylation state.
 
 </details>
 
-## Verification and further reading
-
-```bash
-# Trio fixture, including crossover boundaries, labels, nulls, indexes, BigWigs.
-TAPESTRY_TRIO_CONTAINER=ghcr.io/quinlan-lab/tapestry:dev tests/run_nextflow_trio_smoke.sh
-# Synthetic pedigree workflow, run twice to check complete -resume caching.
-TAPESTRY_CONTAINER=ghcr.io/quinlan-lab/tapestry:dev tests/run_nextflow_e2e.sh
-```
+## Further reading
 
 - [Legacy shell workflows](docs/legacy_shell_workflows.md): manual tool setup,
   count/model shell pipelines, figures, dev-data creation, and remote IGV access.
@@ -402,3 +396,4 @@ TAPESTRY_CONTAINER=ghcr.io/quinlan-lab/tapestry:dev tests/run_nextflow_e2e.sh
 - [Analysis index](analysis/README.md): reproducible experiments and figures.
 - [Roadmap](ROADMAP.md) and [completed work](completed.md): release gates,
   decisions, and verification evidence.
+- [Developer tests](tests/README.md): container and workflow regression checks.
