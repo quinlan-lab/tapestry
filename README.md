@@ -5,11 +5,11 @@ Both Nextflow workflows use one published container image.
 
 | Workflow | Inputs | Command |
 |---|---|---|
-| [Trio (default)](#trio-workflow-default) | Trio PED, joint VCF, three BAMs, reference | `nextflow run . -profile docker ...` |
+| [Trio](#trio-workflow) | Trio PED, joint VCF, three BAMs, reference | `nextflow run . -entry trio -profile docker ...` |
 | [Pedigree](#pedigree-workflow) | Completed family-WDL `outputs.json`, PED, GRCh38 reference | `nextflow run . -entry pedigree -profile docker ...` |
 
 **Migrating existing commands:** WDL-output runs now require `-entry pedigree`.
-Trio runs omit `-entry`; `--container` is the image override for both modes.
+Trio runs now require `-entry trio`; `--container` is the image override for both modes.
 Changes to entry-point names or workflow module layout may invalidate older
 task caches; new runs resume normally with `-resume`.
 
@@ -57,7 +57,7 @@ scripts, see the [dependency guide](docs/dependencies.md).
 
 </details>
 
-## Trio workflow (default)
+## Trio workflow
 
 Supply a six-column PED defining one trio, an indexed joint VCF, three indexed
 BAMs with read-group `SM` tags matching the PED IDs, and an indexed reference.
@@ -66,7 +66,7 @@ BAMs must retain the `MM`/`ML` methylation tags. Keep `.bai`/`.csi` BAM indexes,
 FASTA also needs its `.gzi`.
 
 ```bash
-nextflow run . -profile docker \
+nextflow run . -entry trio -profile docker \
   --ped /path/to/trio.ped \
   --joint-vcf /path/to/joint.vcf.gz \
   --reference-fasta /path/to/GRCh38.fa \
@@ -239,14 +239,14 @@ span the CG dinucleotide; BigWigs span the cytosine base and use a 0–1 scale.
 <summary><h3>Run the checked-in chr22 example</h3></summary>
 
 The fixture covers GRCh38 chr22:20,500,000–21,500,000. Download its reference
-once, then run the default trio workflow:
+once, then run the trio workflow:
 
 ```bash
 docker run --rm --user "$(id -u):$(id -g)" \
   -v "$PWD:/work" -w /work ghcr.io/quinlan-lab/tapestry:dev \
   bash ./trio_dev_data_get_ref.sh trio_dev_data
 fixture=trio_dev_data/input
-nextflow run . -profile docker \
+nextflow run . -entry trio -profile docker \
   --ped "$fixture/trio.ped" \
   --joint-vcf "$fixture/CEPH-1463.joint.GRCh38.deepvariant.glnexus.vcf.gz" \
   --reference-fasta "$fixture/chr22.fa" \

@@ -21,8 +21,9 @@ legacy site-specific shell paths remain available but are not the generic API.
 Scientific choices are Nextflow parameters and are recorded in the normalized
 run. Fixed pedigree/GRCh38/`gtg`/model constraints are inserted internally.
 
-`main.nf` runs the trio workflow by default. Use `-entry pedigree` for the
-WDL-output pedigree workflow, which validates inputs before processing.
+`main.nf` uses explicit entry points: `-entry trio` for the trio workflow and
+`-entry pedigree` for the WDL-output pedigree workflow, which validates inputs
+before processing.
 Both modes share one container image; `--container` selects a version or SIF.
 Parameter defaults and entry points live in `main.nf`; workflow implementations
 live in `workflows/trio.nf` and `workflows/pedigree.nf`.
@@ -75,7 +76,7 @@ paths; its data-creation scripts still depend on site-local source data.
 
 ## Repository map
 
-- `main.nf`: parameter defaults and the default trio / named pedigree entry points.
+- `main.nf`: parameter defaults and the named trio and pedigree entry points.
 - `workflows/trio.nf`, `workflows/pedigree.nf`: workflow-specific helpers,
   processes, validation, and orchestration. Workflow settings are explicit inputs.
 - `nextflow.config`: local/Docker/Apptainer/Slurm profiles; executor and resource

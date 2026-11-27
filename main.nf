@@ -33,7 +33,7 @@ params.crossoverDistanceBp = 10000
 params.trioMinMapq = 1
 
 
-workflow {
+workflow trio {
     TRIO([
         ped: params.ped,
         jointVcf: params.jointVcf,

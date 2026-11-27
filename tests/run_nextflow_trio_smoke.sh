@@ -72,7 +72,7 @@ process {
 }
 CONFIG
 common=(
-    run "$repo_root" -ansi-log false -c "$root/fixture.config"
+    run "$repo_root" -entry trio -ansi-log false -c "$root/fixture.config"
     --ped "$fixture/trio.ped"
     --joint-vcf "$fixture/CEPH-1463.joint.GRCh38.deepvariant.glnexus.vcf.gz"
     --reference-fasta "$fixture/chr22.fa"

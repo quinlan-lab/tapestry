@@ -70,7 +70,7 @@ reference once:
 ./analysis/nextflow-trio-model/reproduce.sh
 ```
 
-The runner invokes the default trio workflow on the 1 Mb fixture with
+The runner invokes the trio workflow with `-entry trio` on the 1 Mb fixture with
 explicit scientific settings, records its command, tool versions, log, and
 Nextflow trace, generates per-sample block lists, runs the existing scientific
 fixture checks, and generates the figures. It refuses an existing destination.
