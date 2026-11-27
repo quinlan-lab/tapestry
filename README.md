@@ -10,8 +10,8 @@ Both Nextflow workflows use one published container image.
 
 **Migrating existing commands:** WDL-output runs now require `-entry pedigree`.
 Trio runs omit `-entry`; `--container` is the image override for both modes.
-Changed entry-point names may invalidate older task caches; new runs resume
-normally with `-resume`.
+Changes to entry-point names or workflow module layout may invalidate older
+task caches; new runs resume normally with `-resume`.
 
 ## Setup: one image for both workflows
 

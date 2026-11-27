@@ -24,10 +24,12 @@ run. Fixed pedigree/GRCh38/`gtg`/model constraints are inserted internally.
 `main.nf` runs the trio workflow by default. Use `-entry pedigree` for the
 WDL-output pedigree workflow, which validates inputs before processing.
 Both modes share one container image; `--container` selects a version or SIF.
+Parameter defaults and entry points live in `main.nf`; workflow implementations
+live in `workflows/trio_phasing.nf` and `workflows/pedigree.nf`.
 
 ### Generic pedigree/model-only path
 
-`main.nf` validates the contract, normalizes the family VCF, runs pinned
+`workflows/pedigree.nf` validates the contract, normalizes the family VCF, runs pinned
 `gtg-ped-map`/`gtg-concordance`, filters WDL model BEDs, reconciles HiPhase and
 inheritance phase per selected sample, generates reference-autosome CpGs, and
 publishes all-CpG tables, BigWigs, QC, provenance, and a results manifest. The
@@ -73,10 +75,11 @@ paths; its data-creation scripts still depend on site-local source data.
 
 ## Repository map
 
-- `main.nf`, `nextflow.config`: generic DSL2 workflow and local/Docker/
-  Apptainer/Slurm profiles. Users pass miniwdl outputs, PED, reference, output
-  location, and optional scientific overrides directly; executor and resource
-  policy belong in profiles.
+- `main.nf`: parameter defaults and the default trio / named pedigree entry points.
+- `workflows/trio_phasing.nf`, `workflows/pedigree.nf`: workflow-specific helpers,
+  processes, validation, and orchestration. Workflow settings are explicit inputs.
+- `nextflow.config`: local/Docker/Apptainer/Slurm profiles; executor and resource
+  policy belong here or in site-specific profiles.
 - `ROADMAP.md`, `completed.md`, `impl.md`: remaining work, completed work, and
   the archived detailed implementation plan, respectively. Do not copy current
   interface details into planning documents.

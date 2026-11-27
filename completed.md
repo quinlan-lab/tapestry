@@ -273,3 +273,21 @@ Implemented 2026-11-27. Supersedes the separate image choices above.
   distance boundaries, and the named pedigree workflow with complete resume
   caching. Slurm/Apptainer configuration resolves to the shared image; actual
   cluster runtime verification remains a release gate.
+
+## Separate Nextflow workflow implementations
+
+Implemented 2026-11-27.
+
+- `main.nf` now contains parameter defaults and thin entry points for the
+  default trio workflow and named pedigree workflow. Both implementations live
+  under `workflows/`.
+- `workflows/pedigree.nf` owns pedigree-specific settings resolution, container
+  mounts, validation, process definitions, and orchestration. Parameters are
+  passed explicitly, and resolved settings are shared with validation.
+- Pedigree process definitions and scientific channel wiring are unchanged.
+  The extra workflow scope changes qualified task names, so pre-refactor
+  pedigree caches may miss; the extracted workflow caches completely on resume.
+- Verified the synthetic pedigree workflow twice with all 12 processes cached
+  on the second run, and the default trio smoke test including both crossover
+  distance boundaries, labels, nulls, indexes, and nine BigWigs. Documentation
+  link, Markdown, shell-example syntax, and whitespace checks also passed.
