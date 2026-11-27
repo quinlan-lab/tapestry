@@ -28,6 +28,8 @@ pins runtime dependencies. Both container profiles use the published
 Use `--container <image-or-digest>` to pin a run to a specific image; Apptainer
 also accepts a local SIF. Configure site-specific queues and resources through a
 local profile; see [nextflow.config](nextflow.config).
+Docker tasks run with the launching user's UID/GID so output and work
+directories remain writable and removable by that user.
 
 ### Options and validation
 

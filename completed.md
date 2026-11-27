@@ -236,6 +236,9 @@ Implemented 2026-11-27.
   the existing `trio` target remains supported.
 - Both Docker and Apptainer profiles use the shared GHCR `dev` image by
   default. Trio users no longer need an image override or a local build.
+- Docker tasks use the launching user's UID/GID. The first hosted trio run
+  passed its scientific checks but exposed root-owned nested directories during
+  fixture cleanup; using the host identity fixes that Linux ownership issue.
 - CI tests the shared image with all regression tests, the pedigree workflow
   and resume check, and the trio fixture without an image override. It also
   builds the smaller pedigree image.
