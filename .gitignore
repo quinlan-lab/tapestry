@@ -1,5 +1,7 @@
 .venv
 .vscode
+.claude/settings.local.json
+.claude/worktrees/
 __pycache__
 .nextflow*
 .nextflow-reports/
