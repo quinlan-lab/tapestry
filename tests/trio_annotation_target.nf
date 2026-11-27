@@ -1,6 +1,6 @@
 nextflow.enable.dsl = 2
 
-include { annotationTarget } from '../workflows/trio_phasing'
+include { annotationTarget } from '../workflows/trio'
 
 workflow {
     // C at 200 is in the target; a variant at its G at 201 must be annotated.

@@ -25,7 +25,7 @@ run. Fixed pedigree/GRCh38/`gtg`/model constraints are inserted internally.
 WDL-output pedigree workflow, which validates inputs before processing.
 Both modes share one container image; `--container` selects a version or SIF.
 Parameter defaults and entry points live in `main.nf`; workflow implementations
-live in `workflows/trio_phasing.nf` and `workflows/pedigree.nf`.
+live in `workflows/trio.nf` and `workflows/pedigree.nf`.
 
 ### Generic pedigree/model-only path
 
@@ -76,7 +76,7 @@ paths; its data-creation scripts still depend on site-local source data.
 ## Repository map
 
 - `main.nf`: parameter defaults and the default trio / named pedigree entry points.
-- `workflows/trio_phasing.nf`, `workflows/pedigree.nf`: workflow-specific helpers,
+- `workflows/trio.nf`, `workflows/pedigree.nf`: workflow-specific helpers,
   processes, validation, and orchestration. Workflow settings are explicit inputs.
 - `nextflow.config`: local/Docker/Apptainer/Slurm profiles; executor and resource
   policy belong here or in site-specific profiles.

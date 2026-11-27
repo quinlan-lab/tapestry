@@ -1,4 +1,4 @@
-include { TRIO_PHASING } from './workflows/trio_phasing'
+include { TRIO_PHASING } from './workflows/trio'
 include { PEDIGREE } from './workflows/pedigree'
 
 nextflow.enable.dsl = 2

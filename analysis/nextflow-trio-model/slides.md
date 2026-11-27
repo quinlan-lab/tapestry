@@ -74,7 +74,7 @@ assignment for that parent; the combined lane is not masked this way.
 
 Evidence: the final all-CpG BED, `trio.model.qc.json`, and `summary.json`.
 Assignment/publication: [trio_model_methylation.py](../../src/trio_model_methylation.py)
-and [trio_phasing.nf](../../workflows/trio_phasing.nf).
+and [trio.nf](../../workflows/trio.nf).
 Scientific checks: [check_trio_model_fixture.py](../../tests/check_trio_model_fixture.py).
 
 ## Slide 6 · Next steps
