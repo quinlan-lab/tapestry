@@ -119,6 +119,46 @@ def write_df_to_vcf(df, vcf, uid=None):
             f.write(f"{chrom}\t{pos}\t{id_}\t{ref}\t{alt}\t{qual}\t{flt}\t{info}\t{fmt_keys}\t{fmt_vals}\n")
 
 
+def add_bigwig_entries(bigwig, df, label, pb_cpg_tool_mode, chunk_size=100_000):
+    """Append one unambiguous value per interval in bounded Python lists."""
+    value_column = f"methylation_level_{label}_{pb_cpg_tool_mode}"
+    interval_columns = ["chrom", "start", "end"]
+    df_bed_graph = (
+        df
+        .filter(pl.col(value_column).is_not_null())
+        .select(interval_columns + [value_column])
+        .group_by(interval_columns)
+        .agg(
+            pl.col(value_column).first().alias(value_column),
+            pl.col(value_column).n_unique().alias("_distinct_values"),
+        )
+        .sort(["chrom", "start", "end"])
+    )
+
+    conflicts = df_bed_graph.filter(pl.col("_distinct_values") > 1)
+    if not conflicts.is_empty():
+        examples = ", ".join(
+            f"{chrom}:{start}-{end}"
+            for chrom, start, end in conflicts.select(interval_columns)
+            .head(5)
+            .iter_rows()
+        )
+        raise ValueError(
+            f"Conflicting {label} {pb_cpg_tool_mode} BigWig values at "
+            f"{len(conflicts)} interval(s); examples: {examples}"
+        )
+
+    df_bed_graph = df_bed_graph.drop("_distinct_values")
+    for offset in range(0, len(df_bed_graph), chunk_size):
+        chunk = df_bed_graph.slice(offset, chunk_size)
+        bigwig.addEntries(
+            chunk["chrom"].to_list(),
+            chunk["start"].to_list(),
+            ends=chunk["end"].to_list(),
+            values=chunk[value_column].to_list(),
+        )
+
+
 def write_methylation(df, file_path, source):
     """Write an already sorted methylation dataframe to a bgzipped, indexed BED.
 

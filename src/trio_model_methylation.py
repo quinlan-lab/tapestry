@@ -12,12 +12,11 @@ import pyBigWig
 
 from get_meth_hap1_hap2 import read_meth_hap1_hap2, read_meth_level
 from phase_meth_to_parent_haps import phase_meth_to_parent_haplotypes
-from phase_meth_to_founder_haps import add_bigwig_entries
 from expand_to_all_cpgs_trio import (
     expand_meth_to_all_cpgs, compute_proximity_to_mismatched_heterozygous_sites,
     get_joint_called_variants, label_with_variants, label_cpgs_as_allele_specific,
 )
-from write_data import write_methylation
+from write_data import add_bigwig_entries, write_methylation
 
 
 def clip(frame, chrom, start, end):

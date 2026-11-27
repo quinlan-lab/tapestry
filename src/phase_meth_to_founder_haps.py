@@ -22,6 +22,7 @@ from get_meth_hap1_hap2 import (
     read_meth_hap1_hap2_chromosome,
 )
 from util.write_data import (
+    add_bigwig_entries,
     write_bed,
     write_bit_vector_mismatches_bed,
     write_bit_vector_mismatches_vcf,
@@ -143,46 +144,6 @@ def _read_fai_chromsizes(reference_fai):
                 )
             chromsizes.append((fields[0], int(fields[1])))
     return chromsizes
-
-
-def add_bigwig_entries(bigwig, df, parental, pb_cpg_tool_mode, chunk_size=100_000):
-    """Append one unambiguous value per interval in bounded Python lists."""
-    value_column = f"methylation_level_{parental}_{pb_cpg_tool_mode}"
-    interval_columns = ["chrom", "start", "end"]
-    df_bed_graph = (
-        df
-        .filter(pl.col(value_column).is_not_null())
-        .select(interval_columns + [value_column])
-        .group_by(interval_columns)
-        .agg(
-            pl.col(value_column).first().alias(value_column),
-            pl.col(value_column).n_unique().alias("_distinct_values"),
-        )
-        .sort(["chrom", "start", "end"])
-    )
-
-    conflicts = df_bed_graph.filter(pl.col("_distinct_values") > 1)
-    if not conflicts.is_empty():
-        examples = ", ".join(
-            f"{chrom}:{start}-{end}"
-            for chrom, start, end in conflicts.select(interval_columns)
-            .head(5)
-            .iter_rows()
-        )
-        raise ValueError(
-            f"Conflicting {parental} {pb_cpg_tool_mode} BigWig values at "
-            f"{len(conflicts)} interval(s); examples: {examples}"
-        )
-
-    df_bed_graph = df_bed_graph.drop("_distinct_values")
-    for offset in range(0, len(df_bed_graph), chunk_size):
-        chunk = df_bed_graph.slice(offset, chunk_size)
-        bigwig.addEntries(
-            chunk["chrom"].to_list(),
-            chunk["start"].to_list(),
-            ends=chunk["end"].to_list(),
-            values=chunk[value_column].to_list(),
-        )
 
 
 def write_bigwig(
