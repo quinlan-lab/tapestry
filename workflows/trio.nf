@@ -275,7 +275,7 @@ def phasingTargets(chromosomeList, region) {
 }
 
 
-workflow TRIO_PHASING {
+workflow TRIO {
     take:
     inputs
 

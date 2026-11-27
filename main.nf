@@ -1,4 +1,4 @@
-include { TRIO_PHASING } from './workflows/trio'
+include { TRIO } from './workflows/trio'
 include { PEDIGREE } from './workflows/pedigree'
 
 nextflow.enable.dsl = 2
@@ -34,7 +34,7 @@ params.trioMinMapq = 1
 
 
 workflow {
-    TRIO_PHASING([
+    TRIO([
         ped: params.ped,
         jointVcf: params.jointVcf,
         reference: params.referenceFasta,
