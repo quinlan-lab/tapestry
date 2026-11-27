@@ -65,6 +65,14 @@ jobs:
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@bb05f3f5519dd87d3ba754cc423b652a5edd6d2c # v4.2.0
 
+      - name: Check trio annotation region boundaries
+        env:
+          NXF_OFFLINE: "true"
+          NXF_ANSI_LOG: "false"
+        run: |
+          cd "$RUNNER_TEMP"
+          nextflow run "$GITHUB_WORKSPACE/tests/trio_annotation_target.nf"
+
       - name: Build pinned runtime image
         uses: docker/build-push-action@53b7df96c91f9c12dcc8a07bcb9ccacbed38856a # v7.3.0
         with:

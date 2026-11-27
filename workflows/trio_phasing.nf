@@ -40,6 +40,12 @@ def shellQuote(value) {
 }
 
 
+def annotationTarget(target) {
+    // Include the G base when a CpG's C is the last target base.
+    return target.contains(':') ? target.replaceFirst(/-([0-9]+)$/, { all, end -> "-${end.toLong() + 1}" }) : target
+}
+
+
 process PHASE_TRIO_CHROMOSOME {
     tag "${target}"
     label 'trio_phasing'
@@ -227,8 +233,7 @@ process EXPAND_TRIO_MODEL {
     script:
     def reference = shellQuote(reference_files[0])
     def joint = shellQuote(joint_files[0])
-    // Include the G base when a CpG's C is the last target base.
-    def annotation_target = target.contains(':') ? target.replaceFirst(/-([0-9]+)\$/, { all, end -> "-${end.toLong() + 1}" }) : target
+    def annotation_target = annotationTarget(target)
     """
     set -euo pipefail
     source "${source_dir}/util/logging.sh"
