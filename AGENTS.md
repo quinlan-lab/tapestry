@@ -93,8 +93,8 @@ paths; its data-creation scripts still depend on site-local source data.
 - `src/filter_model_beds.py`, `src/generate_reference_cpgs.py`,
   `src/expand_model_to_all_cpgs.py`: generic model-only filtering and all-CpG
   publication.
-- `Dockerfile`, `requirements-pipeline.txt`, `containers/gtg.Cargo.lock`: pinned
-  generic runtime; do not update the `gtg` commit or Cargo lock independently.
+- `Dockerfile`, `requirements.txt`, `containers/gtg.Cargo.lock`: pinned
+  shared runtime; do not update the `gtg` commit or Cargo lock independently.
 - `.github/workflows/ci.yml`, `requirements-ci.txt`, `pyrightconfig.json`: the
   small GitHub CI contract. It runs targeted static checks, builds the pinned
   image, runs all containerized tests, and exercises the nine-stage workflow
@@ -163,8 +163,10 @@ paths; its data-creation scripts still depend on site-local source data.
 
 ## Development conventions
 
-- Python 3.11; the repo expects a local `.venv` with deps pinned in
-  `requirements.txt`. This repo predates uv adoption and has no `pyproject.toml`;
+- Python 3.11; the repo expects a local `.venv` installed from
+  `requirements-dev.txt`, which includes the shared `requirements.txt` runtime
+  and CI tooling from `requirements-ci.txt`. See `docs/dependencies.md` for the
+  dependency audit. This repo predates uv adoption and has no `pyproject.toml`;
   use the `.venv` form here rather than migrating it.
 - Imports rely on both `src` and `src/util` being on `PYTHONPATH`:
 

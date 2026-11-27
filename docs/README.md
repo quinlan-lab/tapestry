@@ -3,6 +3,8 @@
 See the [main README](../README.md) for current Nextflow commands, shared-image
 setup, and output-column definitions.
 
+- [Dependency guide](dependencies.md): runtime, developer, and CI environments,
+  with the audit of the former full-environment requirements file.
 - [Legacy shell workflows](legacy_shell_workflows.md): manual tool installation,
   site-specific pipelines, example figures, and remote IGV access.
 - Legacy pedigree workflow diagram ([image](pedigree_workflow.png),

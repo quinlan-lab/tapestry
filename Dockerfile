@@ -53,7 +53,7 @@ RUN apt-get update \
         zlib1g-dev \
     && rm -rf /var/lib/apt/lists/*
 
-COPY requirements-pipeline.txt /opt/tapestry/requirements-pipeline.txt
+COPY requirements.txt /opt/tapestry/requirements.txt
 
 # The PyPI wheels for pysam and cyvcf2 bundle Red Hat-patched OpenSSL
 # libraries that abort when an Apptainer container runs on a FIPS-enabled
@@ -65,19 +65,19 @@ ENV CYVCF2_HTSLIB_MODE=BUILTIN \
 RUN python -m pip wheel \
       --wheel-dir /opt/tapestry/wheels \
       --no-binary=pysam,cyvcf2 \
-      --requirement /opt/tapestry/requirements-pipeline.txt
+      --requirement /opt/tapestry/requirements.txt
 
 
 FROM ${PYTHON_IMAGE} AS python-deps-installer
 
-COPY requirements-pipeline.txt /opt/tapestry/requirements-pipeline.txt
+COPY requirements.txt /opt/tapestry/requirements.txt
 COPY --from=python-deps-builder /opt/tapestry/wheels /opt/tapestry/wheels
 RUN python -m pip install \
       --no-cache-dir \
       --no-index \
       --find-links=/opt/tapestry/wheels \
       --target=/opt/tapestry/site-packages \
-      --requirement /opt/tapestry/requirements-pipeline.txt \
+      --requirement /opt/tapestry/requirements.txt \
     && rm -rf /opt/tapestry/wheels
 
 
@@ -114,10 +114,12 @@ RUN curl --fail --location --output /usr/local/bin/bedGraphToBigWig \
         | sha256sum --check --strict \
     && chmod 0755 /usr/local/bin/bedGraphToBigWig
 
-COPY requirements-pipeline.txt /opt/tapestry/requirements-pipeline.txt
+COPY requirements.txt /opt/tapestry/requirements.txt
 COPY --from=python-deps-installer \
      /opt/tapestry/site-packages \
      /usr/local/lib/python3.11/site-packages
+COPY --from=python-deps-installer /opt/tapestry/site-packages/bin/ /usr/local/bin/
+RUN python -m pip check
 
 # Guard the FIPS-host portability invariant: neither HTSlib binding may
 # reintroduce a private OpenSSL library through a binary PyPI wheel.
@@ -158,18 +160,12 @@ RUN gtg-ped-map --version \
 WORKDIR /work
 
 
-# Build the trio additions on top of the shared pedigree runtime.
-FROM python-deps-builder AS trio-deps-builder
+# Reuse the compiler toolchain to build the pinned samtools executable.
+FROM python-deps-builder AS samtools-builder
 
 RUN apt-get update \
     && apt-get install --yes --no-install-recommends bzip2 curl \
     && rm -rf /var/lib/apt/lists/*
-COPY requirements-trio.txt /opt/tapestry/requirements-trio.txt
-RUN python -m pip wheel \
-      --wheel-dir /opt/tapestry/trio-wheels \
-      --find-links=/opt/tapestry/wheels \
-      --no-binary=pysam,cyvcf2 \
-      --requirement /opt/tapestry/requirements-trio.txt
 
 ARG SAMTOOLS_URL=https://github.com/samtools/samtools/releases/download/1.21/samtools-1.21.tar.bz2
 ARG SAMTOOLS_SHA256=05724b083a6b6f0305fcae5243a056cc36cf826309c3cb9347a6b89ee3fc5ada
@@ -193,17 +189,10 @@ ARG PB_CPG_TOOLS_SHA256=44dc20510edea261ff8db81e5cd13719056ce38c61a99319b14fb9ec
 LABEL org.opencontainers.image.description="Tapestry trio and pedigree methylation runtime"
 LABEL org.opencontainers.image.pb-CpG-tools.sha256="${PB_CPG_TOOLS_SHA256}"
 
-COPY requirements-trio.txt /opt/tapestry/requirements-trio.txt
-COPY --from=trio-deps-builder /opt/tapestry/trio-wheels /tmp/trio-wheels
-# Use the already-installed, source-built HTSlib bindings from the pedigree image.
-RUN python -m pip install --no-index --find-links=/tmp/trio-wheels \
-        --requirement /opt/tapestry/requirements-trio.txt \
-    && python -m pip check \
-    && rm -rf /tmp/trio-wheels
-COPY --from=trio-deps-builder /opt/samtools/bin/samtools /usr/local/bin/samtools
-COPY --from=trio-deps-builder /build-samtools/LICENSE /usr/local/share/licenses/samtools/LICENSE
-COPY --from=trio-deps-builder /build-samtools/htslib-1.21/LICENSE /usr/local/share/licenses/samtools/HTSlib-LICENSE
-COPY --from=trio-deps-builder /build-samtools/lz4/LICENSE /usr/local/share/licenses/samtools/LZ4-LICENSE
+COPY --from=samtools-builder /opt/samtools/bin/samtools /usr/local/bin/samtools
+COPY --from=samtools-builder /build-samtools/LICENSE /usr/local/share/licenses/samtools/LICENSE
+COPY --from=samtools-builder /build-samtools/htslib-1.21/LICENSE /usr/local/share/licenses/samtools/HTSlib-LICENSE
+COPY --from=samtools-builder /build-samtools/lz4/LICENSE /usr/local/share/licenses/samtools/LZ4-LICENSE
 RUN curl --fail --location --output /tmp/pb-CpG-tools.tar.gz "${PB_CPG_TOOLS_URL}" \
     && echo "${PB_CPG_TOOLS_SHA256}  /tmp/pb-CpG-tools.tar.gz" | sha256sum --check --strict \
     && mkdir /opt/pb-CpG-tools \

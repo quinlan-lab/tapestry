@@ -291,3 +291,29 @@ Implemented 2026-11-27.
   on the second run, and the default trio smoke test including both crossover
   distance boundaries, labels, nulls, indexes, and nine BigWigs. Documentation
   link, Markdown, shell-example syntax, and whitespace checks also passed.
+
+## Consolidated and audited Python dependencies
+
+Implemented 2026-11-27.
+
+- Merged pipeline and trio requirements into `requirements.txt` for the shared
+  runtime. All 19 previous runtime pins are preserved; Matplotlib 3.11.2 is now
+  explicit and matches the previously tested container. Removed the two old
+  runtime files and the duplicate Python installation from the Dockerfile.
+- Kept Pyright in `requirements-ci.txt`. `requirements-dev.txt` includes the
+  runtime and CI files plus 11 pinned developer dependencies for notebooks,
+  figures, Excel inputs, IGV serving, and legacy profiling.
+- Audited 82 Python files, four notebooks, shell invocations, and optional
+  format engines before replacing the 195-package environment capture. The
+  audit found a missing CairoSVG declaration and retained the indirect
+  openpyxl requirement. Full results and migration notes are in
+  `docs/dependencies.md`; the existing local `.venv` was left unchanged.
+- The rebuilt amd64 image passed dependency checks, the existing FIPS guard,
+  all 62 regression tests including UCSC/pyBigWig parity, both workflow checks,
+  and complete pedigree resume caching. Pyright and documentation checks passed.
+- Native ARM64 Python 3.11 developer checks passed plotting, SVG-to-PDF,
+  pandas/openpyxl Excel loading, notebook execution/HTML export, and IGV-server
+  and profiler imports. Notebook startup timed out under amd64 emulation on
+  macOS 26.6.2; the same requirements passed natively without changing pins or
+  Docker Desktop settings. This environment-specific observation is documented
+  separately from the passing pipeline CLI tests.

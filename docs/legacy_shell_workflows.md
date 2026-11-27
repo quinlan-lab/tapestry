@@ -30,7 +30,7 @@ pip install -r requirements.txt
 CYVCF2_HTSLIB_MODE=EXTERNAL python setup.py install
 
 cd /path/to/tapestry
-pip install -r requirements.txt
+pip install -r requirements-dev.txt
 ```
 
 Install `bedGraphToBigWig` into the virtual environment's bin directory:

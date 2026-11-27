@@ -1,1 +1,2 @@
+# CI-only static checking tools; install alongside requirements.txt.
 pyright==1.1.411

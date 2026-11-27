@@ -49,10 +49,11 @@ docker build --platform linux/amd64 -t tapestry:dev .
 # Add --container tapestry:dev to either Docker workflow command.
 ```
 
-The [Dockerfile](Dockerfile), [requirements-pipeline.txt](requirements-pipeline.txt),
-and [requirements-trio.txt](requirements-trio.txt) pin the runtime dependencies;
-samtools and pb-CpG-tools archives are SHA-256 checked. Without a container
-profile, provide these tools and Python dependencies on each worker's `PATH`.
+The [Dockerfile](Dockerfile) and [requirements.txt](requirements.txt) pin the
+shared runtime dependencies; samtools and pb-CpG-tools archives are SHA-256
+checked. Without a container profile, provide these tools and Python dependencies
+on each worker's `PATH`. For local notebooks, figures, IGV serving, or legacy
+scripts, see the [dependency guide](docs/dependencies.md).
 
 </details>
 
