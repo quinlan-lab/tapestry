@@ -197,3 +197,54 @@ Implemented 2026-08-17.
 These tests establish the implemented contract on deterministic fixtures. They
 do not replace the real WDL/CEPH, cluster-runtime, hosted-CI, and
 release-publication gates in `ROADMAP.md`.
+
+## Trio container runtime
+
+Implemented 2026-11-26.
+
+- Added a separate `trio` Docker build target sharing the pedigree runtime,
+  with WhatsHap 2.8, samtools 1.21, and pb-CpG-tools 3.0.0. Tool archives are
+  SHA-256 checked; Python additions are pinned separately. The default build
+  remains the pedigree runtime, including its source-built HTSlib bindings.
+- Docker and Apptainer profiles select the trio image for all trio process
+  labels and support a trio-specific image override. CI builds the trio target
+  and runs the chr22 fixture, keeping scientific checks inside the container.
+- The smoke test retains strict expectations for the original macOS/Python
+  3.13 host and adds a Linux/Python 3.11 container baseline. Identical 2,303-site
+  unphased VCFs produced different WhatsHap downsampling selections: 535 reads
+  each, with 142 read names in the symmetric difference. Repeated container
+  phasing retained two raw crossover rows versus the host's three. Both retain
+  the isolated paternal A-to-B switch at 20,959,352–20,961,970. These are runtime
+  baselines, not a crossover truth set; use a consistent runtime for comparisons.
+- Local verification passed both image builds, all 62 containerized unit and
+  regression tests (including UCSC/pyBigWig parity), Pyright, shell syntax,
+  the full pedigree workflow and complete resume caching, and the trio smoke
+  test. Trio checks cover caller/label parity, unresolved nulls, nine BigWigs,
+  indexed BEDs/BAMs, and both sides of the crossover-distance boundary. A
+  separate Docker task verified custom image selection.
+
+The images were built locally for Linux amd64 using emulation on Apple Silicon.
+Registry publication and cluster/Apptainer runtime verification remain release
+work; no image was pushed.
+
+## Default shared runtime and image publication
+
+Implemented 2026-11-27.
+
+- The default Docker target now contains both trio and pedigree tools. The
+  smaller pedigree-only runtime is available through the `pedigree` target;
+  the existing `trio` target remains supported.
+- Both Docker and Apptainer profiles use the shared GHCR `dev` image by
+  default. Trio users no longer need an image override or a local build.
+- CI tests the shared image with all regression tests, the pedigree workflow
+  and resume check, and the trio fixture without an image override. It also
+  builds the smaller pedigree image.
+- After both check jobs pass, a separate publication job uses a repository
+  `GITHUB_TOKEN` with package-write permission to publish development and
+  full-commit tags for both images. Pull requests cannot run that job; it runs
+  for main-branch pushes and explicit manual runs. Personal token permissions
+  do not need to be expanded. Publishing records both SHA-256 digests in the
+  job summary, while README commands explain digest-pinned runs.
+
+Versioned release publication and cluster/Apptainer verification remain release
+gates. The development images do not establish whole-genome scientific parity.

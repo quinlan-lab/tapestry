@@ -1,7 +1,9 @@
 # tapestry
 
 Phase DNA methylation from PacBio HiFi reads onto founder haplotypes in a human
-pedigree, including trios.
+pedigree, including trios. For BAM-based trio inputs, use the
+[Nextflow trio workflow](#nextflow-trio-model-methylation-workflow); both workflows
+use the same default Docker image.
 
 ## Generic WDL-output workflow
 
@@ -17,14 +19,15 @@ nextflow run . -profile slurm,apptainer \
   --ped /path/to/family.ped \
   --reference-fasta /path/to/GRCh38.fa \
   --outdir /path/to/tapestry-results \
-  --container /path/to/tapestry.sif \
   -resume
 ```
 
 Use `-profile docker` for local Docker runs. The [Dockerfile](Dockerfile)
-pins runtime dependencies; pass `--container <image-or-digest>` to use your
-built image until a release digest is published. Configure site-specific queues
-and resources through a local profile; see [nextflow.config](nextflow.config).
+pins runtime dependencies. Both container profiles use the published
+`ghcr.io/quinlan-lab/tapestry:dev` image, which supports trio and pedigree runs.
+Use `--container <image-or-digest>` to pin a run to a specific image; Apptainer
+also accepts a local SIF. Configure site-specific queues and resources through a
+local profile; see [nextflow.config](nextflow.config).
 
 ### Options and validation
 
@@ -225,18 +228,65 @@ and three indexed BAMs whose read-group `SM` tags match the PED sample IDs.
 The joint VCF must be bgzipped with a colocated `.csi` or `.tbi`. Keep BAM
 indexes (`.bai` or `.csi`) beside the
 BAMs and the FASTA's `.fai` beside the reference. A BGZF FASTA also needs its
-`.gzi`. Run with Nextflow, bcftools, bgzip, and a Python environment with the
-trio script dependencies from `requirements.txt`, including WhatsHap 2.8, on
-the worker's `PATH`. Also install samtools and pb-CpG-tools v3.0.0
-(`aligned_bam_to_cpg_scores`) there. The existing pedigree Docker image does
-not supply pb-CpG-tools; supply a trio-capable runtime or use installed CHPC tools. The fixture was tested with bcftools 1.23.
+`.gzi`.
+
+The default image contains WhatsHap 2.8, samtools 1.21, pb-CpG-tools v3.0.0
+(`aligned_bam_to_cpg_scores`), and all pedigree dependencies. Run with
+`-entry trio -profile docker`; no build or image override is required.
+Nextflow runs on the host. Docker pulls the image automatically, or pull it once:
 
 ```bash
-# Run from the repository root. Prepare the reference once.
-./trio_dev_data_get_ref.sh trio_dev_data
-export PATH="$PWD/.venv/bin:$PATH"
+docker pull --platform linux/amd64 ghcr.io/quinlan-lab/tapestry:dev
+```
+
+Published image tags:
+
+| Tag | Contents / purpose |
+|---|---|
+| `dev` | Default trio-capable runtime for both workflows |
+| `sha-<full-git-commit>` | Trio-capable runtime from a tested source revision |
+| `pedigree-dev` | Smaller pedigree-only runtime without WhatsHap or pb-CpG-tools |
+| `pedigree-sha-<full-git-commit>` | Pedigree-only runtime from that source revision |
+
+Images are published to [GHCR](https://github.com/orgs/quinlan-lab/packages/container/package/tapestry)
+only after CI checks pass on a main-branch push or a manual CI run. Published
+SHA-256 digests are recorded in the publishing job summary. For reproducible
+runs, supply `--container ghcr.io/quinlan-lab/tapestry@sha256:<digest>`;
+`dev` is a moving development tag, not a stable release.
+
+All images target Linux amd64; Docker on Apple Silicon requires amd64 emulation.
+Tool archives are SHA-256 checked; Python additions are pinned in
+[`requirements-trio.txt`](requirements-trio.txt). To build locally, use
+`docker build --platform linux/amd64 -t tapestry:dev .` and pass
+`--container tapestry:dev`. Building the smaller image is optional:
+`docker build --platform linux/amd64 --target pedigree -t tapestry:pedigree .`.
+The `trio` build target remains an alias for the full runtime.
+
+For Slurm/Apptainer, use `-profile slurm,apptainer` to obtain the same default
+image, or add `--container /path/to/tapestry.sif` to use a local SIF.
+`--trio-container` remains available as a trio-only override and takes precedence
+over `--container` for those stages.
+
+Without a container profile, install bcftools, bgzip, tabix, samtools,
+pb-CpG-tools v3.0.0 and the Python dependencies in `requirements-trio.txt` on
+the worker's `PATH`, or use the installed CHPC tools. Nextflow runs on the host
+in either case. The original host fixture was tested with bcftools 1.23.
+
+Use the same pinned runtime when comparing phasing results. On the chr22
+fixture, the Linux/Python 3.11 image and the original macOS/Python 3.13 host
+select different reads during WhatsHap downsampling. The image reproducibly
+reports two raw crossover rows; the host reports three. Both retain the
+isolated paternal switch at 20,959,352–20,961,970. The smoke test keeps separate
+strict expectations for these runtimes and checks crossover-distance boundaries
+and unresolved methylation spans for each.
+
+```bash
+# Run from the repository root. Prepare the reference once using the image.
+docker run --rm --user "$(id -u):$(id -g)" \
+  -v "$PWD:/work" -w /work ghcr.io/quinlan-lab/tapestry:dev \
+  bash ./trio_dev_data_get_ref.sh trio_dev_data
 fixture=trio_dev_data/input
-nextflow run . -entry trio \
+nextflow run . -entry trio -profile docker \
   --ped "$fixture/trio.ped" \
   --joint-vcf "$fixture/CEPH-1463.joint.GRCh38.deepvariant.glnexus.vcf.gz" \
   --reference-fasta "$fixture/chr22.fa" \
@@ -297,8 +347,11 @@ following files under `<outdir>/per_chrom_hap_maps/<chrom>/` for each parent.
   mismatches has an empty BED and a header-only VCF.
 
 Configure matching resources with the `trio_bit_vector_matching` process label.
-Run `tests/run_nextflow_trio_smoke.sh` to verify the A-to-B paternal assignment
-and the unresolved bracket and cluster span on the chr22 fixture.
+Run `TAPESTRY_TRIO_CONTAINER=ghcr.io/quinlan-lab/tapestry:dev tests/run_nextflow_trio_smoke.sh`
+to verify the A-to-B paternal assignment and the unresolved bracket and cluster
+span on the chr22 fixture, using Docker for both workflow tasks and output
+checks. Omit the environment variable to test the original macOS/Python 3.13
+host fixture.
 
 `CALL_TRIO_MODEL` strips pre-existing HP/PS tags, retains MM/ML, haplotags
 all three BAMs against the chromosome's pedMEC VCF, indexes them, and runs

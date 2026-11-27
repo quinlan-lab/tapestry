@@ -81,7 +81,7 @@ RUN python -m pip install \
     && rm -rf /opt/tapestry/wheels
 
 
-FROM ${PYTHON_IMAGE} AS runtime
+FROM ${PYTHON_IMAGE} AS pedigree-runtime
 
 ARG GTG_COMMIT=e12aca6b49ee7208952467db4a2a9e2f79b98efb
 ARG BEDGRAPH_TO_BIGWIG_URL
@@ -156,3 +156,68 @@ RUN gtg-ped-map --version \
     && python /opt/tapestry/src/write_results_manifest.py --help
 
 WORKDIR /work
+
+
+# Build the trio additions on top of the shared pedigree runtime.
+FROM python-deps-builder AS trio-deps-builder
+
+RUN apt-get update \
+    && apt-get install --yes --no-install-recommends bzip2 curl \
+    && rm -rf /var/lib/apt/lists/*
+COPY requirements-trio.txt /opt/tapestry/requirements-trio.txt
+RUN python -m pip wheel \
+      --wheel-dir /opt/tapestry/trio-wheels \
+      --find-links=/opt/tapestry/wheels \
+      --no-binary=pysam,cyvcf2 \
+      --requirement /opt/tapestry/requirements-trio.txt
+
+ARG SAMTOOLS_URL=https://github.com/samtools/samtools/releases/download/1.21/samtools-1.21.tar.bz2
+ARG SAMTOOLS_SHA256=05724b083a6b6f0305fcae5243a056cc36cf826309c3cb9347a6b89ee3fc5ada
+RUN curl --fail --location --output /tmp/samtools.tar.bz2 "${SAMTOOLS_URL}" \
+    && echo "${SAMTOOLS_SHA256}  /tmp/samtools.tar.bz2" | sha256sum --check --strict \
+    && mkdir /build-samtools \
+    && tar -xjf /tmp/samtools.tar.bz2 -C /build-samtools --strip-components=1 \
+    && cd /build-samtools \
+    && ./configure --prefix=/opt/samtools --without-curses \
+    && make -j2 samtools \
+    && install -D samtools /opt/samtools/bin/samtools
+
+
+FROM pedigree-runtime AS trio
+
+# Both the pb-CpG-tools release and the UCSC parity binary are Linux x86-64.
+ARG TARGETARCH
+RUN test "${TARGETARCH}" = amd64
+ARG PB_CPG_TOOLS_URL=https://github.com/PacificBiosciences/pb-CpG-tools/releases/download/v3.0.0/pb-CpG-tools-v3.0.0-x86_64-unknown-linux-gnu.tar.gz
+ARG PB_CPG_TOOLS_SHA256=44dc20510edea261ff8db81e5cd13719056ce38c61a99319b14fb9ec55e63a18
+LABEL org.opencontainers.image.description="Tapestry trio and pedigree methylation runtime"
+LABEL org.opencontainers.image.pb-CpG-tools.sha256="${PB_CPG_TOOLS_SHA256}"
+
+COPY requirements-trio.txt /opt/tapestry/requirements-trio.txt
+COPY --from=trio-deps-builder /opt/tapestry/trio-wheels /tmp/trio-wheels
+# Use the already-installed, source-built HTSlib bindings from the pedigree image.
+RUN python -m pip install --no-index --find-links=/tmp/trio-wheels \
+        --requirement /opt/tapestry/requirements-trio.txt \
+    && python -m pip check \
+    && rm -rf /tmp/trio-wheels
+COPY --from=trio-deps-builder /opt/samtools/bin/samtools /usr/local/bin/samtools
+COPY --from=trio-deps-builder /build-samtools/LICENSE /usr/local/share/licenses/samtools/LICENSE
+COPY --from=trio-deps-builder /build-samtools/htslib-1.21/LICENSE /usr/local/share/licenses/samtools/HTSlib-LICENSE
+COPY --from=trio-deps-builder /build-samtools/lz4/LICENSE /usr/local/share/licenses/samtools/LZ4-LICENSE
+RUN curl --fail --location --output /tmp/pb-CpG-tools.tar.gz "${PB_CPG_TOOLS_URL}" \
+    && echo "${PB_CPG_TOOLS_SHA256}  /tmp/pb-CpG-tools.tar.gz" | sha256sum --check --strict \
+    && mkdir /opt/pb-CpG-tools \
+    && tar -xzf /tmp/pb-CpG-tools.tar.gz -C /opt/pb-CpG-tools --strip-components=1 \
+    && ln -s /opt/pb-CpG-tools/bin/aligned_bam_to_cpg_scores /usr/local/bin/aligned_bam_to_cpg_scores \
+    && rm /tmp/pb-CpG-tools.tar.gz \
+    && samtools --version \
+    && test "$(python -m whatshap --version)" = 2.8 \
+    && aligned_bam_to_cpg_scores --version \
+    && python /opt/tapestry/src/phase_meth_to_parent_haps.py --help \
+    && python /opt/tapestry/src/trio_model_methylation.py --help
+
+
+FROM pedigree-runtime AS pedigree
+
+
+FROM trio AS runtime

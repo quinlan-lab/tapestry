@@ -1,0 +1,10 @@
+# Shared pins preserve the pedigree runtime's scientific dependencies.
+-r requirements-pipeline.txt
+biopython==1.86
+isal==1.8.0
+networkx==3.6.1
+PuLP==3.3.0
+scipy==1.15.1
+whatshap==2.8
+xopen==2.0.2
+zlib-ng==1.0.0

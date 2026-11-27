@@ -41,7 +41,7 @@ jobs:
         run: .venv/bin/pyright
 
       - name: Check workflow shell syntax
-        run: bash -n tests/run_nextflow_e2e.sh
+        run: bash -n tests/run_nextflow_e2e.sh tests/run_nextflow_trio_smoke.sh
 
   workflow:
     name: Workflow
@@ -79,7 +79,9 @@ jobs:
           context: .
           load: true
           push: false
-          tags: tapestry:ci
+          tags: |
+            tapestry:ci
+            ghcr.io/quinlan-lab/tapestry:dev
           platforms: linux/amd64
           cache-from: type=gha,scope=tapestry-ci
           cache-to: type=gha,mode=max,scope=tapestry-ci
@@ -101,6 +103,28 @@ jobs:
           TAPESTRY_CONTAINER: tapestry:ci
         run: tests/run_nextflow_e2e.sh
 
+      - name: Build optional pedigree-only image
+        uses: docker/build-push-action@53b7df96c91f9c12dcc8a07bcb9ccacbed38856a # v7.3.0
+        with:
+          context: .
+          target: pedigree
+          load: true
+          push: false
+          tags: tapestry:pedigree-ci
+          platforms: linux/amd64
+          cache-from: type=gha,scope=tapestry-pedigree-ci
+          cache-to: type=gha,mode=max,scope=tapestry-pedigree-ci
+
+      - name: Prepare trio reference and run container smoke test
+        env:
+          NXF_ANSI_LOG: "false"
+          TAPESTRY_TRIO_CONTAINER: ghcr.io/quinlan-lab/tapestry:dev
+        run: |
+          docker run --rm --user "$(id -u):$(id -g)" \
+            --volume "${GITHUB_WORKSPACE}:/work" --workdir /work \
+            tapestry:ci bash ./trio_dev_data_get_ref.sh trio_dev_data
+          tests/run_nextflow_trio_smoke.sh
+
       - name: Upload workflow diagnostics
         if: failure()
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
@@ -117,3 +141,68 @@ jobs:
             .test-work/e2e.*/dag.*.html
             .test-work/e2e.*/fixture/results/**/results-manifest.json
             .test-work/e2e.*/fixture/results/**/*.qc.json
+            .test-work/trio-smoke.*/.nextflow.log*
+            .test-work/trio-smoke.*/.nextflow-reports/**
+            .test-work/trio-smoke.*/work/**/.command.*
+            .test-work/trio-smoke.*/results/**/*.qc.json
+
+  publish:
+    name: Publish images
+    needs: [static-checks, workflow]
+    if: >-
+      github.repository == 'quinlan-lab/tapestry' &&
+      (github.event_name == 'workflow_dispatch' ||
+       (github.event_name == 'push' && github.ref == 'refs/heads/main'))
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - name: Check out tested revision
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@bb05f3f5519dd87d3ba754cc423b652a5edd6d2c # v4.2.0
+
+      - name: Log in to GHCR
+        uses: docker/login-action@f4ef78c080cd8ba55a85445d5b36e214a81df20a
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Publish default trio-capable runtime
+        id: runtime
+        uses: docker/build-push-action@53b7df96c91f9c12dcc8a07bcb9ccacbed38856a # v7.3.0
+        with:
+          context: .
+          push: true
+          platforms: linux/amd64
+          tags: |
+            ghcr.io/quinlan-lab/tapestry:dev
+            ghcr.io/quinlan-lab/tapestry:sha-${{ github.sha }}
+          labels: org.opencontainers.image.revision=${{ github.sha }}
+          cache-from: type=gha,scope=tapestry-ci
+
+      - name: Publish optional pedigree-only runtime
+        id: pedigree
+        uses: docker/build-push-action@53b7df96c91f9c12dcc8a07bcb9ccacbed38856a # v7.3.0
+        with:
+          context: .
+          target: pedigree
+          push: true
+          platforms: linux/amd64
+          tags: |
+            ghcr.io/quinlan-lab/tapestry:pedigree-dev
+            ghcr.io/quinlan-lab/tapestry:pedigree-sha-${{ github.sha }}
+          labels: org.opencontainers.image.revision=${{ github.sha }}
+          cache-from: type=gha,scope=tapestry-pedigree-ci
+
+      - name: Record published digests
+        env:
+          RUNTIME_DIGEST: ${{ steps.runtime.outputs.digest }}
+          PEDIGREE_DIGEST: ${{ steps.pedigree.outputs.digest }}
+        run: |
+          printf 'Default runtime: `ghcr.io/quinlan-lab/tapestry@%s`\n\n' "$RUNTIME_DIGEST" >> "$GITHUB_STEP_SUMMARY"
+          printf 'Pedigree-only: `ghcr.io/quinlan-lab/tapestry@%s`\n' "$PEDIGREE_DIGEST" >> "$GITHUB_STEP_SUMMARY"

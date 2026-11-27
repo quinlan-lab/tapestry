@@ -89,7 +89,8 @@ all-CpG memory defaults only from observed traces.
 - Confirm the first hosted GitHub Actions run is green, then require the
   `Static checks` and `Workflow` jobs in branch protection and enable weekly
   Dependabot updates for pinned CI dependencies.
-- Publish the OCI image and record its immutable digest.
+- Publish a versioned release image and record its immutable digest after the
+  release gates pass; development images are published by CI.
 - Decide whether supported runs start from a tagged GitHub revision, a local
   bundle, or both.
 - Tag the repository only after parity, CI, and runtime gates pass.

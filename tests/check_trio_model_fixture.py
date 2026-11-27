@@ -1,5 +1,5 @@
 """Check scientific labels, unresolved spans, and indexes after the chr22 smoke run."""
-import sys
+import argparse
 from pathlib import Path
 import polars as pl
 import pyBigWig
@@ -8,7 +8,7 @@ import pysam
 from get_meth_hap1_hap2 import read_meth_level
 
 
-def check(results):
+def check(results, docker_runtime=False):
     output = results / 'per_chrom_methylation/chr22'
     bed = output / 'trio.dna-methylation.all_cpgs.sorted.bed.gz'
     frame = pl.read_csv(bed, separator='\t', comment_prefix='##', infer_schema_length=None)
@@ -27,8 +27,9 @@ def check(results):
         for label in labels:
             assert unresolved[f'methylation_level_{label}_model'].null_count() == unresolved.height
         assert frame.filter(pl.col(f'{side}_haplotype').is_not_null()).height > 0
-    for start, end, sides in [(20502762, 20510653, ('paternal', 'maternal')),
-                              (20959351, 20961970, ('paternal',))]:
+    early_span = ((20502762, 20503731, ('maternal',)) if docker_runtime else
+                  (20502762, 20510653, ('paternal', 'maternal')))
+    for start, end, sides in [early_span, (20959351, 20961970, ('paternal',))]:
         span = frame.filter(pl.col('start_cpg').is_between(start, end - 1))
         assert span.height > 0
         for side in sides:
@@ -63,4 +64,9 @@ def check(results):
 
 
 if __name__ == '__main__':
-    check(Path(sys.argv[1]))
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument('results', type=Path)
+    parser.add_argument('--docker-runtime', action='store_true',
+                        help='Check the pinned Linux/Python 3.11 fixture baseline')
+    args = parser.parse_args()
+    check(args.results, args.docker_runtime)
