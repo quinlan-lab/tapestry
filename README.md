@@ -390,8 +390,8 @@ inheritance of methylation state.
 
 ## Further reading
 
-- [Legacy shell workflows](docs/legacy_shell_workflows.md): manual tool setup,
-  count/model shell pipelines, figures, dev-data creation, and remote IGV access.
+- [Supporting documentation](docs/README.md): legacy shell workflows, the
+  pedigree diagram, WhatsHap evidence, and human review records.
 - [Wiki](wiki/): scientific walkthroughs.
 - [Analysis index](analysis/README.md): reproducible experiments and figures.
 - [Roadmap](ROADMAP.md) and [completed work](completed.md): release gates,
