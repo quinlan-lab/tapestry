@@ -16,19 +16,13 @@ Tapestry starts after a completed miniwdl run of the PacBio HiFi human WGS WDL
 
 ```bash
 # Validate, then run inheritance, founder phasing, and all-CpG expansion.
-nextflow run . -profile docker \
+nextflow run . -entry pedigree -profile docker \
   --outputs-json /path/to/outputs.json \
   --ped /path/to/family.ped \
   --reference-fasta /path/to/GRCh38.fa \
   --outdir /path/to/results \
   -resume
 
-# Optional validation-only preflight.
-nextflow run . -entry validate -profile docker \
-  --outputs-json /path/to/outputs.json \
-  --ped /path/to/family.ped \
-  --reference-fasta /path/to/GRCh38.fa \
-  --outdir /path/to/results
 ```
 
 The workflow supports GRCh38 whole autosomes, pedigree mode, model methylation,

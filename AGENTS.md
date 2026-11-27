@@ -21,6 +21,10 @@ legacy site-specific shell paths remain available but are not the generic API.
 Scientific choices are Nextflow parameters and are recorded in the normalized
 run. Fixed pedigree/GRCh38/`gtg`/model constraints are inserted internally.
 
+`main.nf` runs the trio workflow by default. Use `-entry pedigree` for the
+WDL-output pedigree workflow, which validates inputs before processing.
+Both modes share one container image; `--container` selects a version or SIF.
+
 ### Generic pedigree/model-only path
 
 `main.nf` validates the contract, normalizes the family VCF, runs pinned
@@ -180,9 +184,9 @@ paths; its data-creation scripts still depend on site-local source data.
   labels, or workflow commands change.
   Update wiki/manuscript only when
   the corresponding scientific explanation or figure source changes.
-- Keep the full workflow as the primary command: it always validates first.
-  Present `-entry validate` only as an optional preflight. Preserve the compact
-  validation and completion summaries when changing process outputs.
+- Keep the full workflow for each mode as the primary command. The pedigree
+  workflow always validates first. Preserve the compact validation and completion
+  summaries when changing process outputs.
 
 ## Verification
 

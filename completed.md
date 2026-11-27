@@ -251,3 +251,25 @@ Implemented 2026-11-27.
 
 Versioned release publication and cluster/Apptainer verification remain release
 gates. The development images do not establish whole-genome scientific parity.
+
+## Single image and trio-first workflow selection
+
+Implemented 2026-11-27. Supersedes the separate image choices above.
+
+- The default Nextflow entry point runs trio-wise analysis. The WDL-output
+  pedigree path is selected with `-entry pedigree` and always validates inputs
+  first. The standalone validation entry point has been removed to simplify
+  workflow selection.
+- Both modes use one shared runtime with `--container` as the sole image
+  override. Removed the trio-specific override and the separate pedigree/trio
+  final Docker targets. CI builds and publishes only the shared runtime, with
+  development and source-commit tags for version selection.
+- README now presents the default trio workflow first. Current workflow
+  examples, analysis reproduction commands, repository guidance, and CI tests
+  use the new entry points. Older task caches may be invalidated by the changed
+  workflow-qualified task names.
+- Verified the single-image build, all 62 containerized regression tests,
+  Pyright, changed shell syntax, the default trio smoke test with both crossover
+  distance boundaries, and the named pedigree workflow with complete resume
+  caching. Slurm/Apptainer configuration resolves to the shared image; actual
+  cluster runtime verification remains a release gate.
