@@ -1,12 +1,9 @@
-import java.nio.file.Files
-
-
 def requiredFile(value, option) {
     if (!value) {
         error "Missing required trio argument: --${option} <path>"
     }
     def path = file(value, glob: false, checkIfExists: true)
-    if (!Files.isRegularFile(path)) {
+    if (!java.nio.file.Files.isRegularFile(path)) {
         error "--${option} must be a file: ${path}"
     }
     return path
@@ -14,11 +11,10 @@ def requiredFile(value, option) {
 
 
 def findIndex(data, candidates) {
-    for (def name : candidates) {
-        def index = data.resolveSibling(name)
-        if (Files.isRegularFile(index)) {
-            return index
-        }
+    def index = candidates.collect { name -> data.resolveSibling(name) }
+        .find { path -> java.nio.file.Files.isRegularFile(path) }
+    if (index != null) {
+        return index
     }
     error "Missing index for ${data}. Expected one of: ${candidates.join(', ')}"
 }
@@ -288,7 +284,7 @@ workflow TRIO {
     if (!(distance_bp ==~ /[0-9]+/)) {
         error '--crossover-distance-bp must be a non-negative integer'
     }
-    for (setting in [inputs.minCoverage, inputs.minMapq]) {
+    [inputs.minCoverage, inputs.minMapq].each { setting ->
         if (!(setting.toString() ==~ /[0-9]+/)) {
             error '--min-coverage and --trio-min-mapq must be non-negative integers'
         }

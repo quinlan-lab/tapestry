@@ -1,8 +1,5 @@
-import java.nio.file.Paths
-
-
 def resolvedPath(baseDir, value) {
-    def path = Paths.get(value.toString())
+    def path = java.nio.file.Paths.get(value.toString())
     return (path.isAbsolute() ? path : baseDir.resolve(path)).normalize().toAbsolutePath()
 }
 
@@ -43,15 +40,15 @@ def collectMiniwdlMounts(node, key, baseDir, roots) {
 
 def validationMountOptions(inputs, containerEngine) {
     def roots = new LinkedHashSet()
-    def outputsFile = Paths.get(inputs.outputsJson)
+    def outputsFile = java.nio.file.Paths.get(inputs.outputsJson)
     addMountRoot(roots, outputsFile)
-    addMountRoot(roots, Paths.get(inputs.ped))
-    addMountRoot(roots, Paths.get(inputs.referenceFasta))
+    addMountRoot(roots, java.nio.file.Paths.get(inputs.ped))
+    addMountRoot(roots, java.nio.file.Paths.get(inputs.referenceFasta))
     if (inputs.referenceIndex) {
-        addMountRoot(roots, Paths.get(inputs.referenceIndex))
+        addMountRoot(roots, java.nio.file.Paths.get(inputs.referenceIndex))
     }
     if (inputs.referenceGzi) {
-        addMountRoot(roots, Paths.get(inputs.referenceGzi))
+        addMountRoot(roots, java.nio.file.Paths.get(inputs.referenceGzi))
     }
     try {
         if (outputsFile.toFile().isFile()) {
@@ -107,9 +104,9 @@ def resolveRunSettings(options) {
     if (!options.outdir) {
         error "Missing required pipeline argument: --outdir <directory>"
     }
-    def configuredOutdir = Paths.get(options.outdir.toString())
+    def configuredOutdir = java.nio.file.Paths.get(options.outdir.toString())
     if (!configuredOutdir.isAbsolute()) {
-        configuredOutdir = Paths.get(launchDir.toString()).resolve(configuredOutdir)
+        configuredOutdir = java.nio.file.Paths.get(launchDir.toString()).resolve(configuredOutdir)
     }
     def referenceIndex = options.referenceIndex
         ? file(options.referenceIndex, checkIfExists: true).toAbsolutePath().toString()
