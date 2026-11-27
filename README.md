@@ -42,7 +42,7 @@ image, not a stable release. Cluster verification and release gates are tracked
 in [ROADMAP.md](ROADMAP.md).
 
 <details>
-<summary>Build locally or use installed tools</summary>
+<summary><h3>Build locally or use installed tools</h3></summary>
 
 ```bash
 docker build --platform linux/amd64 -t tapestry:dev .
@@ -107,7 +107,7 @@ Nextflow outputs omit count-methylation columns. Final BED intervals span the
 CG dinucleotide; BigWigs span the cytosine base and use a 0–1 scale.
 
 <details>
-<summary>Trio output column definitions</summary>
+<summary><h3>Trio output column definitions</h3></summary>
 
 BED coordinates are zero-based, half-open. Read each file's header for its
 emitted columns and metadata. This reference also includes legacy shell
@@ -172,7 +172,7 @@ cpg_is_allele_specific_mom | does the CpG dinucleotide appear in the reads of on
 </details>
 
 <details>
-<summary>Trio phasing, crossover rules, and output details</summary>
+<summary><h3>Trio phasing, crossover rules, and output details</h3></summary>
 
 For each chromosome, `PHASE_TRIO_CHROMOSOME` subsets the joint VCF, applies the
 provisional filter (PASS or `.`, QUAL ≥20, called genotypes with GQ ≥20 and
@@ -235,7 +235,7 @@ span the CG dinucleotide; BigWigs span the cytosine base and use a 0–1 scale.
 </details>
 
 <details>
-<summary>Run the checked-in chr22 example</summary>
+<summary><h3>Run the checked-in chr22 example</h3></summary>
 
 The fixture covers GRCh38 chr22:20,500,000–21,500,000. Download its reference
 once, then run the default trio workflow:
@@ -320,7 +320,7 @@ chromosome-wise to bound memory. BigWigs collapse repeated intervals only when
 their non-null values agree; conflicts fail.
 
 <details>
-<summary>Pedigree output column definitions</summary>
+<summary><h3>Pedigree output column definitions</h3></summary>
 
 BED coordinates are zero-based, half-open. Read each file's header for its
 emitted columns and metadata. This reference also covers legacy shell outputs.
@@ -362,7 +362,7 @@ cpg_is_allele_specific | does the CpG dinucleotide appear in the reads correspon
 </details>
 
 <details>
-<summary>Explore ancestry and transmission QC</summary>
+<summary><h3>Explore ancestry and transmission QC</h3></summary>
 
 Open `<outdir>/visualizations/haplotype-ancestry/index.html` locally. Select a
 sample and click an inheritance block to trace its founder haplotype through the
