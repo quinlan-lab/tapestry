@@ -9,7 +9,7 @@ def addMountRoot(roots, path) {
     try {
         roots.add(path.toRealPath().parent)
     }
-    catch (Exception ignored) {
+    catch (Exception _ignored) {
         // Python validation reports missing paths with precise field context.
     }
 }
@@ -56,7 +56,7 @@ def validationMountOptions(inputs, containerEngine) {
             collectMiniwdlMounts(outputs, '', outputsFile.parent, roots)
         }
     }
-    catch (Exception ignored) {
+    catch (Exception _ignored) {
         // Python validation reports malformed miniwdl JSON precisely.
     }
     if (containerEngine == 'docker') {
@@ -115,7 +115,7 @@ def resolveRunSettings(options) {
         ? file(options.referenceGzi, checkIfExists: true).toAbsolutePath().toString()
         : null
     def samples = options.samples
-        ? options.samples.toString().split(',').collect { it.trim() }.findAll { it }
+        ? options.samples.toString().split(',').collect { sample -> sample.trim() }.findAll { sample -> sample }
         : []
     if (samples.size() != samples.toSet().size()) {
         error "--samples contains duplicate sample IDs"
@@ -637,12 +637,12 @@ workflow RUN_VALIDATION {
 
     main:
     VALIDATE_INPUTS(
-        Channel.value(settings.inputs),
-        Channel.value(settings.publishRoot),
-        Channel.value(file("${projectDir}/src/tapestry_validate.py", checkIfExists: true)),
-        Channel.value(settings.mountOptions)
+        channel.value(settings.inputs),
+        channel.value(settings.publishRoot),
+        channel.value(file("${projectDir}/src/tapestry_validate.py", checkIfExists: true)),
+        channel.value(settings.mountOptions)
     )
-    VALIDATE_INPUTS.out.validation_summary.view { it.trim() }
+    VALIDATE_INPUTS.out.validation_summary.view { summary -> summary.trim() }
 
     emit:
     resolved_run = VALIDATE_INPUTS.out.resolved_run
@@ -711,23 +711,23 @@ workflow PEDIGREE {
     FILTER_MODEL_BEDS(
         model_artifacts,
         validation_gate,
-        Channel.value(settings.publishRoot),
-        Channel.value(file("${projectDir}/src/filter_model_beds.py", checkIfExists: true))
+        channel.value(settings.publishRoot),
+        channel.value(file("${projectDir}/src/filter_model_beds.py", checkIfExists: true))
     )
     CAPTURE_RUNTIME_VERSIONS(
         RUN_VALIDATION.out.resolved_manifest,
         validation_gate,
-        Channel.value(settings.publishRoot),
-        Channel.value(file("${projectDir}/src/capture_versions.py", checkIfExists: true))
+        channel.value(settings.publishRoot),
+        channel.value(file("${projectDir}/src/capture_versions.py", checkIfExists: true))
     )
     NORMALIZE_JOINT_VCF(
         RUN_VALIDATION.out.resolved_run,
         RUN_VALIDATION.out.resolved_manifest,
         RUN_VALIDATION.out.normalized_ped,
         validation_gate,
-        Channel.value(settings.publishRoot),
-        Channel.value(file("${projectDir}/src/normalize_joint_vcf.py", checkIfExists: true)),
-        Channel.value(settings.mountOptions)
+        channel.value(settings.publishRoot),
+        channel.value(file("${projectDir}/src/normalize_joint_vcf.py", checkIfExists: true)),
+        channel.value(settings.mountOptions)
     )
     RUN_GTG_INHERITANCE(
         RUN_VALIDATION.out.resolved_run,
@@ -738,14 +738,14 @@ workflow PEDIGREE {
         NORMALIZE_JOINT_VCF.out.map_index,
         NORMALIZE_JOINT_VCF.out.normalization_report,
         validation_gate,
-        Channel.value(settings.publishRoot),
-        Channel.value(file("${projectDir}/src/run_gtg_inheritance.py", checkIfExists: true))
+        channel.value(settings.publishRoot),
+        channel.value(file("${projectDir}/src/run_gtg_inheritance.py", checkIfExists: true))
     )
     GENERATE_REFERENCE_CPGS(
         reference_artifact,
         validation_gate,
-        Channel.value(settings.publishRoot),
-        Channel.value(file("${projectDir}/src/generate_reference_cpgs.py", checkIfExists: true))
+        channel.value(settings.publishRoot),
+        channel.value(file("${projectDir}/src/generate_reference_cpgs.py", checkIfExists: true))
     )
 
     filter_phase_inputs = FILTER_MODEL_BEDS.out.filtered_models.join(
@@ -765,8 +765,8 @@ workflow PEDIGREE {
     PHASE_MODEL_TO_FOUNDERS(
         founder_inputs,
         validation_gate,
-        Channel.value(settings.publishRoot),
-        Channel.value(file("${projectDir}/src", checkIfExists: true))
+        channel.value(settings.publishRoot),
+        channel.value(file("${projectDir}/src", checkIfExists: true))
     )
 
     all_cpg_metadata = filter_phase_inputs.map { row ->
@@ -789,31 +789,31 @@ workflow PEDIGREE {
     EXPAND_MODEL_TO_ALL_CPGS(
         all_cpg_inputs,
         validation_gate,
-        Channel.value(settings.publishRoot),
-        Channel.value(file("${projectDir}/src/expand_model_to_all_cpgs.py", checkIfExists: true))
+        channel.value(settings.publishRoot),
+        channel.value(file("${projectDir}/src/expand_model_to_all_cpgs.py", checkIfExists: true))
     )
 
     methylation_summary_inputs = EXPAND_MODEL_TO_ALL_CPGS.out.all_cpg_results
-        .map { sample_id, bed, index, qc -> tuple(sample_id, bed) }
+        .map { sample_id, bed, _index, _qc -> tuple(sample_id, bed) }
         .combine(RUN_GTG_INHERITANCE.out.iht)
     SUMMARIZE_HAPLOTYPE_METHYLATION(
         methylation_summary_inputs,
         validation_gate,
-        Channel.value(file("${projectDir}/src/summarize_haplotype_methylation.py", checkIfExists: true))
+        channel.value(file("${projectDir}/src/summarize_haplotype_methylation.py", checkIfExists: true))
     )
     methylation_summary_files = SUMMARIZE_HAPLOTYPE_METHYLATION.out.summaries
-        .map { sample_id, summary -> summary }
+        .map { _sample_id, summary -> summary }
         .collect()
     transmission_qc_beds = EXPAND_MODEL_TO_ALL_CPGS.out.all_cpg_results
-        .map { sample_id, bed, index, qc -> bed }
+        .map { _sample_id, bed, _index, _qc -> bed }
         .collect()
     SUMMARIZE_TRANSMISSION_METHYLATION(
         RUN_VALIDATION.out.normalized_ped,
         transmission_qc_beds,
-        Channel.value(settings.inputs.qcDiscordanceThreshold),
-        Channel.value(settings.inputs.qcMinPairedCpgs),
+        channel.value(settings.inputs.qcDiscordanceThreshold),
+        channel.value(settings.inputs.qcMinPairedCpgs),
         validation_gate,
-        Channel.value(file("${projectDir}/src/summarize_transmission_methylation.py", checkIfExists: true))
+        channel.value(file("${projectDir}/src/summarize_transmission_methylation.py", checkIfExists: true))
     )
     BUILD_HAPLOTYPE_ANCESTRY(
         RUN_VALIDATION.out.normalized_ped,
@@ -822,14 +822,14 @@ workflow PEDIGREE {
         methylation_summary_files,
         SUMMARIZE_TRANSMISSION_METHYLATION.out.summary,
         validation_gate,
-        Channel.value(settings.publishRoot),
-        Channel.value(file("${projectDir}/src/plot_haplotype_ancestry.py", checkIfExists: true)),
-        Channel.value(file("${projectDir}/src/plot_pedigree_haplotypes.py", checkIfExists: true)),
-        Channel.value(file("${projectDir}/src/plot_transmission_qc.py", checkIfExists: true))
+        channel.value(settings.publishRoot),
+        channel.value(file("${projectDir}/src/plot_haplotype_ancestry.py", checkIfExists: true)),
+        channel.value(file("${projectDir}/src/plot_pedigree_haplotypes.py", checkIfExists: true)),
+        channel.value(file("${projectDir}/src/plot_transmission_qc.py", checkIfExists: true))
     )
 
     completed_sample_qc = EXPAND_MODEL_TO_ALL_CPGS.out.all_cpg_results
-        .map { sample_id, bed, index, qc -> qc }
+        .map { _sample_id, _bed, _index, qc -> qc }
         .collect()
     WRITE_RESULTS_MANIFEST(
         RUN_VALIDATION.out.resolved_run,
@@ -840,8 +840,8 @@ workflow PEDIGREE {
         completed_sample_qc,
         BUILD_HAPLOTYPE_ANCESTRY.out.visualization,
         validation_gate,
-        Channel.value(settings.publishRoot),
-        Channel.value(file("${projectDir}/src/write_results_manifest.py", checkIfExists: true))
+        channel.value(settings.publishRoot),
+        channel.value(file("${projectDir}/src/write_results_manifest.py", checkIfExists: true))
     )
-    WRITE_RESULTS_MANIFEST.out.completion_summary.view { it.trim() }
+    WRITE_RESULTS_MANIFEST.out.completion_summary.view { summary -> summary.trim() }
 }

@@ -38,7 +38,7 @@ def shellQuote(value) {
 
 def annotationTarget(target) {
     // Include the G base when a CpG's C is the last target base.
-    return target.contains(':') ? target.replaceFirst(/-([0-9]+)$/, { all, end -> "-${end.toLong() + 1}" }) : target
+    return target.contains(':') ? target.replaceFirst(/-([0-9]+)$/, { _all, end -> "-${end.toLong() + 1}" }) : target
 }
 
 
@@ -66,7 +66,7 @@ process PHASE_TRIO_CHROMOSOME {
     script:
     def joint = shellQuote(joint_files[0])
     def reference = shellQuote(reference_files[0])
-    def bams = [child_files, father_files, mother_files].collect { shellQuote(it[0]) }.join(' ')
+    def bams = [child_files, father_files, mother_files].collect { files -> shellQuote(files[0]) }.join(' ')
     """
     set -euo pipefail
     source ./logging.sh
@@ -181,7 +181,7 @@ process CALL_TRIO_MODEL {
 
     script:
     def reference = shellQuote(reference_files[0])
-    def bam_paths = [child_files, father_files, mother_files].collect { shellQuote(it[0]) }.join(' ')
+    def bam_paths = [child_files, father_files, mother_files].collect { files -> shellQuote(files[0]) }.join(' ')
     """
     set -euo pipefail
     source ./logging.sh
@@ -251,8 +251,8 @@ def phasingTargets(chromosomeList, region) {
     if (!chromosomeList) {
         error 'Trio phasing requires --chromosomes <chr1,chr2,...>'
     }
-    def chromosomes = chromosomeList.toString().split(',', -1).collect { it.trim() }
-    if (!chromosomes.every { it ==~ /[A-Za-z0-9_][A-Za-z0-9_.-]*/ } ||
+    def chromosomes = chromosomeList.toString().split(',', -1).collect { chrom -> chrom.trim() }
+    if (!chromosomes.every { chrom -> chrom ==~ /[A-Za-z0-9_][A-Za-z0-9_.-]*/ } ||
             chromosomes.size() != chromosomes.toSet().size()) {
         error '--chromosomes must be a comma-separated list of unique chromosome names'
     }
@@ -264,9 +264,9 @@ def phasingTargets(chromosomeList, region) {
         }
         return [tuple(chromosomes.first(), region.toString())]
     }
-    def autosomes = chromosomes.findAll { it ==~ /chr[0-9]+/ }
+    def autosomes = chromosomes.findAll { chrom -> chrom ==~ /chr[0-9]+/ }
     def other_chromosomes = chromosomes - autosomes
-    return (autosomes.sort { it.substring(3).toBigInteger() } + other_chromosomes.sort())
+    return (autosomes.sort { chrom -> chrom.substring(3).toBigInteger() } + other_chromosomes.sort())
         .collect { chrom -> tuple(chrom, chrom) }
 }
 
@@ -302,24 +302,24 @@ workflow TRIO {
     def mother = indexedBam(inputs.motherBam, 'mother-bam')
     def prefilter = file("${projectDir}/src/prefilter_whatshap_vcf.py", checkIfExists: true)
     def screener = file("${projectDir}/src/report_whatshap_crossovers.py", checkIfExists: true)
-    def shell_helpers = ['logging.sh', 'trio_ped.sh'].collect {
-        file("${projectDir}/src/util/${it}", checkIfExists: true)
+    def shell_helpers = ['logging.sh', 'trio_ped.sh'].collect { name ->
+        file("${projectDir}/src/util/${name}", checkIfExists: true)
     }
     def publish_root = file(inputs.outdir, glob: false).toAbsolutePath()
 
     PHASE_TRIO_CHROMOSOME(
-        Channel.fromList(targets),
+        channel.fromList(targets),
         ped, joint_files, reference_files, child, father, mother,
         prefilter, shell_helpers, publish_root.toString()
     )
     SCREEN_TRIO_CROSSOVERS(
-        PHASE_TRIO_CHROMOSOME.out.phased.map { chrom, vcf, index, report -> tuple(chrom, report) },
+        PHASE_TRIO_CHROMOSOME.out.phased.map { chrom, _vcf, _index, report -> tuple(chrom, report) },
         screener, distance_bp, publish_root.toString()
     )
     matching_inputs = PHASE_TRIO_CHROMOSOME.out.phased
-        .map { chrom, vcf, index, report -> tuple(chrom, vcf, index) }
+        .map { chrom, vcf, index, _report -> tuple(chrom, vcf, index) }
         .join(
-            SCREEN_TRIO_CROSSOVERS.out.crossover_candidates.map { chrom, tsv, bed -> tuple(chrom, tsv) },
+            SCREEN_TRIO_CROSSOVERS.out.crossover_candidates.map { chrom, tsv, _bed -> tuple(chrom, tsv) },
             failOnDuplicate: true, failOnMismatch: true
         )
     MATCH_TRIO_BIT_VECTORS(
@@ -328,8 +328,8 @@ workflow TRIO {
     )
 
     CALL_TRIO_MODEL(
-        PHASE_TRIO_CHROMOSOME.out.phased.map { chrom, vcf, index, report -> tuple(chrom, vcf, index) }
-            .join(Channel.fromList(targets), failOnDuplicate: true, failOnMismatch: true),
+        PHASE_TRIO_CHROMOSOME.out.phased.map { chrom, vcf, index, _report -> tuple(chrom, vcf, index) }
+            .join(channel.fromList(targets), failOnDuplicate: true, failOnMismatch: true),
         ped, reference_files, child, father, mother, shell_helpers,
         inputs.minCoverage, inputs.minMapq, publish_root.toString()
     )
