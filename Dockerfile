@@ -81,7 +81,7 @@ RUN python -m pip install \
     && rm -rf /opt/tapestry/wheels
 
 
-FROM ${PYTHON_IMAGE} AS pedigree-runtime
+FROM ${PYTHON_IMAGE} AS base-runtime
 
 ARG GTG_COMMIT=e12aca6b49ee7208952467db4a2a9e2f79b98efb
 ARG BEDGRAPH_TO_BIGWIG_URL
@@ -183,7 +183,7 @@ RUN curl --fail --location --output /tmp/samtools.tar.bz2 "${SAMTOOLS_URL}" \
     && install -D samtools /opt/samtools/bin/samtools
 
 
-FROM pedigree-runtime AS trio
+FROM base-runtime AS runtime
 
 # Both the pb-CpG-tools release and the UCSC parity binary are Linux x86-64.
 ARG TARGETARCH
@@ -215,9 +215,3 @@ RUN curl --fail --location --output /tmp/pb-CpG-tools.tar.gz "${PB_CPG_TOOLS_URL
     && aligned_bam_to_cpg_scores --version \
     && python /opt/tapestry/src/phase_meth_to_parent_haps.py --help \
     && python /opt/tapestry/src/trio_model_methylation.py --help
-
-
-FROM pedigree-runtime AS pedigree
-
-
-FROM trio AS runtime

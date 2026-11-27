@@ -688,12 +688,7 @@ workflow RUN_VALIDATION {
 }
 
 
-workflow validate {
-    RUN_VALIDATION()
-}
-
-
-workflow trio {
+workflow {
     TRIO_PHASING([
         ped: params.ped,
         jointVcf: params.jointVcf,
@@ -708,17 +703,10 @@ workflow trio {
         minMapq: params.trioMinMapq,
         outdir: params.outdir
     ])
-
-    emit:
-    phased = TRIO_PHASING.out.phased
-    crossover_candidates = TRIO_PHASING.out.crossover_candidates
-    parental_maps = TRIO_PHASING.out.parental_maps
-    methylation = TRIO_PHASING.out.methylation
-    haplotagged = TRIO_PHASING.out.haplotagged
 }
 
 
-workflow {
+workflow pedigree {
     // Every scientific process takes validation.success as an explicit dependency.
     def settings = resolveRunSettings()
     RUN_VALIDATION()

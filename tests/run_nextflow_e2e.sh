@@ -35,7 +35,7 @@ docker run --rm \
     "/work/.test-work/${fixture_name}/fixture"
 
 common=(
-    run "${repo_root}"
+    run "${repo_root}" -entry pedigree
     -profile docker
     --container "${container_image}"
     --outputs-json "${fixture_root}/fixture/miniwdl-outputs.json"

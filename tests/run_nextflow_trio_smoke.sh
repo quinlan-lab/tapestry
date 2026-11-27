@@ -72,7 +72,7 @@ process {
 }
 CONFIG
 common=(
-    run "$repo_root" -entry trio -ansi-log false -c "$root/fixture.config"
+    run "$repo_root" -ansi-log false -c "$root/fixture.config"
     --ped "$fixture/trio.ped"
     --joint-vcf "$fixture/CEPH-1463.joint.GRCh38.deepvariant.glnexus.vcf.gz"
     --reference-fasta "$fixture/chr22.fa"
@@ -85,7 +85,7 @@ common=(
 if [[ -n "$container_image" ]]; then
     common+=(-profile docker)
     if [[ "$container_image" != ghcr.io/quinlan-lab/tapestry:dev ]]; then
-        common+=(--trio-container "$container_image")
+        common+=(--container "$container_image")
     fi
 fi
 "$nextflow_bin" "${common[@]}"

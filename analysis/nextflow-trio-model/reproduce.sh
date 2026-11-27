@@ -37,7 +37,7 @@ mkdir -p "$out"
 out="$(cd "$out" && pwd)"
 mkdir "$out/pipeline"
 cd "$out/pipeline"
-args=(run "$repo_root" -entry trio -ansi-log false
+args=(run "$repo_root" -ansi-log false
     --ped "$fixture/trio.ped"
     --joint-vcf "$fixture/CEPH-1463.joint.GRCh38.deepvariant.glnexus.vcf.gz"
     --reference-fasta "$fixture/chr22.fa"
